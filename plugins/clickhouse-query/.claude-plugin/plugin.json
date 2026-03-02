@@ -1,0 +1,5 @@
+{
+  "name": "clickhouse-query",
+  "description": "Adds a skill for writing optimized query for SigNoz clickhouse to get opentelementry data (traces for now)",
+  "version": "1.0.0"
+}

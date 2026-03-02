@@ -1,0 +1,13 @@
+{
+  "name": "signoz",
+  "owner": {
+    "name": "SigNoz"
+  },
+  "plugins": [
+    {
+      "name": "clickhouse-query",
+      "source": "./plugins/clickhouse-query",
+      "description": "Adds a skill for writing optimized query for SigNoz clickhouse to get opentelementry data (traces for now)"
+    }
+  ]
+}
