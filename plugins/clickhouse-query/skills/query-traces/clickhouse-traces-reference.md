@@ -157,7 +157,7 @@ WHERE resource_fingerprint GLOBAL IN __resource_filter
 **Always** include `ts_bucket_start` filter alongside `timestamp` filter. Data is bucketed in 30-minute (1800-second) intervals.
 
 ```sql
-WHERE timestamp BETWEEN {{.start_datetime}} AND {{.end_datetime}}
+WHERE timestamp BETWEEN $start_datetime AND $end_datetime
   AND ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp
 ```
 
@@ -180,16 +180,11 @@ The naming convention: replace `.` with `$$` in the attribute name and prefix wi
 ### 4. Use Pre-extracted Columns
 
 These top-level columns are faster than map access and are derived from multiple similar attributes, 
-always prefer these if any of similar attributes are required:
+**always** prefer these if any of similar attributes are required:
 - `http_method`, `http_url`, `http_host`
 - `db_name`, `db_operation`
 - `has_error`, `duration_nano`, `name`, `kind`
 - `response_status_code`
-
-### 5. Other mandator rules
-
-- Always use `GLOBAL IN` to avoid missing data during query
-- Always use `distributed_` version of table names to query across nodes
 
 ---
 
@@ -232,7 +227,7 @@ SELECT
 FROM signoz_traces.distributed_signoz_index_v3
 WHERE
     resource_fingerprint GLOBAL IN __resource_filter AND
-    timestamp BETWEEN {{.start_datetime}} AND {{.end_datetime}} AND
+    timestamp BETWEEN $start_datetime AND $end_datetime AND
     ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp
 GROUP BY ts
 ORDER BY ts ASC;
@@ -240,7 +235,7 @@ ORDER BY ts ASC;
 
 ### Value Panel
 
-Returns a single aggregated number. Wrap the timeseries query and reduce with `avg()`, `sum()`, `min()`, `max()`, or `any()`.
+Returns a single aggregated number using `avg()`, `sum()`, `min()`, `max()`, or `any()`.
 
 ```sql
 WITH __resource_filter AS (
@@ -249,26 +244,17 @@ WITH __resource_filter AS (
     WHERE (simpleJSONExtractString(labels, 'service.name') = '{{service}}')
     AND seen_at_ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp
 )
+
 SELECT
-    avg(value) as value,
-    any(ts) as ts
-FROM (
-    SELECT
-        toStartOfInterval(timestamp, INTERVAL 1 MINUTE) AS ts,
-        toFloat64(count()) AS value
-    FROM signoz_traces.distributed_signoz_index_v3
-    WHERE
-        resource_fingerprint GLOBAL IN __resource_filter AND
-        timestamp BETWEEN {{.start_datetime}} AND {{.end_datetime}} AND
-        ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp
-    GROUP BY ts
-    ORDER BY ts ASC
-)
+    toFloat64(count()) AS value
+FROM signoz_traces.distributed_signoz_index_v3
+WHERE
+    resource_fingerprint GLOBAL IN __resource_filter AND
+    timestamp BETWEEN $start_datetime AND $end_datetime AND
+    ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp;
 ```
 
 ### Table Panel
-
-Rows grouped by dimensions. Use `now() as ts` instead of a time interval column.
 
 ```sql
 WITH __resource_filter AS (
@@ -277,16 +263,15 @@ WITH __resource_filter AS (
     WHERE seen_at_ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp
 )
 SELECT
-    now() as ts,
     resource.service.name::String as `service.name`,
     toFloat64(count()) AS value
 FROM signoz_traces.distributed_signoz_index_v3
 WHERE
     resource_fingerprint GLOBAL IN __resource_filter AND
-    timestamp BETWEEN {{.start_datetime}} AND {{.end_datetime}} AND
+    timestamp BETWEEN $start_datetime AND $end_datetime AND
     ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp AND
     `service.name` IS NOT NULL
-GROUP BY `service.name`, ts
+GROUP BY `service.name`
 ORDER BY value DESC;
 ```
 
@@ -311,7 +296,7 @@ SELECT
 FROM signoz_traces.distributed_signoz_index_v3
 WHERE
     resource_fingerprint GLOBAL IN __resource_filter AND
-    timestamp BETWEEN {{.start_datetime}} AND {{.end_datetime}} AND
+    timestamp BETWEEN $start_datetime AND $end_datetime AND
     has_error = true AND
     `service.name` IS NOT NULL AND
     ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp
@@ -319,9 +304,7 @@ GROUP BY `service.name`, ts
 ORDER BY ts ASC;
 ```
 
-### Value — Average duration of GET requests
-
-Shows the value-panel wrapping pattern (`avg(value)` / `any(ts)`) with a service resource filter.
+### Value — Average duration of GET requests for a service
 
 ```sql
 WITH __resource_filter AS (
@@ -331,25 +314,16 @@ WITH __resource_filter AS (
     AND seen_at_ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp
 )
 SELECT
-    avg(value) as value,
-    any(ts) as ts FROM (
-        SELECT
-            toStartOfInterval(timestamp, INTERVAL 1 MINUTE) AS ts,
-            toFloat64(avg(duration_nano)) AS value
-        FROM signoz_traces.distributed_signoz_index_v3
-        WHERE
-            resource_fingerprint GLOBAL IN __resource_filter AND
-            timestamp BETWEEN {{.start_datetime}} AND {{.end_datetime}} AND
-            ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp AND
-            http_method = 'GET'
-        GROUP BY ts
-        ORDER BY ts ASC
-    )
+    toFloat64(avg(duration_nano)) AS value
+FROM signoz_traces.distributed_signoz_index_v3
+WHERE
+    resource_fingerprint GLOBAL IN __resource_filter AND
+    timestamp BETWEEN $start_datetime AND $end_datetime AND
+    ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp AND
+    http_method = 'GET'
 ```
 
 ### Table — Average duration by HTTP method
-
-Shows `now() as ts` pattern, pre-extracted column usage, and non-null filtering.
 
 ```sql
 WITH __resource_filter AS (
@@ -359,16 +333,15 @@ WITH __resource_filter AS (
     AND seen_at_ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp
 )
 SELECT
-    now() as ts,
     http_method,
     toFloat64(avg(duration_nano)) AS avg_duration_nano
 FROM signoz_traces.distributed_signoz_index_v3
 WHERE
     resource_fingerprint GLOBAL IN __resource_filter AND
-    timestamp BETWEEN {{.start_datetime}} AND {{.end_datetime}} AND
+    timestamp BETWEEN $start_datetime AND $end_datetime AND
     ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp AND
     http_method IS NOT NULL AND http_method != ''
-GROUP BY http_method, ts
+GROUP BY http_method
 ORDER BY avg_duration_nano DESC;
 ```
 
@@ -379,13 +352,14 @@ Shows `arrayFilter`/`arrayMap` pattern for querying the `events` JSON array.
 ```sql
 WITH arrayFilter(x -> JSONExtractString(x, 'name')='Getting customer', events) AS filteredEvents
 SELECT toStartOfInterval(timestamp, INTERVAL 1 MINUTE) AS interval,
-toFloat64(count()) AS count,
-arrayJoin(arrayMap(x -> JSONExtractString(JSONExtractString(x, 'attributeMap'), 'customer_id'), filteredEvents)) AS resultArray
+    toFloat64(count()) AS count,
+    arrayJoin(arrayMap(x -> JSONExtractString(JSONExtractString(x, 'attributeMap'), 'customer_id'), filteredEvents)) AS resultArray
 FROM signoz_traces.distributed_signoz_index_v3
 WHERE not empty(filteredEvents)
-AND timestamp > toUnixTimestamp(now() - INTERVAL 30 MINUTE)
-AND ts_bucket_start >= toUInt64(toUnixTimestamp(now() - toIntervalMinute(30))) - 1800
-GROUP BY (resultArray, interval) order by (resultArray, interval) ASC;
+    AND timestamp > toUnixTimestamp(now() - INTERVAL 30 MINUTE)
+    AND ts_bucket_start >= toUInt64(toUnixTimestamp(now() - toIntervalMinute(30))) - 1800
+GROUP BY resultArray 
+ORDER BY resultArray ASC;
 ```
 
 ### Advanced — Average latency between two specific spans
@@ -410,8 +384,8 @@ FROM
             minIf(timestamp, if(resource_string_service$$name='driver', if(name = '/driver.DriverService/FindNearest', if((resources_string['component']) = 'gRPC', true, false), false), false)) AS startTime1,
             minIf(timestamp, if(resource_string_service$$name='route', if(name = 'HTTP GET /route', true, false), false)) AS startTime2
         FROM signoz_traces.distributed_signoz_index_v3
-        WHERE (timestamp BETWEEN {{.start_datetime}} AND {{.end_datetime}})
-            AND (ts_bucket_start BETWEEN {{.start_timestamp}} - 1800 AND {{.end_timestamp}})
+        WHERE (timestamp BETWEEN $start_datetime AND $end_datetime)
+            AND (ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp)
             AND (resource_string_service$$name IN ('driver', 'route'))
         GROUP BY (interval, traceID)
         ORDER BY (interval, traceID) ASC
@@ -430,8 +404,8 @@ These template variables are automatically replaced by SigNoz when the query run
 
 | Variable | Description |
 |---|---|
-| `{{.start_datetime}}` | Start of selected time range (DateTime64) |
-| `{{.end_datetime}}` | End of selected time range (DateTime64) |
+| `$start_datetime` | Start of selected time range (DateTime64) |
+| `$end_datetime` | End of selected time range (DateTime64) |
 | `$start_timestamp` | Start as Unix timestamp (seconds) |
 | `$end_timestamp` | End as Unix timestamp (seconds) |
 
@@ -448,3 +422,4 @@ Before finalizing any query, verify:
 - [ ] **Pre-extracted columns** are used where available (`has_error`, `duration_nano`, `http_method`, `db_name`, `http_host`, etc.)
 - [ ] **`seen_at_ts_bucket_start`** filter is included in the resource CTE
 - [ ] For timeseries: results are ordered by time column ASC
+- [ ] **Table Name**: For distributed tables, always use table name with `distributed_` prefix to avoid running query in a local table of clickhouse node.
