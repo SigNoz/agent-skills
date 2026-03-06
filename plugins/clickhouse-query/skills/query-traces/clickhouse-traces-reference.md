@@ -134,7 +134,7 @@ Used in the resource filter CTE pattern for efficient filtering by resource attr
 
 ### 1. Resource Filter CTE
 
-**Always** use a CTE to pre-filter resource fingerprints when filtering by resource attributes (service.name, environment, etc.). This is the single most impactful optimization.
+**Always** use a CTE to pre-filter resource fingerprints when filtering by resource attributes (service.name, environment, etc.). This is the single most impactful optimization but do not add this if there is no resource attribute filter required.
 
 ```sql
 WITH __resource_filter AS (
@@ -151,6 +151,7 @@ WHERE resource_fingerprint GLOBAL IN __resource_filter
 
 - Multiple resource filters: chain with AND in the CTE WHERE clause.
 - Use `simpleJSONExtractString(labels, '<key>')` to extract resource attribute values.
+- Examples of resources attributes are service.name, host.name, cloud.provider, k8s.deployment.name, k8s.*, os.* etc
 
 ### 2. Timestamp Bucketing
 
@@ -241,7 +242,7 @@ Returns a single aggregated number using `avg()`, `sum()`, `min()`, `max()`, or 
 WITH __resource_filter AS (
     SELECT fingerprint
     FROM signoz_traces.distributed_traces_v3_resource
-    WHERE (simpleJSONExtractString(labels, 'service.name') = '{{service}}')
+    WHERE (simpleJSONExtractString(labels, 'service.name') = 'service-name')
     AND seen_at_ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp
 )
 
@@ -257,17 +258,11 @@ WHERE
 ### Table Panel
 
 ```sql
-WITH __resource_filter AS (
-    SELECT fingerprint
-    FROM signoz_traces.distributed_traces_v3_resource
-    WHERE seen_at_ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp
-)
 SELECT
     resource.service.name::String as `service.name`,
     toFloat64(count()) AS value
 FROM signoz_traces.distributed_signoz_index_v3
 WHERE
-    resource_fingerprint GLOBAL IN __resource_filter AND
     timestamp BETWEEN $start_datetime AND $end_datetime AND
     ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp AND
     `service.name` IS NOT NULL
@@ -284,18 +279,12 @@ ORDER BY value DESC;
 Shows `has_error` filtering, resource attribute in SELECT, and multi-series grouping.
 
 ```sql
-WITH __resource_filter AS (
-    SELECT fingerprint
-    FROM signoz_traces.distributed_traces_v3_resource
-    WHERE seen_at_ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp
-)
 SELECT
     toStartOfInterval(timestamp, INTERVAL 1 MINUTE) AS ts,
     resource.service.name::String as `service.name`,
     toFloat64(count()) AS value
 FROM signoz_traces.distributed_signoz_index_v3
 WHERE
-    resource_fingerprint GLOBAL IN __resource_filter AND
     timestamp BETWEEN $start_datetime AND $end_datetime AND
     has_error = true AND
     `service.name` IS NOT NULL AND
@@ -416,6 +405,7 @@ These template variables are automatically replaced by SigNoz when the query run
 Before finalizing any query, verify:
 
 - [ ] **Resource filter CTE** is present when filtering by resource attributes (service.name, deployment.environment, etc.)
+- [ ] Do not add the resource filter CTE if filtering is not required on resource attributes
 - [ ] **`ts_bucket_start`** filter is included alongside `timestamp` filter, with `- 1800` on start
 - [ ] **`GLOBAL IN`** is used (not just `IN`) for the resource fingerprint subquery
 - [ ] **Indexed columns** are used over map access where available (e.g., `attribute_string_http$$route']` over `attributes_string['http.route']`)
