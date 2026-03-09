@@ -411,4 +411,4 @@ Before finalizing any query, verify:
 - [ ] **`seen_at_ts_bucket_start`** filter is included in the resource CTE
 - [ ] For timeseries: results are ordered by time column ASC
 - [ ] **Table Name**: For distributed tables, always use table name with `distributed_` prefix to avoid running query in a local table of clickhouse node.
-- [ ] If multiple tables are joined, ensure all tables have timestamp and bucket filter appliced if applicable.
+- [ ] If multiple tables are joined, ensure all tables have timestamp and bucket filter applied if applicable.
