@@ -224,11 +224,13 @@ SELECT
     toFloat64(count()) AS value
 FROM signoz_logs.distributed_logs_v2
 WHERE
-    resource_fingerprint GLOBAL IN __resource_filter AND
     timestamp >= $start_timestamp_nano AND timestamp <= $end_timestamp_nano AND
     ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp
-GROUP BY `service.name`;
+GROUP BY `service.name`
+ORDER BY value DESC;
 ```
+
+> Note: only add the resource CTE and `resource_fingerprint GLOBAL IN __resource_filter` when you need to filter on resource attributes. A plain table breakdown by service name does not require it.
 
 ---
 
@@ -281,7 +283,6 @@ ORDER BY ts ASC;
 
 ```sql
 SELECT
-    now() AS ts,
     resource.service.name::String AS `service.name`,
     toFloat64(count()) AS value
 FROM signoz_logs.distributed_logs_v2
@@ -289,8 +290,8 @@ WHERE
     timestamp >= $start_timestamp_nano AND timestamp <= $end_timestamp_nano AND
     severity_text = 'INFO' AND
     ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp
-GROUP BY `service.name`, ts
-ORDER BY ts ASC;
+GROUP BY `service.name`
+ORDER BY value DESC;
 ```
 
 ### Timeseries — Log lines per Kubernetes cluster
@@ -311,7 +312,7 @@ FROM signoz_logs.distributed_logs_v2
 WHERE
     resource_fingerprint GLOBAL IN __resource_filter AND
     timestamp >= $start_timestamp_nano AND timestamp <= $end_timestamp_nano AND
-    k8s_cluster_name IS NOT NULL AND
+    resource.k8s.cluster.name::String IS NOT NULL AND
     ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp
 GROUP BY k8s_cluster_name, ts
 ORDER BY ts ASC;
@@ -355,4 +356,4 @@ Before finalizing any query, verify:
 - [ ] **`seen_at_ts_bucket_start`** filter is included in the resource CTE
 - [ ] For timeseries: results are ordered by `ts ASC`
 - [ ] **Table Name**: Always use the `distributed_` prefix (`distributed_logs_v2`, not `logs_v2`)
-- [ ] If multiple tables are joined, ensure all tables have timestamp and bucket filter appliced if applicable.
+- [ ] If multiple tables are joined, ensure all tables have timestamp and bucket filter applied if applicable.
