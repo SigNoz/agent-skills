@@ -1,4 +1,5 @@
 ---
+name: signoz-query-logs
 description: Write optimised ClickHouse queries for SigNoz logs or building dashboard panels based on logs. Use this skill whenever the user asks to query SigNoz logs, build a log-based dashboard panel, analyse log volume or error rates, filter logs by service or severity, or explore log attributes — even if they don't mention ClickHouse. If the request could be logs or traces, prefer this skill when the user mentions log lines, severity, body text, or structured log fields. For trace-based queries (spans, latency, duration), use the traces skill instead.
 ---
 

@@ -9,6 +9,7 @@ SigNoz skills to teach agents on writing optimised clickhouse queries for making
 ## Installation
 
 For querying traces data - `npx skills add https://github.com/SigNoz/agent-skills --skill signoz-query-traces`
+
 For querying logs data - `npx skills add https://github.com/SigNoz/agent-skills --skill signoz-query-logs`
 
 
