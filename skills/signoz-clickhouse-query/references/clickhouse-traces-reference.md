@@ -92,40 +92,6 @@ Used in the resource filter CTE pattern for efficient filtering by resource attr
 )
 ```
 
-### distributed_top_level_operations
-
-```sql
-(
-    `name` LowCardinality(String) CODEC(ZSTD(1)),
-    `serviceName` LowCardinality(String) CODEC(ZSTD(1))
-)
-```
-
-### distributed_span_attributes_keys
-
-```sql
-(
-    `tagKey` LowCardinality(String) CODEC(ZSTD(1)),
-    `tagType` Enum8('tag' = 1, 'resource' = 2) CODEC(ZSTD(1)),
-    `dataType` Enum8('string' = 1, 'bool' = 2, 'float64' = 3) CODEC(ZSTD(1)),
-    `isColumn` Bool CODEC(ZSTD(1))
-)
-```
-
-### distributed_span_attributes
-
-```sql
-(
-    `timestamp` DateTime CODEC(DoubleDelta, ZSTD(1)),
-    `tagKey` LowCardinality(String) CODEC(ZSTD(1)),
-    `tagType` Enum8('tag' = 1, 'resource' = 2) CODEC(ZSTD(1)),
-    `dataType` Enum8('string' = 1, 'bool' = 2, 'float64' = 3) CODEC(ZSTD(1)),
-    `stringTagValue` String CODEC(ZSTD(1)),
-    `float64TagValue` Nullable(Float64) CODEC(ZSTD(1)),
-    `isColumn` Bool CODEC(ZSTD(1))
-)
-```
-
 ---
 
 ## Mandatory Optimization Patterns
@@ -232,27 +198,6 @@ GROUP BY ts
 ORDER BY ts ASC;
 ```
 
-### Value Panel
-
-Returns a single aggregated number using `avg()`, `sum()`, `min()`, `max()`, or `any()`.
-
-```sql
-WITH __resource_filter AS (
-    SELECT fingerprint
-    FROM signoz_traces.distributed_traces_v3_resource
-    WHERE (simpleJSONExtractString(labels, 'service.name') = 'service-name')
-    AND seen_at_ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp
-)
-
-SELECT
-    toFloat64(count()) AS value
-FROM signoz_traces.distributed_signoz_index_v3
-WHERE
-    resource_fingerprint GLOBAL IN __resource_filter AND
-    timestamp BETWEEN $start_datetime AND $end_datetime AND
-    ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp;
-```
-
 ### Table Panel
 
 ```sql
@@ -291,25 +236,6 @@ GROUP BY `service.name`, ts
 ORDER BY ts ASC;
 ```
 
-### Value — Average duration of GET requests for a service
-
-```sql
-WITH __resource_filter AS (
-    SELECT fingerprint
-    FROM signoz_traces.distributed_traces_v3_resource
-    WHERE (simpleJSONExtractString(labels, 'service.name') = 'api-service')
-    AND seen_at_ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp
-)
-SELECT
-    toFloat64(avg(duration_nano)) AS value
-FROM signoz_traces.distributed_signoz_index_v3
-WHERE
-    resource_fingerprint GLOBAL IN __resource_filter AND
-    timestamp BETWEEN $start_datetime AND $end_datetime AND
-    ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp AND
-    http_method = 'GET'
-```
-
 ### Table — Average duration by HTTP method
 
 ```sql
@@ -331,70 +257,6 @@ WHERE
 GROUP BY http_method
 ORDER BY avg_duration_nano DESC;
 ```
-
-### Advanced — Extract values from span events
-
-Shows `arrayFilter`/`arrayMap` pattern for querying the `events` JSON array.
-
-```sql
-WITH arrayFilter(x -> JSONExtractString(x, 'name')='Getting customer', events) AS filteredEvents
-SELECT toStartOfInterval(timestamp, INTERVAL 1 MINUTE) AS interval,
-    toFloat64(count()) AS count,
-    arrayJoin(arrayMap(x -> JSONExtractString(JSONExtractString(x, 'attributeMap'), 'customer_id'), filteredEvents)) AS resultArray
-FROM signoz_traces.distributed_signoz_index_v3
-WHERE not empty(filteredEvents)
-    AND timestamp > toUnixTimestamp(now() - INTERVAL 30 MINUTE)
-    AND ts_bucket_start >= toUInt64(toUnixTimestamp(now() - toIntervalMinute(30))) - 1800
-GROUP BY resultArray 
-ORDER BY resultArray ASC;
-```
-
-### Advanced — Average latency between two specific spans
-
-Shows cross-span latency calculation using `minIf()` and indexed service columns.
-
-```sql
-SELECT
-    interval,
-    round(avg(time_diff), 2) AS result
-FROM
-(
-    SELECT
-        interval,
-        traceID,
-        if(startTime1 != 0, if(startTime2 != 0, (toUnixTimestamp64Nano(startTime2) - toUnixTimestamp64Nano(startTime1)) / 1000000, nan), nan) AS time_diff
-    FROM
-    (
-        SELECT
-            toStartOfInterval(timestamp, toIntervalMinute(1)) AS interval,
-            traceID,
-            minIf(timestamp, if(resource_string_service$$name='driver', if(name = '/driver.DriverService/FindNearest', if((resources_string['component']) = 'gRPC', true, false), false), false)) AS startTime1,
-            minIf(timestamp, if(resource_string_service$$name='route', if(name = 'HTTP GET /route', true, false), false)) AS startTime2
-        FROM signoz_traces.distributed_signoz_index_v3
-        WHERE (timestamp BETWEEN $start_datetime AND $end_datetime)
-            AND (ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp)
-            AND (resource_string_service$$name IN ('driver', 'route'))
-        GROUP BY (interval, traceID)
-        ORDER BY (interval, traceID) ASC
-    )
-)
-WHERE isNaN(time_diff) = 0
-GROUP BY interval
-ORDER BY interval ASC;
-```
-
----
-
-## SigNoz Dashboard Variables
-
-These template variables are automatically replaced by SigNoz when the query runs:
-
-| Variable | Description |
-|---|---|
-| `$start_datetime` | Start of selected time range (DateTime64) |
-| `$end_datetime` | End of selected time range (DateTime64) |
-| `$start_timestamp` | Start as Unix timestamp (seconds) |
-| `$end_timestamp` | End as Unix timestamp (seconds) |
 
 ---
 
