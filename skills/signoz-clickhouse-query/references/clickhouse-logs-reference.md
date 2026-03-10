@@ -149,21 +149,6 @@ toStartOfInterval(fromUnixTimestamp64Nano(timestamp), INTERVAL 1 MINUTE) AS ts
 
 ---
 
-## Critical Difference vs Traces
-
-> **Logs timestamps are nanosecond `UInt64`, not `DateTime64`.**
-
-| | Traces | Logs |
-|---|---|---|
-| Timestamp type | `DateTime64(9)` | `UInt64` (nanoseconds) |
-| Time filter variables | `$start_datetime`, `$end_datetime` | `$start_timestamp_nano`, `$end_timestamp_nano` |
-| Bucket filter variables | `$start_timestamp`, `$end_timestamp` | `$start_timestamp`, `$end_timestamp` (same) |
-| Display conversion | direct | `fromUnixTimestamp64Nano(timestamp)` |
-| Main table | `signoz_traces.distributed_signoz_index_v3` | `signoz_logs.distributed_logs_v2` |
-| Resource table | `signoz_traces.distributed_traces_v3_resource` | `signoz_logs.distributed_logs_v2_resource` |
-
----
-
 ## Dashboard Panel Query Examples
 
 ### Timeseries Panel
@@ -187,33 +172,6 @@ WHERE
     ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp
 GROUP BY ts
 ORDER BY ts ASC;
-```
-
-### Value Panel
-
-Returns a single aggregated number using methods like `avg()`.
-
-```sql
-WITH __resource_filter AS (
-    SELECT fingerprint
-    FROM signoz_logs.distributed_logs_v2_resource
-    WHERE (simpleJSONExtractString(labels, 'service.name') = 'myservice')
-    AND seen_at_ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp
-)
-SELECT
-    avg(value) AS value
-FROM (
-    SELECT
-        toStartOfInterval(fromUnixTimestamp64Nano(timestamp), INTERVAL 1 MINUTE) AS ts,
-        toFloat64(count()) AS value
-    FROM signoz_logs.distributed_logs_v2
-    WHERE
-        resource_fingerprint GLOBAL IN __resource_filter AND
-        timestamp >= $start_timestamp_nano AND timestamp <= $end_timestamp_nano AND
-        ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp
-    GROUP BY ts
-    ORDER BY ts ASC
-);
 ```
 
 ### Table Panel
@@ -276,45 +234,6 @@ WHERE
     attributes_string['method'] = 'GET' AND
     ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp
 GROUP BY ts
-ORDER BY ts ASC;
-```
-
-### Table — Info log count by service name
-
-```sql
-SELECT
-    resource.service.name::String AS `service.name`,
-    toFloat64(count()) AS value
-FROM signoz_logs.distributed_logs_v2
-WHERE
-    timestamp >= $start_timestamp_nano AND timestamp <= $end_timestamp_nano AND
-    severity_text = 'INFO' AND
-    ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp
-GROUP BY `service.name`
-ORDER BY value DESC;
-```
-
-### Timeseries — Log lines per Kubernetes cluster
-
-Shows `resource.k8s.cluster.name::String` with IS NOT NULL guard.
-
-```sql
-WITH __resource_filter AS (
-    SELECT fingerprint
-    FROM signoz_logs.distributed_logs_v2_resource
-    WHERE seen_at_ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp
-)
-SELECT
-    toStartOfInterval(fromUnixTimestamp64Nano(timestamp), INTERVAL 1 MINUTE) AS ts,
-    resource.k8s.cluster.name::String AS k8s_cluster_name,
-    toFloat64(count()) AS value
-FROM signoz_logs.distributed_logs_v2
-WHERE
-    resource_fingerprint GLOBAL IN __resource_filter AND
-    timestamp >= $start_timestamp_nano AND timestamp <= $end_timestamp_nano AND
-    resource.k8s.cluster.name::String IS NOT NULL AND
-    ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp
-GROUP BY k8s_cluster_name, ts
 ORDER BY ts ASC;
 ```
 

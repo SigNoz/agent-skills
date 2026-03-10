@@ -2,20 +2,18 @@
 
 SigNoz skills to teach agents on writing optimised clickhouse queries for making dashboards using OpenTelementry data (traces, logs)
 
-## Plugins
+## Skills
 
-- **clickhouse-query** — Write optimized ClickHouse queries for SigNoz OpenTelemetry data (traces)
+- **signoz-clickhouse-query** — Write optimized ClickHouse queries for SigNoz OpenTelemetry data (traces)
+
 
 ## Installation
 
-For querying traces data - `npx skills add https://github.com/SigNoz/agent-skills --skill signoz-query-traces`
-For querying logs data - `npx skills add https://github.com/SigNoz/agent-skills --skill signoz-query-logs`
+`npx skills add https://github.com/SigNoz/agent-skills --skill signoz-clickhouse-query`
 
-
-## Install using Claude Marketplace
+## Install as Claude plugin
 
 ```sh
-
 /plugin marketplace add SigNoz/agent-skills
 /plugin install clickhouse-query@signoz
 ```
