@@ -8,7 +8,7 @@
       "name": "clickhouse-query",
       "description": "Skills for writing optimized ClickHouse queries for SigNoz OpenTelemetry data (traces and logs) to create dashboards",
       "source": "./",
-      "skills": ["./skills/signoz-query-logs", "./skills/signoz-query-traces"]
+      "skills": ["./skills/signoz-clickhouse-query"]
     }
   ]
 }
