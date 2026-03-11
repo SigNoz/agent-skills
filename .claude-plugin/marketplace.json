@@ -1,14 +1,20 @@
 {
-  "name": "signoz",
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "signoz-skills",
+  "metadata": {
+    "description": "Official SigNoz marketplace for Claude Code skills"
+  },
   "owner": {
     "name": "SigNoz"
   },
   "plugins": [
     {
-      "name": "clickhouse-query",
-      "description": "Skills for writing optimized ClickHouse queries for SigNoz OpenTelemetry data (traces and logs) to create dashboards",
-      "source": "./",
-      "skills": ["./skills/signoz-clickhouse-query"]
+      "name": "signoz",
+      "description": "Official SigNoz plugin for docs guidance and ClickHouse dashboard queries",
+      "author": {
+        "name": "SigNoz"
+      },
+      "source": "./plugins/signoz"
     }
   ]
 }

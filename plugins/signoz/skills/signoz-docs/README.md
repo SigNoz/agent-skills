@@ -1,16 +1,18 @@
 # signoz-docs
 
-Agent skill that answers SigNoz questions using official documentation from [signoz.io/docs](https://signoz.io/docs).
+Agent skill for answering SigNoz questions with official documentation from [signoz.io/docs](https://signoz.io/docs).
+
+This skill ships inside the official `signoz` Claude plugin and the shared `skills.sh` package.
 
 ## How it works
 
-1. **Docs fetch** — SigNoz docs support `Accept: text/markdown`. The skill teaches the agent to fetch any docs page as clean markdown instead of scraping HTML.
-2. **Domain heuristics** — Decision trees that route the user to the right guide before fetching docs. Prevents the agent from jumping to a random guide without understanding the user's setup.
+1. **Docs fetch** — SigNoz docs support `Accept: text/markdown`, so the agent can fetch clean markdown instead of scraping HTML.
+2. **Domain heuristics** — Decision trees route the user to the right guide before fetching docs, which avoids jumping to a random page without understanding the setup.
 
 ## Structure
 
 ```
-skills/signoz-docs/
+plugins/signoz/skills/signoz-docs/
 ├── SKILL.md              # Entry point — goal, docs-fetch method, workflow, heuristic routing table
 ├── README.md
 └── heuristics/
