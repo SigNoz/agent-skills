@@ -1,0 +1,20 @@
+{
+  "name": "signoz",
+  "displayName": "SigNoz",
+  "version": "1.0.0",
+  "description": "Official SigNoz plugin for docs guidance and ClickHouse dashboard queries",
+  "author": {
+    "name": "SigNoz"
+  },
+  "repository": "https://github.com/SigNoz/agent-skills",
+  "license": "MIT",
+  "keywords": [
+    "signoz",
+    "opentelemetry",
+    "observability",
+    "clickhouse",
+    "tracing",
+    "logging"
+  ],
+  "skills": "./skills/"
+}

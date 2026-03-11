@@ -1,8 +1,8 @@
-# SigNoz Skills Marketplace
+# SigNoz Agent Skills
 
-Official SigNoz skills for Claude Code and the `skills.sh` ecosystem.
+Official SigNoz skills for Claude Code, Cursor, and the `skills.sh` ecosystem.
 
-This repository publishes the `signoz` Claude Code plugin through the `signoz-skills` marketplace and remains compatible with `agent-skills` / `skills.sh`.
+This repository keeps the SigNoz skills in one canonical location and exposes them through Claude and Cursor plugin manifests plus the standard Agent Skills layout.
 
 ## Available Skills
 
@@ -27,6 +27,19 @@ To update after new releases:
 /plugin update signoz@signoz-skills
 ```
 
+### Cursor Plugin
+
+This repository includes a Cursor marketplace manifest at `.cursor-plugin/marketplace.json` and a Cursor plugin manifest at `plugins/signoz/.cursor-plugin/plugin.json`.
+
+For repository-backed distribution:
+
+1. Add `https://github.com/SigNoz/agent-skills` as a Cursor team marketplace.
+2. Install the `signoz` plugin from that marketplace.
+
+For local development, use `plugins/signoz/` as the plugin root.
+
+Claude Code and Cursor both point at the same `plugins/signoz/skills/` directory, so there is no duplicated skill content to maintain.
+
 ### `skills.sh`
 
 Install all SigNoz skills:
@@ -46,6 +59,7 @@ npx skills add SigNoz/agent-skills --skill signoz-clickhouse-query
 
 - **Marketplace id**: `signoz-skills`
 - **Plugin id**: `signoz`
+- **Cursor plugin root**: `plugins/signoz`
 - **Repository**: `SigNoz/agent-skills`
 
 Reserve `signoz` for the primary official SigNoz plugin. Add more installable plugins only when they need a genuinely separate audience or release cadence.
@@ -56,13 +70,17 @@ Reserve `signoz` for the primary official SigNoz plugin. Add more installable pl
 .
 ├── .claude-plugin/
 │   └── marketplace.json
+├── .cursor-plugin/
+│   └── marketplace.json
 ├── plugins/
-│   └── signoz/
-│       ├── .claude-plugin/
-│       │   └── plugin.json
-│       └── skills/
-│           ├── signoz-clickhouse-query/
-│           └── signoz-docs/
+│   ├── signoz/
+│   │   ├── .claude-plugin/
+│   │   │   └── plugin.json
+│   │   ├── .cursor-plugin/
+│   │   │   └── plugin.json
+│   │   └── skills/
+│   │       ├── signoz-clickhouse-query/
+│   │       └── signoz-docs/
 └── README.md
 ```
 
@@ -91,6 +109,7 @@ Keep these conventions:
 - `description` should explain both what the skill does and when it should trigger.
 - Keep `SKILL.md` concise and move deeper reference material into `references/`, `scripts/`, or `assets/` when needed.
 - Bump `plugins/signoz/.claude-plugin/plugin.json` whenever a skill or other plugin-shipped content changes so Claude Code users receive updates.
+- Bump `plugins/signoz/.cursor-plugin/plugin.json` whenever the Cursor plugin ships updated skill content.
 
 ## License
 
