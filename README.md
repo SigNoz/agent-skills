@@ -2,8 +2,6 @@
 
 Official SigNoz skills for Claude Code, Cursor, and the `skills.sh` ecosystem.
 
-This repository keeps the SigNoz skills in one canonical location and exposes them through Claude and Cursor plugin manifests plus the standard Agent Skills layout.
-
 ## Available Skills
 
 | Skill | Description |
@@ -31,16 +29,15 @@ To update after new releases:
 
 This repository includes a Cursor marketplace manifest at `.cursor-plugin/marketplace.json` and a Cursor plugin manifest at `plugins/signoz/.cursor-plugin/plugin.json`.
 
-For repository-backed distribution:
+This plugin is not yet published on the public Cursor Marketplace. Install it manually through a Cursor Team Marketplace:
 
 1. Add `https://github.com/SigNoz/agent-skills` as a Cursor team marketplace.
-2. Install the `signoz` plugin from that marketplace.
+2. In the Cursor dashboard, go to `Settings -> Plugins`.
+3. Under `Team Marketplaces`, click `Import`.
+4. Paste the GitHub repository URL and save the marketplace.
+5. Open the marketplace panel in Cursor and install the `signoz` plugin.
 
-For local development, use `plugins/signoz/` as the plugin root.
-
-Claude Code and Cursor both point at the same `plugins/signoz/skills/` directory, so there is no duplicated skill content to maintain.
-
-### `skills.sh`
+### skills.sh
 
 Install all SigNoz skills:
 
@@ -61,8 +58,6 @@ npx skills add SigNoz/agent-skills --skill signoz-clickhouse-query
 - **Plugin id**: `signoz`
 - **Cursor plugin root**: `plugins/signoz`
 - **Repository**: `SigNoz/agent-skills`
-
-Reserve `signoz` for the primary official SigNoz plugin. Add more installable plugins only when they need a genuinely separate audience or release cadence.
 
 ## Repository Structure
 
