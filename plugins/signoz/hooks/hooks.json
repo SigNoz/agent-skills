@@ -1,0 +1,16 @@
+{
+  "description": "Auto-allow WebFetch for official SigNoz HTTPS URLs",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/allow-signoz-webfetch.js\""
+          }
+        ]
+      }
+    ]
+  }
+}
