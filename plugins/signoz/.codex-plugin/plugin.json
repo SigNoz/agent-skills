@@ -1,0 +1,37 @@
+{
+  "name": "signoz",
+  "version": "1.0.0",
+  "description": "Official SigNoz plugin for docs guidance and ClickHouse dashboard queries",
+  "author": {
+    "name": "SigNoz",
+    "url": "https://signoz.io"
+  },
+  "homepage": "https://signoz.io",
+  "repository": "https://github.com/SigNoz/agent-skills",
+  "license": "MIT",
+  "keywords": [
+    "signoz",
+    "opentelemetry",
+    "observability",
+    "clickhouse",
+    "tracing",
+    "logging"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "SigNoz",
+    "shortDescription": "Official SigNoz skills for docs guidance and ClickHouse queries",
+    "longDescription": "Installs the official SigNoz skills for using SigNoz docs and writing ClickHouse queries for traces and logs in Codex.",
+    "developerName": "SigNoz",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://signoz.io",
+    "defaultPrompt": [
+      "Use SigNoz to help me find the right docs page for OpenTelemetry instrumentation.",
+      "Use SigNoz to write a ClickHouse query for a SigNoz dashboard panel over traces or logs."
+    ]
+  }
+}

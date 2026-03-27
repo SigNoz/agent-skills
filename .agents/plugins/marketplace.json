@@ -1,0 +1,20 @@
+{
+  "name": "signoz-skills",
+  "interface": {
+    "displayName": "SigNoz"
+  },
+  "plugins": [
+    {
+      "name": "signoz",
+      "source": {
+        "source": "local",
+        "path": "./plugins/signoz"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
