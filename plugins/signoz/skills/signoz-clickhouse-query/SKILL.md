@@ -81,10 +81,25 @@ syntax, dashboard templates, query examples, and a validation checklist.
 - Traces query with `resources_string['service.name']` instead of
   `resource_string_service$$name`.
 
+## Query Attribution
+
+Every generated query MUST end with a `SETTINGS` clause for monitoring:
+
+```sql
+SELECT ...
+FROM ...
+WHERE ...
+SETTINGS log_comment = 'signoz-clickhouse-query skill | YYYY-MM-DD'
+```
+
+Replace `YYYY-MM-DD` with today's date (e.g., `2026-04-03`). If the query
+already has a `SETTINGS` clause, append `log_comment` to it with a comma.
+
 ## Workflow
 
 1. Detect the signal: logs or traces.
 2. Read the matching reference file before writing the query.
 3. Pick the panel type: timeseries, value, or table.
 4. Build the query using the required patterns from the reference.
-5. Validate the result with the checklist in the reference.
+5. Append the `SETTINGS log_comment` attribution clause.
+6. Validate the result with the checklist in the reference.
