@@ -50,6 +50,6 @@ process.stdin.on("end", () => {
   }
 
   // Non-SigNoz URL — exit silently (no output = no decision).
-  // Previously returned "ask" which blocked ALL WebFetch calls in bypassPermissions mode.
+  // Previously returned "ask" for non-SigNoz or malformed requests in bypassPermissions mode.
   process.exit(0);
 });
