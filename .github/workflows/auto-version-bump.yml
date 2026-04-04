@@ -1,0 +1,89 @@
+name: Auto CalVer Bump
+
+# Runs on push to jaine branch — auto-bumps CalVer for changed plugins.
+# GITHUB_TOKEN bot commits don't re-trigger workflows → no loops.
+
+on:
+  push:
+    branches:
+      - 'jaine'
+
+jobs:
+  auto-bump:
+    runs-on: ubuntu-latest
+
+    # Skip if this push was already an auto-bump
+    if: "!contains(github.event.head_commit.message, 'chore: auto-bump CalVer')"
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed plugins and bump CalVer
+        id: bump
+        run: |
+          # Find changed plugin directories
+          CHANGED=$(git diff --name-only HEAD~1 HEAD -- 'plugins/' 'external_plugins/' 2>/dev/null || true)
+
+          if [[ -z "$CHANGED" ]]; then
+            echo "No plugin changes detected"
+            echo "bumped=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Extract unique plugin dirs
+          PLUGIN_DIRS=$(echo "$CHANGED" | grep -oE '^(plugins|external_plugins)/[^/]+' | sort -u)
+
+          TODAY=$(date -u +%Y.%m.%d)
+          BUMPED=""
+
+          for PLUGIN_DIR in $PLUGIN_DIRS; do
+            PLUGIN_JSON="$PLUGIN_DIR/.claude-plugin/plugin.json"
+
+            if [[ ! -f "$PLUGIN_JSON" ]]; then
+              continue
+            fi
+
+            CURRENT=$(grep '"version"' "$PLUGIN_JSON" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
+
+            if [[ -z "$CURRENT" ]]; then
+              continue
+            fi
+
+            # CalVer bump logic (replicate _calver_bump)
+            if [[ "$CURRENT" == "$TODAY" ]]; then
+              NEW="${TODAY}.1"
+            elif [[ "$CURRENT" == "${TODAY}."* ]]; then
+              MICRO="${CURRENT##*.}"
+              NEW="${TODAY}.$((MICRO + 1))"
+            else
+              NEW="$TODAY"
+            fi
+
+            sed -i "s/\"version\": \"$CURRENT\"/\"version\": \"$NEW\"/" "$PLUGIN_JSON"
+            PLUGIN_NAME=$(basename "$PLUGIN_DIR")
+            BUMPED="$BUMPED $PLUGIN_NAME"
+            echo "Bumped $PLUGIN_NAME: $CURRENT -> $NEW"
+          done
+
+          if [[ -z "$BUMPED" ]]; then
+            echo "bumped=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "bumped=true" >> "$GITHUB_OUTPUT"
+            echo "names=$BUMPED" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push
+        if: steps.bump.outputs.bumped == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add '**/.claude-plugin/plugin.json'
+          git commit -m "chore: auto-bump CalVer${{ steps.bump.outputs.names }}"
+          git pull --rebase origin jaine
+          git push

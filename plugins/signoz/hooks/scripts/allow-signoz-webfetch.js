@@ -46,8 +46,10 @@ process.stdin.on("end", () => {
       return;
     }
   } catch {
-    // Fall through to the default ask behavior if the hook input is malformed.
+    // Malformed input — exit silently, let other hooks or default behavior handle it.
   }
 
-  emitDecision("ask", "URL is outside the SigNoz HTTPS allowlist");
+  // Non-SigNoz URL — exit silently (no output = no decision).
+  // Previously returned "ask" for non-SigNoz or malformed requests in bypassPermissions mode.
+  process.exit(0);
 });
