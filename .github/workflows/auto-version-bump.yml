@@ -1,6 +1,6 @@
 name: Auto CalVer Bump
 
-# Runs on push to jaine branch — auto-bumps CalVer for changed plugins.
+# Runs on push to main — auto-bumps CalVer for changed plugins.
 # Loop prevention: the commit-message check on the `if` line below is the
 # real safety net. GITHUB_TOKEN's no-retrigger behaviour is not guaranteed
 # across all repository configurations.
@@ -8,11 +8,11 @@ name: Auto CalVer Bump
 on:
   push:
     branches:
-      - 'jaine'
+      - 'main'
 
 # Serialise runs so concurrent pushes don't race each other.
 concurrency:
-  group: auto-bump-jaine
+  group: auto-bump-main
   cancel-in-progress: true
 
 jobs:
@@ -132,5 +132,5 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add plugins/**/.claude-plugin/plugin.json plugins/**/.codex-plugin/plugin.json plugins/**/.cursor-plugin/plugin.json
           git commit -m "chore: auto-bump CalVer for ${{ steps.bump.outputs.count }} plugin(s)"
-          git pull --rebase origin jaine || { git rebase --abort 2>/dev/null; echo "ERROR: rebase failed"; exit 1; }
+          git pull --rebase origin main || { git rebase --abort 2>/dev/null; echo "ERROR: rebase failed"; exit 1; }
           git push
