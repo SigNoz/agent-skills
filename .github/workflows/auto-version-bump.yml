@@ -40,6 +40,12 @@ jobs:
         run: |
           # Compare against the pre-push ref for reliable diffs across
           # merge commits, squash merges, and multi-commit pushes.
+          # On the first push to a branch (or some force-pushes),
+          # github.event.before is all zeros — fall back to diffing
+          # against the parent commit.
+          if [[ "$BEFORE_SHA" =~ ^0+$ ]]; then
+            BEFORE_SHA="HEAD~1"
+          fi
           CHANGED=$(git diff --name-only "$BEFORE_SHA" HEAD -- 'plugins/' || true)
 
           if [[ -z "$CHANGED" ]]; then
@@ -79,8 +85,11 @@ jobs:
               NEW="$TODAY"
             fi
 
-            # Monotonicity guard — never downgrade the version
-            if [[ "$NEW" < "$CURRENT" ]]; then
+            # Monotonicity guard — never downgrade the version.
+            # Use version-sort so numeric micro suffixes compare correctly
+            # (e.g. 2026.04.08.10 > 2026.04.08.9).
+            LOWEST=$(printf '%s\n%s\n' "$NEW" "$CURRENT" | sort -V | head -1)
+            if [[ "$LOWEST" == "$NEW" && "$NEW" != "$CURRENT" ]]; then
               echo "WARNING: Computed version ($NEW) < current ($CURRENT) for $PLUGIN_DIR, keeping current"
               continue
             fi
