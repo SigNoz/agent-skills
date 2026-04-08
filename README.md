@@ -72,6 +72,7 @@ npx skills add SigNoz/agent-skills --skill signoz-clickhouse-query    # specific
 | Marketplace | `signoz-skills` |
 | Plugin | `signoz` |
 | Repository | `SigNoz/agent-skills` |
+| Versioning | CalVer (`YYYY.MM.DD`) — auto-bumped on push to `jaine` |
 
 ## Contributing
 

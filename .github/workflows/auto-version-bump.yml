@@ -1,19 +1,28 @@
 name: Auto CalVer Bump
 
 # Runs on push to jaine branch — auto-bumps CalVer for changed plugins.
-# GITHUB_TOKEN bot commits don't re-trigger workflows → no loops.
+# Loop prevention: the commit-message check on the `if` line below is the
+# real safety net. GITHUB_TOKEN's no-retrigger behaviour is not guaranteed
+# across all repository configurations.
 
 on:
   push:
     branches:
       - 'jaine'
 
+# Serialise runs so concurrent pushes don't race each other.
+concurrency:
+  group: auto-bump-jaine
+  cancel-in-progress: true
+
 jobs:
   auto-bump:
     runs-on: ubuntu-latest
 
-    # Skip if this push was already an auto-bump
-    if: "!contains(github.event.head_commit.message, 'chore: auto-bump CalVer')"
+    # Skip if this push was already an auto-bump (null-safe).
+    if: >-
+      github.event.head_commit != null &&
+      !contains(github.event.head_commit.message, 'chore: auto-bump CalVer')
 
     permissions:
       contents: write
@@ -22,13 +31,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
+          fetch-depth: 0
 
       - name: Detect changed plugins and bump CalVer
         id: bump
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
         run: |
-          # Find changed plugin directories
-          CHANGED=$(git diff --name-only HEAD~1 HEAD -- 'plugins/' 'external_plugins/' 2>/dev/null || true)
+          # Compare against the pre-push ref for reliable diffs across
+          # merge commits, squash merges, and multi-commit pushes.
+          CHANGED=$(git diff --name-only "$BEFORE_SHA" HEAD -- 'plugins/' || true)
 
           if [[ -z "$CHANGED" ]]; then
             echo "No plugin changes detected"
@@ -36,26 +48,28 @@ jobs:
             exit 0
           fi
 
-          # Extract unique plugin dirs
-          PLUGIN_DIRS=$(echo "$CHANGED" | grep -oE '^(plugins|external_plugins)/[^/]+' | sort -u)
+          # Extract unique plugin dirs (e.g. plugins/signoz)
+          PLUGIN_DIRS=$(echo "$CHANGED" | grep -oE '^plugins/[^/]+' | sort -u)
 
           TODAY=$(date -u +%Y.%m.%d)
           BUMPED=""
+          COUNT=0
 
           for PLUGIN_DIR in $PLUGIN_DIRS; do
-            PLUGIN_JSON="$PLUGIN_DIR/.claude-plugin/plugin.json"
-
-            if [[ ! -f "$PLUGIN_JSON" ]]; then
+            # Read current version from the primary manifest
+            CLAUDE_JSON="$PLUGIN_DIR/.claude-plugin/plugin.json"
+            if [[ ! -f "$CLAUDE_JSON" ]]; then
+              echo "WARNING: No .claude-plugin/plugin.json in $PLUGIN_DIR, skipping"
               continue
             fi
 
-            CURRENT=$(grep '"version"' "$PLUGIN_JSON" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1)
-
+            CURRENT=$(jq -r '.version // empty' "$CLAUDE_JSON")
             if [[ -z "$CURRENT" ]]; then
+              echo "WARNING: No version field in $CLAUDE_JSON, skipping"
               continue
             fi
 
-            # CalVer bump logic (replicate _calver_bump)
+            # CalVer bump logic
             if [[ "$CURRENT" == "$TODAY" ]]; then
               NEW="${TODAY}.1"
             elif [[ "$CURRENT" == "${TODAY}."* ]]; then
@@ -65,9 +79,30 @@ jobs:
               NEW="$TODAY"
             fi
 
-            sed -i "s/\"version\": \"$CURRENT\"/\"version\": \"$NEW\"/" "$PLUGIN_JSON"
+            # Monotonicity guard — never downgrade the version
+            if [[ "$NEW" < "$CURRENT" ]]; then
+              echo "WARNING: Computed version ($NEW) < current ($CURRENT) for $PLUGIN_DIR, keeping current"
+              continue
+            fi
+
+            # Bump all three plugin manifests using jq
+            for MANIFEST in \
+              "$PLUGIN_DIR/.claude-plugin/plugin.json" \
+              "$PLUGIN_DIR/.codex-plugin/plugin.json" \
+              "$PLUGIN_DIR/.cursor-plugin/plugin.json"; do
+              if [[ -f "$MANIFEST" ]]; then
+                if ! jq --arg v "$NEW" '.version = $v' "$MANIFEST" > "${MANIFEST}.tmp"; then
+                  echo "ERROR: jq failed on $MANIFEST"
+                  rm -f "${MANIFEST}.tmp"
+                  exit 1
+                fi
+                mv "${MANIFEST}.tmp" "$MANIFEST"
+              fi
+            done
+
             PLUGIN_NAME=$(basename "$PLUGIN_DIR")
             BUMPED="$BUMPED $PLUGIN_NAME"
+            COUNT=$((COUNT + 1))
             echo "Bumped $PLUGIN_NAME: $CURRENT -> $NEW"
           done
 
@@ -76,6 +111,7 @@ jobs:
           else
             echo "bumped=true" >> "$GITHUB_OUTPUT"
             echo "names=$BUMPED" >> "$GITHUB_OUTPUT"
+            echo "count=$COUNT" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Commit and push
@@ -83,7 +119,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add '**/.claude-plugin/plugin.json'
-          git commit -m "chore: auto-bump CalVer${{ steps.bump.outputs.names }}"
-          git pull --rebase origin jaine
+          git add plugins/**/.claude-plugin/plugin.json plugins/**/.codex-plugin/plugin.json plugins/**/.cursor-plugin/plugin.json
+          git commit -m "chore: auto-bump CalVer for ${{ steps.bump.outputs.count }} plugin(s)"
+          git pull --rebase origin jaine || { git rebase --abort 2>/dev/null; echo "ERROR: rebase failed"; exit 1; }
           git push

@@ -28,30 +28,28 @@ Conventions:
 - Keep `SKILL.md` concise; move deeper reference material into `references/`, `scripts/`, or `assets/` subdirectories.
 - Keep plugin manifests in sync with shipped skills for Codex (`plugins/signoz/.codex-plugin/plugin.json`) and Cursor (`plugins/signoz/.cursor-plugin/plugin.json`) distribution.
 
-## Bumping the Plugin Version
+## Plugin Versioning (CalVer)
 
-**This is required.** Whenever a skill is added or an existing skill is updated, you must bump the `version` field in **all** plugin manifests:
+This repository uses **CalVer** (`YYYY.MM.DD`, with an optional `.N` micro suffix for same-day releases) for plugin versions. The version field lives in three manifests per plugin:
 
 - `plugins/signoz/.claude-plugin/plugin.json`
 - `plugins/signoz/.codex-plugin/plugin.json`
 - `plugins/signoz/.cursor-plugin/plugin.json`
 
-Users of Claude Code, Codex, and Cursor receive updates based on the version in these manifests. If the version is not bumped, downstream users will not pick up the changes.
+Users of Claude Code, Codex, and Cursor receive updates based on these versions. If the version is not bumped, downstream users will not pick up the changes.
 
-Use [semver](https://semver.org/) to decide the bump:
+### Auto-bump workflow
 
-| Change | Bump |
-|--------|------|
-| New skill added | Minor (e.g. `1.0.1` -> `1.1.0`) |
-| Skill content updated (fix, improvement) | Patch (e.g. `1.0.1` -> `1.0.2`) |
-| Breaking change (skill renamed/removed, hook behavior change) | Major (e.g. `1.0.1` -> `2.0.0`) |
+A GitHub Actions workflow (`.github/workflows/auto-version-bump.yml`) automatically bumps all three manifests on push to the `jaine` branch. It detects which plugins have changed files and sets the version to today's date (or appends a micro suffix for multiple bumps in the same day).
+
+**You do not need to manually bump versions when pushing to `jaine`** — the workflow handles it. For other branches or manual releases, bump the version yourself in all three manifests.
 
 ## Pull Request Checklist
 
 - [ ] Skill follows the [Agent Skills specification](https://agentskills.io/specification)
 - [ ] `name` in SKILL.md frontmatter matches the directory name
 - [ ] `README.md` updated if a new skill was added
-- [ ] **Plugin versions bumped** in all three manifests (`plugin.json`)
+- [ ] **Plugin versions bumped** in all three manifests (auto-bumped on `jaine`, manual on other branches)
 - [ ] Changes tested locally with the relevant tool (Claude Code, Codex, or Cursor)
 
 ## License
