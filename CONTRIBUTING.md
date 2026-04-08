@@ -40,16 +40,16 @@ Users of Claude Code, Codex, and Cursor receive updates based on these versions.
 
 ### Auto-bump workflow
 
-A GitHub Actions workflow (`.github/workflows/auto-version-bump.yml`) automatically bumps all three manifests on push to the `jaine` branch. It detects which plugins have changed files and sets the version to today's date (or appends a micro suffix for multiple bumps in the same day).
+A GitHub Actions workflow (`.github/workflows/auto-version-bump.yml`) can automatically bump all three manifests on push to configured branches. It detects which plugins have changed files and sets the version to today's date (or appends a micro suffix for multiple bumps in the same day).
 
-**You do not need to manually bump versions when pushing to `jaine`** — the workflow handles it. For other branches or manual releases, bump the version yourself in all three manifests.
+If the auto-bump workflow is enabled for your branch, you do not need to manually bump versions. Otherwise, bump the version yourself in all three manifests before merging.
 
 ## Pull Request Checklist
 
 - [ ] Skill follows the [Agent Skills specification](https://agentskills.io/specification)
 - [ ] `name` in SKILL.md frontmatter matches the directory name
 - [ ] `README.md` updated if a new skill was added
-- [ ] **Plugin versions bumped** in all three manifests (auto-bumped on `jaine`, manual on other branches)
+- [ ] **Plugin versions bumped** in all three manifests (automatic if auto-bump workflow is configured, otherwise manual)
 - [ ] Changes tested locally with the relevant tool (Claude Code, Codex, or Cursor)
 
 ## License
