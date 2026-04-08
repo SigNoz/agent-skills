@@ -118,9 +118,11 @@ jobs:
           if [[ -z "$BUMPED" ]]; then
             echo "bumped=false" >> "$GITHUB_OUTPUT"
           else
-            echo "bumped=true" >> "$GITHUB_OUTPUT"
-            echo "names=$BUMPED" >> "$GITHUB_OUTPUT"
-            echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+            {
+              echo "bumped=true"
+              echo "names=$BUMPED"
+              echo "count=$COUNT"
+            } >> "$GITHUB_OUTPUT"
           fi
 
       - name: Commit and push
