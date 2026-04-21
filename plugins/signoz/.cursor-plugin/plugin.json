@@ -2,7 +2,7 @@
   "name": "signoz",
   "displayName": "SigNoz",
   "version": "1.0.0",
-  "description": "Official SigNoz plugin for docs guidance and ClickHouse dashboard queries",
+  "description": "Official SigNoz plugin for docs, queries, dashboards, and alerts",
   "author": {
     "name": "SigNoz"
   },
