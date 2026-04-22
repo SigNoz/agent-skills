@@ -83,13 +83,8 @@ If the array is empty, no template matches — **go to Step 3**.
    exits non-zero, tell the user and offer Step 3 (custom build) instead.
 3. **Validate and normalize the fetched JSON before creating.** Read the MCP
    resources `signoz://dashboard/widgets-instructions` and
-   `signoz://dashboard/widgets-examples`. Ensure every non-row widget has:
-   `selectedLogFields` (`[]` if not list), `selectedTracesFields` (`[]` if not
-   list), `contextLinks` (`{"linksData": []}`), `thresholds` (`[]`),
-   `timePreferance` (deliberate typo), `opacity`, `nullZeroValues`. Every
-   `queryData` item must have: `queryName`, `stepInterval`, `dataSource`,
-   `groupBy`, `expression`, `orderBy`, `selectColumns`, `functions`,
-   `aggregations`. Add any missing required fields.
+   `signoz://dashboard/widgets-examples` for the required widget and
+   `queryData` fields, and add any that are missing from the template JSON.
 4. Pass `title`, `description`, `tags`, `layout`, `widgets`, and `variables`
    to `signoz_create_dashboard`.
 5. Report what was created: title, panel count, sections.
@@ -129,13 +124,9 @@ When no template fits the user's request, build a dashboard from scratch.
    - `queryFormulas` for derived metrics (error rate, percentages) — remember
      to set `"disabled": true` on individual queries when formulas combine them
    - 12-column grid layout with sensible panel sizes
-   - All required widget fields: `timePreferance` (deliberate typo), `opacity`,
-     `nullZeroValues`, `selectedLogFields` (`[]` for non-list),
-     `selectedTracesFields` (`[]` for non-list), `contextLinks`
-     (`{"linksData": []}`), and `thresholds` (`[]`).
-   - All required `queryData` fields: `queryName`, `stepInterval`,
-     `dataSource`, `groupBy`, `expression`, `orderBy`, `selectColumns`,
-     `functions`, `aggregations`.
+   - All required widget and `queryData` fields as specified in the MCP
+     resources `signoz://dashboard/widgets-instructions` and
+     `signoz://dashboard/widgets-examples`.
 4. Call `signoz_create_dashboard` with the built JSON.
 5. Report what was created and offer to adjust anything. If the user requests
    changes, call `signoz_get_dashboard` to fetch the current state, then use
@@ -151,14 +142,10 @@ When no template fits the user's request, build a dashboard from scratch.
 - **No duplicate dashboards**: Always call `signoz_list_dashboards` first and
   paginate through all pages before concluding no similar dashboard exists.
 - **Valid JSON only**: When building custom dashboards, follow the v5 schema
-  as documented in the `signoz://dashboard/*` MCP resources. Every widget
-  (except `row`) **must** include:
-  `selectedLogFields` (`[]`), `selectedTracesFields` (`[]`), `contextLinks`
-  (`{"linksData": []}`), `thresholds` (`[]`), `timePreferance`, `opacity`,
-  `nullZeroValues`. Every queryData item **must** include: `queryName`,
-  `stepInterval`, `dataSource`, `groupBy`, `expression`, `orderBy`,
-  `selectColumns`, `functions`, `aggregations`. Never generate malformed queries
-  or layouts.
+  as documented in the `signoz://dashboard/*` MCP resources. Required widget
+  and `queryData` fields are listed in `signoz://dashboard/widgets-instructions`
+  and `signoz://dashboard/widgets-examples` — include all of them. Never
+  generate malformed queries or layouts.
 - **OTel attribute names**: Always use OpenTelemetry semantic conventions for
   attribute names in filters, groupBy, and variables. Use `service.name` not
   `service`, `host.name` not `host`, `deployment.environment.name` not `env`.
