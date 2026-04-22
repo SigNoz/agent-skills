@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -22,9 +23,11 @@ WEIGHT_KEYWORD_EXACT = 10
 WEIGHT_TITLE_SUBSTRING = 5
 WEIGHT_DESCRIPTION_SUBSTRING = 2
 
+_NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
+
 
 def _tokenize(text: str) -> list[str]:
-    return [t for t in text.lower().replace("-", " ").replace("_", " ").split() if t]
+    return [t for t in _NON_ALNUM_RE.sub(" ", text.lower()).split() if t]
 
 
 def _score_entry(entry: dict[str, Any], query_tokens: list[str]) -> int:

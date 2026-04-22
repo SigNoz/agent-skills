@@ -31,18 +31,32 @@ Call `signoz_list_dashboards` to see what dashboards already exist. **Paginate
 through all pages** — check `pagination.hasMore` in the response. If `hasMore`
 is true, call again with `offset` set to `pagination.nextOffset` and repeat until
 all pages are exhausted. Only after checking every page can you conclude no
-similar dashboard exists. If a similar dashboard exists, tell the user and offer
-to create a new one anyway or modify the existing one instead. If the user
-chooses to modify the existing dashboard, call `signoz_get_dashboard` with the
-dashboard UUID to fetch its full configuration, then use
-`signoz_update_dashboard` to apply the changes.
+similar dashboard exists.
+
+**Match aggressively.** For each existing dashboard, compare its lowercased
+`name` and `tags` against the user's request (and against the template title
+you are about to import, if Step 2 has matched one). A match is any of:
+- lowercased name contains the technology/domain keyword (e.g. "redis",
+  "postgres", "k8s"/"kubernetes", "docker"/"container");
+- any tag matches the keyword;
+- existing name and the template title share the root token (e.g.
+  "Redis - Overview" vs "Redis overview").
+
+**If any potential match exists**, list the concrete matches back to the user —
+name, UUID, and created-at — and ask explicitly: "I found these dashboards
+that look similar: [list]. Do you want to (a) modify an existing one, (b)
+create a new one anyway, or (c) skip?" Do not create until the user picks.
+If they pick (a), call `signoz_get_dashboard` with the chosen UUID to fetch
+its full configuration, then use `signoz_update_dashboard` to apply the
+changes.
 
 ### Step 2: Search the template catalog
 
-Run the search tool via Bash:
+Run the search tool via Bash from the skill's base directory (shown in the
+initial skill-load message):
 
 ```bash
-python skills/dashboard-create/tools/search_templates.py "<query>" --limit 5
+python3 "<skill-base>/tools/search_templates.py" "<query>" --limit 5
 ```
 
 The query should be the user's request boiled down to the technology or
@@ -52,12 +66,15 @@ If the array is empty, no template matches — **go to Step 3**.
 
 **If a template matches:**
 
-1. Confirm with the user: "I found a pre-built [title] dashboard template —
-   [description]. Should I import it?"
+1. Confirm with the user. If the search result has a non-empty `description`,
+   use: "I found a pre-built [title] dashboard template — [description].
+   Should I import it?" If `description` is empty (common — most entries
+   have none), fall back to: "I found a pre-built [title] dashboard template
+   (category: [id], file: [path]). Should I import it?"
 2. On confirmation, fetch the template JSON:
 
    ```bash
-   python skills/dashboard-create/tools/fetch_template.py "<path>"
+   python3 "<skill-base>/tools/fetch_template.py" "<path>"
    ```
 
    where `<path>` is the `path` field from the search result. **Always quote
@@ -113,9 +130,12 @@ When no template fits the user's request, build a dashboard from scratch.
      to set `"disabled": true` on individual queries when formulas combine them
    - 12-column grid layout with sensible panel sizes
    - All required widget fields: `timePreferance` (deliberate typo), `opacity`,
-     `nullZeroValues`, `stepSize`, `selectedLogFields` (`[]` for non-list),
+     `nullZeroValues`, `selectedLogFields` (`[]` for non-list),
      `selectedTracesFields` (`[]` for non-list), `contextLinks`
      (`{"linksData": []}`), and `thresholds` (`[]`).
+   - All required `queryData` fields: `queryName`, `stepInterval`,
+     `dataSource`, `groupBy`, `expression`, `orderBy`, `selectColumns`,
+     `functions`, `aggregations`.
 4. Call `signoz_create_dashboard` with the built JSON.
 5. Report what was created and offer to adjust anything. If the user requests
    changes, call `signoz_get_dashboard` to fetch the current state, then use
@@ -159,13 +179,13 @@ When no template fits the user's request, build a dashboard from scratch.
 
 **Agent:**
 1. Calls `signoz_list_dashboards` — no existing PostgreSQL dashboard.
-2. Runs `python skills/dashboard-create/tools/search_templates.py "postgresql"` —
+2. Runs `python3 "<skill-base>/tools/search_templates.py" "postgresql"` —
    top result is `postgresql/postgresql.json`.
 3. Confirms: "I found a pre-built PostgreSQL dashboard template — this
    dashboard provides a high-level overview of your PostgreSQL databases.
    Should I import it?"
 4. User confirms.
-5. Runs `python skills/dashboard-create/tools/fetch_template.py "postgresql/postgresql.json"`.
+5. Runs `python3 "<skill-base>/tools/fetch_template.py" "postgresql/postgresql.json"`.
 6. Reads `signoz://dashboard/widgets-instructions` and
    `signoz://dashboard/widgets-examples`, normalizes any missing required
    widget fields, then calls `signoz_create_dashboard`.
@@ -179,7 +199,7 @@ When no template fits the user's request, build a dashboard from scratch.
 
 **Agent:**
 1. Calls `signoz_list_dashboards` — no existing payment dashboard.
-2. Runs `python skills/dashboard-create/tools/search_templates.py "payment processing"` —
+2. Runs `python3 "<skill-base>/tools/search_templates.py" "payment processing"` —
    empty array, no match.
 3. Says: "I don't have a pre-built template for payment processing. Let me help
    you build a custom one. What signals are you monitoring — traces, metrics,

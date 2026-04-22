@@ -13,6 +13,7 @@ and exits non-zero.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
@@ -52,6 +53,12 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     except URLError as exc:
         sys.stderr.write(f"Network error fetching {args.path}: {exc.reason}\n")
+        return 1
+
+    try:
+        json.loads(body)
+    except ValueError as exc:
+        sys.stderr.write(f"Fetched body for {args.path} is not valid JSON: {exc}\n")
         return 1
 
     sys.stdout.buffer.write(body)
