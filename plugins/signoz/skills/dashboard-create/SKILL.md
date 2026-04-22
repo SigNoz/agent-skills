@@ -110,23 +110,9 @@ When no template fits the user's request, build a dashboard from scratch.
    Add metric/trace/log-specific resources (`signoz://dashboard/clickhouse-*`,
    `signoz://dashboard/promql-example`, `signoz://traces/query-builder-guide`)
    as needed for the signal types involved.
-3. **Build the dashboard JSON** following the v5 schema with:
-   - Descriptive title and tags
-   - Row panels to organize sections
-   - Appropriate panel types (graph for time series, value for single metrics,
-     table for tabular data, bar for comparisons, pie for distributions,
-     histogram for distributions, list for log/trace entries)
-   - v5 builder queries with `aggregations` array and string-based
-     `filter.expression` (see `signoz://dashboard/query-builder-example` for
-     format)
-   - Variables as DYNAMIC type for common filters (deployment.environment.name,
-     service.name) — use OTel attribute names, not shorthand
-   - `queryFormulas` for derived metrics (error rate, percentages) — remember
-     to set `"disabled": true` on individual queries when formulas combine them
-   - 12-column grid layout with sensible panel sizes
-   - All required widget and `queryData` fields as specified in the MCP
-     resources `signoz://dashboard/widgets-instructions` and
-     `signoz://dashboard/widgets-examples`.
+3. **Build the dashboard JSON** following the v5 schema as documented in the
+   MCP resources loaded in the previous step. Use OTel semantic attribute
+   names (not shorthand) in filters, groupBy, and variables.
 4. Call `signoz_create_dashboard` with the built JSON.
 5. Report what was created and offer to adjust anything. If the user requests
    changes, call `signoz_get_dashboard` to fetch the current state, then use
