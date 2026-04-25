@@ -103,6 +103,89 @@ Always use `GLOBAL IN`, not plain `IN`:
 WHERE resource_fingerprint GLOBAL IN __resource_filter
 ```
 
+### 5. Body Text Search — Engaging Skip Indexes
+
+The `body` column has two skip indexes, **both on `lower(body)`**:
+
+```sql
+INDEX body_index_v2_token  lower(body) TYPE tokenbf_v1(10000, 2, 0)   GRANULARITY 1,
+INDEX body_index_v2_ngram  lower(body) TYPE ngrambf_v1(4, 15000, 3, 0) GRANULARITY 1
+```
+
+ClickHouse compares predicate ASTs to the index expression **literally**. A predicate must reference `lower(body)` to engage either index — `hasToken(body, …)` and `body LIKE '%x%'` prune nothing.
+
+#### Predicate engagement
+
+| Predicate | tokenbf | ngrambf | Notes |
+|---|:-:|:-:|---|
+| `hasToken(lower(body), 'tok')` | yes | no | Whole-token check; best for distinctive single words. |
+| `lower(body) = 'literal'` | yes | yes | Exact equality. |
+| `lower(body) LIKE '%substr%'` | no | yes | Substring must be ≥ 4 chars (ngrambf `N=4`). |
+| `lower(body) LIKE '%a%b%'` | no | yes | n-grams of each substring ANDed — more selective. |
+| `lower(body) ILIKE '%x%'` | no | sometimes | Prefer the explicit `lower(body) LIKE '%x%'` form. |
+| `position(body, 'x') > 0` | no | no | Always rewrite to `lower(body) LIKE`. |
+| `positionCaseInsensitive(body, 'X') > 0` | no | no | Biggest trap — engages neither even with `lower(body)` index. |
+| `match(lower(body), 'regex')` | no | partial | Only literal substrings inside the regex are usable. |
+
+#### Anti-patterns to rewrite
+
+| Replace | With |
+|---|---|
+| `positionCaseInsensitive(body, 'Foo')` | `lower(body) LIKE '%foo%'` |
+| `position(body, 'foo') > 0` | `lower(body) LIKE '%foo%'` |
+| `body LIKE '%Foo%'` | `lower(body) LIKE '%foo%'` |
+| `hasToken(body, 'foo')` | `hasToken(lower(body), 'foo')` |
+
+Lowercase the literal (the index value is lowercase). Escape `%` and `_` in the literal; pass other characters (hyphens, dots, parens, colons) through as-is.
+
+#### OR-of-LIKE — add a common AND-prefix
+
+OR'd `LIKE` patterns weaken ngrambf to nearly nothing: any branch matching keeps the granule. Find a token or substring shared by **all** branches and AND it before the OR block:
+
+```sql
+-- BEFORE: ngrambf keeps almost every granule
+WHERE lower(body) LIKE '%failed to send foo%'
+   OR lower(body) LIKE '%failed to send bar%'
+   OR lower(body) LIKE '%failed to send baz%'
+
+-- AFTER: tokenbf + ngrambf both prune; OR is now a per-row validator
+WHERE hasToken(lower(body), 'failed')               -- tokenbf engages
+  AND lower(body) LIKE '%failed to send%'           -- ngrambf engages
+  AND ( lower(body) LIKE '%failed to send foo%'
+     OR lower(body) LIKE '%failed to send bar%'
+     OR lower(body) LIKE '%failed to send baz%' )
+```
+
+Pick the AND-prefix in this order: (1) most distinctive single token via `hasToken`, (2) two ANDed `hasToken` calls, (3) distinctive shared substring via `LIKE`. Avoid common words like `the`, `user`, `error` — high false-positive rate on the bloom filter.
+
+#### Hyphens and punctuation split tokens
+
+`tokenbf` only stores `[A-Za-z0-9_]+` runs. Anything else (hyphens, dots, slashes, quotes, parens, colons) is a token boundary. So:
+
+- `hasToken(lower(body), 'settlement-requested')` matches **nothing** — there is no such token.
+- Use `hasToken(lower(body), 'settlement') AND hasToken(lower(body), 'requested')`, or
+- Use `lower(body) LIKE '%settlement-requested%'` (ngrambf handles punctuation).
+
+#### Verify with `EXPLAIN indexes=1`
+
+```sql
+EXPLAIN indexes=1
+<your query>;
+```
+
+Each `Skip` block under `ReadFromMergeTree` shows `Granules: kept/total`. For both `body_index_v2_token` and `body_index_v2_ngram`, kept should be `<` total. The `Combined` block is what feeds the actual scan — that's the number to drive down.
+
+Failure modes:
+- `Granules: 195/195` — predicate doesn't match the index expression, or the chosen token is too common.
+- `Skip` block missing — predicate engages no skip index at all.
+
+`tokenbf_v1(10000, …)` is small and saturates at high cardinality; `ngrambf_v1(4, 15000, …)` is the workhorse. If tokenbf looks idle even with a correct `hasToken(lower(body), …)`, lean on `lower(body) LIKE` rather than chasing tokenbf pruning the filter size won't deliver.
+
+#### Type traps in body-search queries
+
+- `toUnixTimestamp64Nano(now())` → `Code: 43, ILLEGAL_TYPE_OF_ARGUMENT`. Use `now64()` (or `toDateTime64(now(), 9)`). SigNoz dashboard macros like `$start_timestamp_nano` resolve to literal integers and sidestep this.
+- `max(fromUnixTimestamp64Nano(timestamp))` converts every row before aggregating. Use `fromUnixTimestamp64Nano(max(timestamp))` — `max` once on cheap UInt64, convert once at the end.
+
 ---
 
 ## Attribute Access Syntax
@@ -272,6 +355,7 @@ Before finalizing any query, verify:
 - [ ] **`fromUnixTimestamp64Nano(timestamp)`** used in SELECT when displaying timestamps
 - [ ] **`GLOBAL IN`** is used (not plain `IN`) for the any subquery
 - [ ] **Indexed columns** used over map access where the attribute is a selected field
+- [ ] **Body searches** use `lower(body)` (not raw `body`) and `LIKE` (not `position` / `positionCaseInsensitive`); for OR'd patterns, a shared `hasToken` or `LIKE` is ANDed before the OR block
 - [ ] **`seen_at_ts_bucket_start`** filter is included in the resource CTE
 - [ ] For timeseries: results are ordered by `ts ASC`
 - [ ] **Table Name**: Always use the `distributed_` prefix (`distributed_logs_v2`, not `logs_v2`)
