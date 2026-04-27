@@ -3,3 +3,7 @@
 __pycache__/
 *.pyc
 .claude
+
+# Skill eval workspaces and local eval prompts (skill-creator output)
+plugins/*/skills/*-workspace/
+plugins/*/skills/*/evals/

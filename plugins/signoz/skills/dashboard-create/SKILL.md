@@ -61,8 +61,21 @@ python3 "<skill-base>/tools/search_templates.py" "<query>" --limit 5
 
 The query should be the user's request boiled down to the technology or
 domain words (e.g., "postgresql", "redis", "kubernetes nodes"). The tool
-emits a JSON array of `{id, title, path, description, score}` entries.
-If the array is empty, no template matches — **go to Step 3**.
+emits a JSON array of `{id, title, path, description, category, score}`
+entries. If the array is empty, no template matches — **go to Step 3**.
+
+**Narrowing by category (optional).** When the user's request is broad
+(e.g. "give me an APM dashboard", "something for Kubernetes") and the
+keyword search returns too many or too few hits, you can list the
+categories first and search inside one:
+
+```bash
+python3 "<skill-base>/tools/search_templates.py" --list-categories
+python3 "<skill-base>/tools/search_templates.py" "" --category "Apm" --limit 10
+```
+
+A category-only call (empty query) returns every template in that
+category, ordered by title.
 
 **If a template matches:**
 
@@ -70,7 +83,7 @@ If the array is empty, no template matches — **go to Step 3**.
    use: "I found a pre-built [title] dashboard template — [description].
    Should I import it?" If `description` is empty (common — most entries
    have none), fall back to: "I found a pre-built [title] dashboard template
-   (category: [id], file: [path]). Should I import it?"
+   (category: [category], file: [path]). Should I import it?"
 2. On confirmation, fetch the template JSON:
 
    ```bash
@@ -81,14 +94,48 @@ If the array is empty, no template matches — **go to Step 3**.
    the path** — some entries contain spaces (e.g., `temporal.io/Temporal Cloud Metrics.json`).
    The tool writes raw JSON to stdout. It handles HTTP/network errors — if it
    exits non-zero, tell the user and offer Step 3 (custom build) instead.
-3. **Validate and normalize the fetched JSON before creating.** Read the MCP
-   resources `signoz://dashboard/widgets-instructions` and
-   `signoz://dashboard/widgets-examples` for the required widget and
-   `queryData` fields, and add any that are missing from the template JSON.
-4. Pass `title`, `description`, `tags`, `layout`, `widgets`, and `variables`
+3. **Validate and normalize the fetched JSON before creating.** The
+   `signoz_create_dashboard` tool's input schema enumerates every required
+   widget and `queryData` field — use it as the source of truth and add any
+   that the template JSON is missing. If the schema is unclear or you need
+   richer guidance (panel-type-specific examples, layout rules), also read
+   the MCP resources `signoz://dashboard/widgets-instructions` and
+   `signoz://dashboard/widgets-examples`.
+4. **Pre-flight no-data check.** Before calling `signoz_create_dashboard`,
+   probe whether the template's signals are actually being ingested:
+   - Walk the fetched JSON and collect what each widget queries:
+     - **Metrics** — `query.builder.queryData[].aggregateAttribute.key`
+       on widgets where `dataSource = "metrics"`.
+     - **Traces** — widgets where `dataSource = "traces"`; collect any
+       `service.name` filter values plus the aggregated attribute.
+     - **Logs** — widgets where `dataSource = "logs"`; collect filter
+       attribute keys.
+     - **Raw ClickHouse / PromQL** — extract the metric names referenced
+       in the SQL/PromQL string.
+   - Probe up to ~5 representative signals using these MCP tools (one
+     per metric/attribute — keep the total small):
+     - Metrics: `signoz_list_metrics` with `searchText=<metric_name>`
+       and `timeRange=1h`. Empty result → metric is not being ingested.
+     - Traces: `signoz_aggregate_traces` with `aggregation=count`,
+       `service=<svc>` (or `filter=<attr> EXISTS`), `timeRange=1h`.
+       A zero count → no traces.
+     - Logs: `signoz_aggregate_logs` with `aggregation=count`,
+       `filter=<attr> EXISTS`, `timeRange=1h`. A zero count → no logs.
+     - Resource attribute values referenced by template variables:
+       `signoz_get_field_values` with the matching `signal` and `name`.
+   - If **none** of the probed signals return data, warn the user
+     verbatim: "I couldn't find data for [list] in the last hour — this
+     template is for [technology] and it doesn't look like that data is
+     being ingested yet. I can still create the dashboard (it will just
+     show 'No data' until you ingest), or I can stop here. Which would
+     you like?" Wait for the user's choice.
+   - If **some** signals are present and others aren't, list which are
+     missing and proceed only on confirmation.
+   - If everything is present, proceed silently.
+5. Pass `title`, `description`, `tags`, `layout`, `widgets`, and `variables`
    to `signoz_create_dashboard`.
-5. Report what was created: title, panel count, sections.
-6. Offer customization. If the user requests changes, call
+6. Report what was created: title, panel count, sections.
+7. Offer customization. If the user requests changes, call
    `signoz_get_dashboard`, then `signoz_update_dashboard` with the modified
    full JSON.
 
@@ -113,8 +160,15 @@ When no template fits the user's request, build a dashboard from scratch.
 3. **Build the dashboard JSON** following the v5 schema as documented in the
    MCP resources loaded in the previous step. Use OTel semantic attribute
    names (not shorthand) in filters, groupBy, and variables.
-4. Call `signoz_create_dashboard` with the built JSON.
-5. Report what was created and offer to adjust anything. If the user requests
+4. **Pre-flight no-data check.** Before calling `signoz_create_dashboard`,
+   probe a representative subset of the metrics / attributes you used,
+   using the same MCP tools listed in Step 2.4 (`signoz_list_metrics` for
+   metrics, `signoz_aggregate_traces` / `signoz_aggregate_logs` for
+   trace/log presence, `signoz_get_field_values` for variable values).
+   If none return data in the last hour, warn the user (same wording as
+   Step 2.4) and wait for confirmation before creating.
+5. Call `signoz_create_dashboard` with the built JSON.
+6. Report what was created and offer to adjust anything. If the user requests
    changes, call `signoz_get_dashboard` to fetch the current state, then use
    `signoz_update_dashboard` with the modified full dashboard JSON.
 
@@ -137,6 +191,10 @@ When no template fits the user's request, build a dashboard from scratch.
   `service`, `host.name` not `host`, `deployment.environment.name` not `env`.
 - **No metric guessing**: For custom builds, if you are not sure what metrics are
   available, ask the user. Wrong metric names produce empty panels.
+- **No-data warning before create**: Always run the pre-flight probe (Step
+  2.4 / Step 3.4) before `signoz_create_dashboard`. A "No data" dashboard
+  is a worse user outcome than one extra confirmation prompt. Skip the
+  probe only if the user has explicitly opted out for this request.
 - **GitHub fetch failures**: If fetching a template JSON from GitHub fails, tell
   the user and offer to build a custom version instead.
 - **Full state on update**: `signoz_update_dashboard` requires the complete
