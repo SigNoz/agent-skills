@@ -46,9 +46,16 @@ you are about to import, if Step 2 has matched one). A match is any of:
 name, UUID, and created-at — and ask explicitly: "I found these dashboards
 that look similar: [list]. Do you want to (a) modify an existing one, (b)
 create a new one anyway, or (c) skip?" Do not create until the user picks.
-If they pick (a), call `signoz_get_dashboard` with the chosen UUID to fetch
-its full configuration, then use `signoz_update_dashboard` to apply the
-changes.
+
+**Branch on the user's choice:**
+- **(a) Modify existing** — call `signoz_get_dashboard` with the chosen UUID
+  to fetch its full configuration, then use `signoz_update_dashboard` to
+  apply the changes. Do not continue to Step 2.
+- **(b) Create anyway** — **continue to Step 2**. "Create anyway" means
+  "create a new dashboard despite the duplicates"; it does **not** mean
+  "skip the template search". You must still run the template catalog
+  search before deciding between template-import and custom-build.
+- **(c) Skip** — stop. Do not create anything.
 
 ### Step 2: Search the template catalog
 
