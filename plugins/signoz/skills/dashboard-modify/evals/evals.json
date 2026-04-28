@@ -1,0 +1,98 @@
+{
+  "skill_name": "dashboard-modify",
+  "evals": [
+    {
+      "id": 0,
+      "name": "add-panel-to-existing-dashboard",
+      "prompt": "Add a panel showing p99 latency by service to my 'API Monitoring' dashboard. Group by service.name.",
+      "expected_output": "Agent paginates list_dashboards to find 'API Monitoring', fetches it, builds a new graph widget with all required fields and a UUID, places it in the layout (and panelMap if rows exist), preserves all existing panels/variables, and calls update_dashboard with the full state.",
+      "files": [],
+      "assertions": [
+        "Updated dashboard has exactly one more widget than original",
+        "New widget has all required v5 fields",
+        "New widget's id is a valid UUID",
+        "New widget's query uses 'service.name' (OTel naming) in groupBy, not 'service'",
+        "Layout has one new entry whose 'i' matches the new widget's id",
+        "All original widgets and variables remain present and unchanged",
+        "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
+      ]
+    },
+    {
+      "id": 1,
+      "name": "remove-panel-destructive-confirm",
+      "prompt": "Get rid of the memory fragmentation widget on my Redis dashboard, just do it quickly.",
+      "expected_output": "Despite 'just do it quickly', agent confirms the deletion before applying. On confirmation, removes widget from widgets[], layout entry, and panelMap entry. Leaves other y positions untouched.",
+      "files": [],
+      "assertions": [
+        "Transcript contains an explicit confirmation question before deletion (despite user's 'just do it quickly')",
+        "Updated dashboard has exactly one fewer widget than original",
+        "Removed widget's id is absent from widgets[], layout[], and panelMap[*].widgets",
+        "Remaining widgets' y positions are unchanged from original (no auto-compaction)",
+        "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "panel-type-graph-to-table",
+      "prompt": "Change the 'Request Latency' panel on my API dashboard from a graph to a table.",
+      "expected_output": "Non-destructive: proceeds without confirmation. Updates panelTypes from 'graph' to 'table', adds columnUnits ({}) and columnWidths ({}) if missing, keeps the query and other widget fields intact, preserves all other panels.",
+      "files": [],
+      "assertions": [
+        "Target widget's panelTypes is 'table' in updated, was 'graph' in original",
+        "Target widget retains the same query object (deep-equal to original)",
+        "Target widget has both columnUnits and columnWidths keys present",
+        "Widget count is identical between original and updated (no add/remove)",
+        "Transcript shows no confirmation prompt — non-destructive change proceeded directly",
+        "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "compound-add-rename-remove",
+      "prompt": "On my 'Service Health' dashboard: rename it to 'Service Health (Production)', remove the CPU Usage panel, and add an Error Rate panel grouped by service.name. Use OTel attribute names.",
+      "expected_output": "Agent fetches the dashboard once, plans all three changes against that single state, confirms the destructive removal, and applies all three as a single update. Uses service.name. Preserves untouched widgets/variables/panelMap entries.",
+      "files": [],
+      "assertions": [
+        "Transcript shows a single confirmation prompt covering the destructive removal of CPU Usage",
+        "Dashboard title (or name) is updated to 'Service Health (Production)'",
+        "CPU Usage widget is absent from widgets[], layout[], and panelMap",
+        "A new Error Rate widget is present with all required v5 fields and groupBy contains 'service.name'",
+        "Net widget count equals original count (one removed, one added)",
+        "Transcript indicates a single planned update_dashboard call (changes batched, not iterative)",
+        "All non-target widgets, variables, and panelMap entries preserved unchanged",
+        "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "side-by-side-layout",
+      "prompt": "Put the 'CPU' and 'Memory' panels on my host overview dashboard side by side at the top.",
+      "expected_output": "Agent moves both panels to same y, w:6 each, x:0 and x:6, equal h. Updates panelMap[rowId].widgets entries to match layout. Preserves rest of dashboard.",
+      "files": [],
+      "assertions": [
+        "CPU and Memory widgets in layout[] both have w == 6",
+        "Their x values are {0, 6} (one each, in some order)",
+        "Their y values are equal",
+        "Their h values are equal",
+        "Matching panelMap[rowId].widgets entries for CPU and Memory have the same x, y, w, h as the top-level layout entries (panelMap-sync rule)",
+        "No other panels modified",
+        "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "add-environment-variable",
+      "prompt": "Add a deployment environment dropdown variable to my Kafka dashboard so I can filter by env.",
+      "expected_output": "Agent adds a DYNAMIC variable for deployment.environment.name with UUID id and key, valid v5 structure, preserves existing variables, panels, and layout.",
+      "files": [],
+      "assertions": [
+        "variables map in updated has exactly one more entry than original",
+        "New variable's type is 'DYNAMIC'",
+        "New variable's underlying attribute is 'deployment.environment.name' (not 'env', 'environment', or 'deployment.environment')",
+        "New variable has UUID-shaped id and key",
+        "Existing variables, widgets, and layout are untouched",
+        "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
+      ]
+    }
+  ]
+}
