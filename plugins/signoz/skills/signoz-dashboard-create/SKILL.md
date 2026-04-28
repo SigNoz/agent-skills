@@ -10,6 +10,17 @@ description: >
 
 # Dashboard Create
 
+## Prerequisites
+
+This skill calls SigNoz MCP server tools (`signoz_create_dashboard`,
+`signoz_list_dashboards`, `signoz_list_metrics`, `signoz_get_field_values`,
+`signoz_aggregate_logs`, `signoz_aggregate_traces`, etc.). Before running
+the workflow, confirm the `signoz_*` tools are available. If they are not,
+the SigNoz MCP server is not installed or configured — stop and direct the
+user to set it up: <https://signoz.io/docs/ai/signoz-mcp-server/>. Do not
+fall back to raw HTTP calls or fabricate dashboard JSON without the MCP
+tools.
+
 ## When to use
 
 Use this skill when the user asks to:

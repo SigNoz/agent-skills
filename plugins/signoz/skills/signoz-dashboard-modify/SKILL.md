@@ -9,6 +9,16 @@ description: >
 
 # Dashboard Modify
 
+## Prerequisites
+
+This skill calls SigNoz MCP server tools (`signoz_get_dashboard`,
+`signoz_update_dashboard`, `signoz_list_dashboards`, `signoz_list_metrics`).
+Before running the workflow, confirm the `signoz_*` tools are available.
+If they are not, the SigNoz MCP server is not installed or configured —
+stop and direct the user to set it up:
+<https://signoz.io/docs/ai/signoz-mcp-server/>. Do not fall back to raw
+HTTP calls or hand-edit dashboard JSON without the MCP tools.
+
 ## When to use
 
 Use this skill when the user asks to:

@@ -6,8 +6,9 @@ Official SigNoz skills for Claude Code, Codex, Cursor, and the [skills.sh](https
 
 | Skill | Description |
 |-------|-------------|
-| [signoz-alert-create](plugins/signoz/skills/signoz-alert-create/SKILL.md) | Create SigNoz alert rules for threshold breaches, error rates, latency, and other monitoring conditions. |
-| [signoz-alert-explain-what](plugins/signoz/skills/signoz-alert-explain-what/SKILL.md) | Explain and interpret an existing SigNoz alert rule's configuration and behavior. |
+| [signoz-alert-create](plugins/signoz/skills/signoz-alert-create/SKILL.md) | Create SigNoz alert rules for threshold breaches, error rates, latency, anomaly detection, and absent-data conditions across metrics, logs, and traces. |
+| [signoz-alert-explain](plugins/signoz/skills/signoz-alert-explain/SKILL.md) | Explain and interpret an existing SigNoz alert rule's configuration, evaluation behavior, notification routing, and recent fire frequency. |
+| [signoz-alert-investigate](plugins/signoz/skills/signoz-alert-investigate/SKILL.md) | Diagnose why a SigNoz alert fired by correlating its signal with neighbor metrics, traces, and logs around the fire window, and ranking likely causes. |
 | [signoz-dashboard-create](plugins/signoz/skills/signoz-dashboard-create/SKILL.md) | Create new SigNoz dashboards or import pre-built templates for services and infrastructure. |
 | [signoz-dashboard-explain](plugins/signoz/skills/signoz-dashboard-explain/SKILL.md) | Explain panels, queries, and layout of an existing SigNoz dashboard. |
 | [signoz-dashboard-modify](plugins/signoz/skills/signoz-dashboard-modify/SKILL.md) | Modify an existing SigNoz dashboard: add, remove, or edit panels, variables, queries, and layout. |
@@ -69,7 +70,8 @@ npx skills add SigNoz/agent-skills --skill signoz-clickhouse-query    # specific
 │   ├── hooks/                              # Auto-allow hooks
 │   └── skills/
 │       ├── signoz-alert-create/
-│       ├── signoz-alert-explain-what/
+│       ├── signoz-alert-explain/
+│       ├── signoz-alert-investigate/
 │       ├── signoz-clickhouse-query/
 │       ├── signoz-dashboard-create/
 │       ├── signoz-dashboard-explain/

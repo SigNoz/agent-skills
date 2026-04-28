@@ -9,6 +9,19 @@ description: >
 
 # Query Generate
 
+## Prerequisites
+
+This skill calls SigNoz MCP server tools heavily (`signoz_execute_builder_query`,
+`signoz_query_metrics`, `signoz_search_logs`, `signoz_search_traces`,
+`signoz_aggregate_logs`, `signoz_aggregate_traces`, `signoz_get_field_keys`,
+`signoz_get_field_values`, `signoz_list_metrics`, `signoz_list_services`,
+`signoz_get_service_top_operations`, `signoz_get_trace_details`). Before
+running the workflow, confirm the `signoz_*` tools are available. If they
+are not, the SigNoz MCP server is not installed or configured — stop and
+direct the user to set it up: <https://signoz.io/docs/ai/signoz-mcp-server/>.
+Do not fall back to raw HTTP calls or fabricate query results without the
+MCP tools.
+
 ## When to use
 
 Use this skill when the user asks to:
@@ -136,6 +149,14 @@ from context (e.g., from a dashboard or @mention), skip redundant discovery.
 - **Scope boundary**: This skill queries data. If the user's query results lead
   to wanting a dashboard, redirect to `signoz-dashboard-create`. If they want an alert,
   redirect to the alert skill.
+- **Emit `apply_filter` on the final message.** When the user asks you to
+  write, build, generate, or show a query, include an `apply_filter` action
+  on your final assistant message with the resolved `compositeQuery` from
+  the tool result and the appropriate `signal` field (`metrics`, `logs`, or
+  `traces`). This signals to the SigNoz UI that the user wants to apply the
+  query to an explorer page. Only emit `apply_filter` when the user's primary
+  intent is to obtain a runnable query — not when the user is asking a
+  one-shot data question that the analysis text already answers.
 
 ## Examples
 

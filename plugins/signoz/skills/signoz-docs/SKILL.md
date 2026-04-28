@@ -1,6 +1,6 @@
 ---
 name: signoz-docs
-description: Use this skill first whenever the user asks about SigNoz instrumentation, OpenTelemetry setup, querying, dashboards, alerts, troubleshooting, self-hosted deployment, API endpoints, auth headers, or where to find anything in SigNoz docs.
+description: Look up information in SigNoz documentation. Use this skill when the user asks "how do I", "where in the docs", "what does the docs say about", "find docs for", or otherwise needs reference material on SigNoz instrumentation, OpenTelemetry setup, self-hosted deployment, API endpoints, auth headers, or troubleshooting steps. Do NOT use this skill to perform actions in SigNoz — for creating alerts use signoz-alert-create, explaining alerts use signoz-alert-explain, investigating alert fires use signoz-alert-investigate, creating/explaining/modifying dashboards use signoz-dashboard-*, generating queries use signoz-query-generate, and writing raw ClickHouse SQL for dashboard panels use signoz-clickhouse-query. Docs lookup only.
 ---
 
 # SigNoz Docs
