@@ -139,10 +139,20 @@ category, ordered by title.
    - If **some** signals are present and others aren't, list which are
      missing and proceed only on confirmation.
    - If everything is present, proceed silently.
-5. Pass `title`, `description`, `tags`, `layout`, `widgets`, and `variables`
+5. **Shape check before create.** The `signoz_create_dashboard` tool rejects
+   stringified JSON for array/object fields with errors like
+   `cannot unmarshal string into ... layout of type []LayoutItem`. Verify
+   the values you are about to pass match the input schema's types — do
+   **not** wrap them in `JSON.stringify` / `json.dumps`:
+   - `tags` → array of strings, e.g. `["host", "infra"]` (not `"[\"host\"]"`).
+   - `layout` → array of `{i, x, y, w, h}` objects (not a JSON string).
+   - `widgets` → array of widget objects (not a JSON string).
+   - `variables` → object/map keyed by variable name (not a JSON string).
+   - `title`, `description` → plain strings.
+6. Pass `title`, `description`, `tags`, `layout`, `widgets`, and `variables`
    to `signoz_create_dashboard`.
-6. Report what was created: title, panel count, sections.
-7. Offer customization. If the user requests changes, call
+7. Report what was created: title, panel count, sections.
+8. Offer customization. If the user requests changes, call
    `signoz_get_dashboard`, then `signoz_update_dashboard` with the modified
    full JSON.
 
@@ -174,15 +184,34 @@ When no template fits the user's request, build a dashboard from scratch.
    trace/log presence, `signoz_get_field_values` for variable values).
    If none return data in the last hour, warn the user (same wording as
    Step 2.4) and wait for confirmation before creating.
-5. Call `signoz_create_dashboard` with the built JSON.
-6. Report what was created and offer to adjust anything. If the user requests
+5. **Shape check before create.** The `signoz_create_dashboard` tool rejects
+   stringified JSON for array/object fields with errors like
+   `cannot unmarshal string into ... layout of type []LayoutItem` /
+   `... tags of type []string`. Verify the values you are about to pass
+   match the input schema's types — do **not** wrap them in
+   `JSON.stringify` / `json.dumps`:
+   - `tags` → array of strings.
+   - `layout` → array of `{i, x, y, w, h}` objects.
+   - `widgets` → array of widget objects.
+   - `variables` → object/map keyed by variable name.
+   - `title`, `description` → plain strings.
+6. Call `signoz_create_dashboard` with the built JSON.
+7. Report what was created and offer to adjust anything. If the user requests
    changes, call `signoz_get_dashboard` to fetch the current state, then use
    `signoz_update_dashboard` with the modified full dashboard JSON.
 
 ## Guardrails
 
 - **Template-first**: Always check the template catalog before proposing a custom
-  build. Never build from scratch when a matching template exists.
+  build. Never build from scratch when a matching template exists. If the user
+  picks "(b) create anyway" in Step 1's duplicate-check branch, that is **not**
+  permission to skip Step 2 — you must still run `search_templates.py` before
+  any `signoz_create_dashboard` call. "Create anyway" overrides the duplicate
+  warning, not the template-first rule.
+- **No stringified JSON in tool args**: `signoz_create_dashboard` and
+  `signoz_update_dashboard` reject array/object fields passed as JSON strings.
+  `tags`, `layout`, `widgets` must be real arrays; `variables` must be a real
+  object. Never `JSON.stringify` / `json.dumps` these before passing them.
 - **No blind creation**: Always confirm with the user before creating. For
   templates: one confirmation. For custom: confirm the plan after gathering
   requirements.
