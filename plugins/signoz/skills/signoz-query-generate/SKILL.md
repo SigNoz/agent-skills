@@ -1,5 +1,5 @@
 ---
-name: query-generate
+name: signoz-query-generate
 description: >
   Trigger when the user wants to generate, write, or run a query against their
   observability data.  Includes requests like "show me error rates",
@@ -18,8 +18,8 @@ Use this skill when the user asks to:
 - Investigate patterns (spikes, drops, trends over time)
 
 Do NOT use when:
-- User wants to create a dashboard → `dashboard-create`
-- User wants to modify a dashboard → `dashboard-modify`
+- User wants to create a dashboard → `signoz-dashboard-create`
+- User wants to modify a dashboard → `signoz-dashboard-modify`
 - User wants to create or modify an alert → alert skills
 - User wants to understand what a dashboard/alert shows → explain the entity directly
 
@@ -134,7 +134,7 @@ from context (e.g., from a dashboard or @mention), skip redundant discovery.
 - **No raw ClickHouse SQL**: Always use the Query Builder tools. Never construct
   raw SQL.
 - **Scope boundary**: This skill queries data. If the user's query results lead
-  to wanting a dashboard, redirect to `dashboard-create`. If they want an alert,
+  to wanting a dashboard, redirect to `signoz-dashboard-create`. If they want an alert,
   redirect to the alert skill.
 
 ## Examples

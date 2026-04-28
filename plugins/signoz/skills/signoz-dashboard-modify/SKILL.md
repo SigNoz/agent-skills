@@ -1,5 +1,5 @@
 ---
-name: dashboard-modify
+name: signoz-dashboard-modify
 description: >
   Trigger when the user wants to modify, update, or change an existing dashboard.
   Includes requests like "add a panel to my dashboard", "change the query on this
@@ -22,9 +22,9 @@ Use this skill when the user asks to:
 - Update tags on a dashboard
 
 Do NOT use when:
-- User wants to create a new dashboard from scratch → `dashboard-create`
-- User wants to understand what a dashboard shows → `dashboard-explain`
-- User wants to query data without modifying a dashboard → `query-generate`
+- User wants to create a new dashboard from scratch → `signoz-dashboard-create`
+- User wants to understand what a dashboard shows → `signoz-dashboard-explain`
+- User wants to query data without modifying a dashboard → `signoz-query-generate`
 
 ## Instructions
 
@@ -186,7 +186,7 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
   needs a unique UUID (`crypto.randomUUID()` format). Never use sequential IDs
   or short strings.
 - **Scope boundary**: This skill modifies existing dashboards. If the user wants to
-  create a new dashboard, redirect to `dashboard-create`.
+  create a new dashboard, redirect to `signoz-dashboard-create`.
 
 ## Examples
 

@@ -1,5 +1,5 @@
 ---
-name: alert-explain-what
+name: signoz-alert-explain-what
 description: >
   Trigger when the user wants to understand, interpret, or get an overview of an
   existing alert rule. Includes requests like "explain this alert", "what does
@@ -18,9 +18,9 @@ Use this skill when the user asks to:
 - Understand the queries, thresholds, or notification routing on an alert
 
 Do NOT use when:
-- User wants to create a new alert → `alert-create`
+- User wants to create a new alert → `signoz-alert-create`
 - User wants to modify an existing alert → `alert_modify`
-- User wants to query data without an alert context → `query-generate`
+- User wants to query data without an alert context → `signoz-query-generate`
 
 ## Instructions
 
@@ -185,11 +185,11 @@ After the explanation, offer actionable follow-ups:
 - "Want me to check recent firing history for this alert?" (→
   `signoz_get_alert_history`)
 - "Want me to run the underlying query to see current values?"
-  (→ `query-generate`)
+  (→ `signoz-query-generate`)
 - "Want me to adjust the threshold or add another severity level?"
   (→ `alert_modify`)
 - "Want me to create a related alert for [gap you noticed]?"
-  (→ `alert-create`)
+  (→ `signoz-alert-create`)
 
 ## Guardrails
 
@@ -215,7 +215,7 @@ After the explanation, offer actionable follow-ups:
   counts. Do not describe the evaluation model using Prometheus terminology.
 - **Scope boundary**: This skill explains existing alert rules. If the user
   wants to change something after your explanation, redirect to `alert_modify`.
-  If they want a new alert, redirect to `alert-create`.
+  If they want a new alert, redirect to `signoz-alert-create`.
 
 ## Examples
 

@@ -1,5 +1,5 @@
 ---
-name: dashboard-explain
+name: signoz-dashboard-explain
 description: >
   Trigger when the user wants to understand, interpret, or get an overview of an
   existing dashboard. Includes requests like "explain this dashboard", "what does
@@ -18,9 +18,9 @@ Use this skill when the user asks to:
 - Understand the variables, filters, or queries on a dashboard
 
 Do NOT use when:
-- User wants to create a new dashboard → `dashboard-create`
-- User wants to modify an existing dashboard → `dashboard-modify`
-- User wants to query data without a dashboard context → `query-generate`
+- User wants to create a new dashboard → `signoz-dashboard-create`
+- User wants to modify an existing dashboard → `signoz-dashboard-modify`
+- User wants to query data without a dashboard context → `signoz-query-generate`
 
 ## Instructions
 
@@ -111,8 +111,8 @@ adding panels for X to cover Y."
 After the explanation, offer actionable follow-ups:
 - "Want me to run the queries from any specific panel to check if they're returning
   data?"
-- "Want me to add any missing panels or thresholds?" (→ `dashboard-modify`)
-- "Want me to create a companion dashboard for [related area]?" (→ `dashboard-create`)
+- "Want me to add any missing panels or thresholds?" (→ `signoz-dashboard-modify`)
+- "Want me to create a companion dashboard for [related area]?" (→ `signoz-dashboard-create`)
 
 ## Guardrails
 
@@ -136,8 +136,8 @@ After the explanation, offer actionable follow-ups:
   aggregations, filter expression, and groupBy. For raw SQL/PromQL, parse the
   query string and explain the intent.
 - **Scope boundary**: This skill explains dashboards. If the user wants to change
-  something after your explanation, redirect to `dashboard-modify`. If they want a
-  new dashboard, redirect to `dashboard-create`.
+  something after your explanation, redirect to `signoz-dashboard-modify`. If they want a
+  new dashboard, redirect to `signoz-dashboard-create`.
 
 ## Examples
 

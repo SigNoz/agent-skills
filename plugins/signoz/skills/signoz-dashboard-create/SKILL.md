@@ -1,5 +1,5 @@
 ---
-name: dashboard-create
+name: signoz-dashboard-create
 description: >
   Trigger when the user wants to create a new dashboard, set up monitoring
   for a service or infrastructure component, or import a pre-built dashboard
@@ -19,9 +19,9 @@ Use this skill when the user asks to:
 - Import a dashboard template
 
 Do NOT use when:
-- User wants to modify an existing dashboard → `dashboard-modify`
-- User wants to understand what a dashboard shows → `dashboard-explain`
-- User wants to query data without creating a dashboard → `query-generate`
+- User wants to modify an existing dashboard → `signoz-dashboard-modify`
+- User wants to understand what a dashboard shows → `signoz-dashboard-explain`
+- User wants to query data without creating a dashboard → `signoz-query-generate`
 
 ## Instructions
 
@@ -202,7 +202,7 @@ When no template fits the user's request, build a dashboard from scratch.
   to get the current state, merge your changes into that full object, and pass
   the result to `signoz_update_dashboard`.
 - **Scope boundary**: This skill creates dashboards. Post-creation modifications
-  beyond the initial customization offer belong to `dashboard-modify`.
+  beyond the initial customization offer belong to `signoz-dashboard-modify`.
 
 ## Examples
 

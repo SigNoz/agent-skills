@@ -1,5 +1,5 @@
 ---
-name: alert-create
+name: signoz-alert-create
 description: >
   Trigger when the user wants to create a new alert rule, set up monitoring
   alerts, or get notified about threshold breaches. Includes requests like
@@ -20,11 +20,11 @@ Use this skill when the user asks to:
 
 Do NOT use when:
 - User wants to modify an existing alert → `alert_modify`
-- User wants to understand what an alert monitors → `alert-explain-what`
+- User wants to understand what an alert monitors → `signoz-alert-explain-what`
 - User wants to check alert status or history → use `signoz_list_alerts` /
   `signoz_get_alert_history` directly
-- User wants to create a dashboard → `dashboard-create`
-- User wants to query data without alerting → `query-generate`
+- User wants to create a dashboard → `signoz-dashboard-create`
+- User wants to query data without alerting → `signoz-query-generate`
 
 ## Instructions
 

@@ -2,9 +2,9 @@
 """Regenerate the bundled ``templates.json`` from the upstream repo.
 
 Usage:
-    python3 plugins/signoz/skills/dashboard-create/scripts/regenerate_index.py \
+    python3 plugins/signoz/skills/signoz-dashboard-create/scripts/regenerate_index.py \
         --sha <commit-sha> \
-        [--output plugins/signoz/skills/dashboard-create/templates.json]
+        [--output plugins/signoz/skills/signoz-dashboard-create/templates.json]
 
 Walks the ``SigNoz/dashboards`` repo at the given SHA, locates each
 template JSON, extracts title/description/tags, and emits the bundled
