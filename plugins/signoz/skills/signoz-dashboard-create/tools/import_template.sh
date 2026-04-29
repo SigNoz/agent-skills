@@ -29,7 +29,10 @@ PATH_ARG="${1#/}"
 ENCODED="$(jq -rn --arg s "$PATH_ARG" '$s | @uri' | sed 's|%2F|/|g')"
 URL="$BASE_URL/$PINNED_SHA/$ENCODED"
 
-TMP="$(mktemp)"
+# Write the scratch file under cwd (the agent's per-thread config_dir,
+# which is the only writable path in the sandbox). A bare `mktemp` resolves
+# to TMPDIR (on macOS that's /var/folders/<…>/T which the sandbox blocks).
+TMP="$(mktemp "./.import-template.XXXXXX")"
 trap 'rm -f "$TMP"' EXIT
 
 HTTP_CODE="$(curl -sS -o "$TMP" -w '%{http_code}' --max-time "$FETCH_TIMEOUT_SECONDS" "$URL" || true)"
