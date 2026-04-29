@@ -52,7 +52,7 @@ Run the search tool via Bash from the skill's base directory (shown in the
 initial skill-load message):
 
 ```bash
-bash "<skill-base>/tools/search_templates.sh" "<query>" --limit 5
+python3 "<skill-base>/tools/search_templates.py" "<query>" --limit 5
 ```
 
 The query should be the user's request boiled down to the technology or
@@ -66,8 +66,8 @@ keyword search returns too many or too few hits, you can list the
 categories first and search inside one:
 
 ```bash
-bash "<skill-base>/tools/search_templates.sh" --list-categories
-bash "<skill-base>/tools/search_templates.sh" "" --category "Apm" --limit 10
+python3 "<skill-base>/tools/search_templates.py" --list-categories
+python3 "<skill-base>/tools/search_templates.py" "" --category "Apm" --limit 10
 ```
 
 A category-only call (empty query) returns every template in that
@@ -128,15 +128,15 @@ configuration, plan the requested changes, then call
 Run this path when the user has confirmed in Step 2 that they want to
 import the template found in Step 1.
 
-> **Tool guardrail.** The only template tools are `search_templates.sh`
-> and `import_template.sh`. Do not invent other script names (no
-> `fetch_template.sh`, no `create_from_template.sh`, etc.).
-> `import_template.sh` takes exactly one argument: the template `<path>`.
+> **Tool guardrail.** The only template tools are `search_templates.py`
+> and `import_template.py`. Do not invent other script names (no
+> `fetch_template.py`, no `create_from_template.py`, etc.).
+> `import_template.py` takes exactly one argument: the template `<path>`.
 
 1. Fetch the template JSON:
 
    ```bash
-   bash "<skill-base>/tools/import_template.sh" "<path>"
+   python3 "<skill-base>/tools/import_template.py" "<path>"
    ```
 
    where `<path>` is the `path` field from the Step 1 search result.
@@ -202,7 +202,7 @@ import the template found in Step 1.
 #### Step 3c: Custom build (no template, or template fetch failed)
 
 Run this path when Step 1 found no template, or when the user opted for
-a custom build, or when `import_template.sh` failed. Build a dashboard
+a custom build, or when `import_template.py` failed. Build a dashboard
 from scratch.
 
 1. **Gather requirements** — ask the user:
@@ -291,7 +291,7 @@ from scratch.
 **User:** "Create a dashboard for my PostgreSQL database"
 
 **Agent:**
-1. Runs `bash "<skill-base>/tools/search_templates.sh" "postgresql"` —
+1. Runs `python3 "<skill-base>/tools/search_templates.py" "postgresql"` —
    top result is `postgresql/postgresql.json`.
 2. Calls `signoz_list_dashboards` (paginated) — no existing PostgreSQL
    dashboard.
@@ -299,7 +299,7 @@ from scratch.
    dashboard provides a high-level overview of your PostgreSQL databases.
    Should I import it?"
 4. User confirms.
-5. Runs `bash "<skill-base>/tools/import_template.sh" "postgresql/postgresql.json"`.
+5. Runs `python3 "<skill-base>/tools/import_template.py" "postgresql/postgresql.json"`.
 6. Reads `signoz://dashboard/widgets-instructions` and
    `signoz://dashboard/widgets-examples`, normalizes any missing required
    widget fields, runs the no-data probe, then calls
@@ -313,7 +313,7 @@ from scratch.
 **User:** "Create a dashboard to track our payment processing pipeline"
 
 **Agent:**
-1. Runs `bash "<skill-base>/tools/search_templates.sh" "payment processing"` —
+1. Runs `python3 "<skill-base>/tools/search_templates.py" "payment processing"` —
    empty array, no match. Marks request as custom build.
 2. Calls `signoz_list_dashboards` (paginated) — no existing payment
    dashboard.
@@ -337,7 +337,7 @@ plus a curated template. Template-search-first means we propose the
 template even though duplicates exist.)
 
 **Agent:**
-1. Runs `bash "<skill-base>/tools/search_templates.sh" "host metrics"` —
+1. Runs `python3 "<skill-base>/tools/search_templates.py" "host metrics"` —
    top result is `hostmetrics/hostmetrics.json` (title: "OpenTelemetry
    Host Metrics Dashboard").
 2. Calls `signoz_list_dashboards` (paginated) — finds 8 dashboards
@@ -355,7 +355,7 @@ template even though duplicates exist.)
 **User:** "Set up monitoring for Redis"
 
 **Agent:**
-1. Runs `bash "<skill-base>/tools/search_templates.sh" "redis"` — top
+1. Runs `python3 "<skill-base>/tools/search_templates.py" "redis"` — top
    result is `redis/redis.json`.
 2. Calls `signoz_list_dashboards` (paginated) — finds existing "Redis
    Overview" dashboard.
