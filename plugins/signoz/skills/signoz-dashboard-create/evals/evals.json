@@ -19,7 +19,7 @@
       "id": 2,
       "name": "broad-request-apm-category",
       "prompt": "I need an APM dashboard - what do you have?",
-      "expected_output": "Agent recognises the request is broad. Uses search_templates.py with --list-categories and/or --category 'Apm' to enumerate APM templates, presents them to the user, and asks the user to pick before importing.",
+      "expected_output": "Agent recognises the request is broad. Uses search_templates.sh with --list-categories and/or --category 'Apm' to enumerate APM templates, presents them to the user, and asks the user to pick before importing.",
       "files": []
     }
   ]
