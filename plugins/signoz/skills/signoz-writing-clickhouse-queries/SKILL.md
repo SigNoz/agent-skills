@@ -1,10 +1,14 @@
 ---
-name: signoz-clickhouse-query
+name: signoz-writing-clickhouse-queries
 description: >-
-  Write ClickHouse queries for SigNoz dashboards over OpenTelemetry logs and
-  traces. Use this skill whenever the user asks for SigNoz ClickHouse queries
-  for logs or traces, SigNoz dashboard queries, log analysis, span counts,
-  latency, or trace breakdowns.
+  Write raw ClickHouse SQL for a SigNoz dashboard panel — timeseries, value,
+  or table widgets that the builder UI cannot express (custom joins, window
+  functions, regex extraction over log bodies, aggregations beyond builder
+  syntax). Trigger when the user explicitly asks for a "ClickHouse query",
+  a "raw SQL panel", a "custom SQL widget", or describes a SigNoz dashboard
+  panel whose query needs SQL the builder cannot produce. Anchored to
+  dashboard-panel SQL specifically. For ad-hoc data exploration that does
+  not need to land in a panel, use `signoz-generating-queries` instead.
 ---
 
 # Writing ClickHouse Queries for SigNoz Dashboards
@@ -89,7 +93,7 @@ Every generated query MUST end with a `SETTINGS` clause for monitoring:
 SELECT ...
 FROM ...
 WHERE ...
-SETTINGS log_comment = 'signoz-clickhouse-query skill | YYYY-MM-DD'
+SETTINGS log_comment = 'signoz-writing-clickhouse-queries skill | YYYY-MM-DD'
 ```
 
 Replace `YYYY-MM-DD` with today's date (e.g., `2026-04-03`). If the query

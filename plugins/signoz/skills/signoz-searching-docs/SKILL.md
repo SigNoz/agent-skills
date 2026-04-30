@@ -1,6 +1,13 @@
 ---
-name: signoz-docs
-description: Use this skill first whenever the user asks about SigNoz instrumentation, OpenTelemetry setup, querying, dashboards, alerts, troubleshooting, self-hosted deployment, API endpoints, auth headers, or where to find anything in SigNoz docs.
+name: signoz-searching-docs
+description: >
+  Look up information in SigNoz documentation. Make sure to use this skill
+  whenever the user asks "how do I", "where in the docs", "what does the
+  docs say about", "find docs for", or otherwise needs reference material
+  on SigNoz instrumentation, OpenTelemetry setup, self-hosted deployment,
+  API endpoints, auth headers, or troubleshooting steps — even if they
+  don't say the word "docs" explicitly. Docs lookup only — for actions
+  inside SigNoz, the agent will pick the matching `signoz-*` action skill.
 ---
 
 # SigNoz Docs

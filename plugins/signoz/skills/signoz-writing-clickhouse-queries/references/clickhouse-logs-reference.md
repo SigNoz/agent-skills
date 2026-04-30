@@ -1,5 +1,22 @@
 # ClickHouse Logs Query Reference for SigNoz
 
+## Contents
+
+- Table Schemas (`distributed_logs_v2`, `distributed_logs_v2_resource`)
+- Mandatory Optimization Patterns
+  - Resource Filter CTE
+  - Timestamp Bucketing
+  - Use Indexed (Selected) Columns Over Map Access
+  - Use GLOBAL IN for Resource Fingerprint Subquery
+  - Body Text Search — Engaging Skip Indexes (predicate engagement,
+    anti-patterns, OR-of-LIKE, hyphens/punctuation, EXPLAIN, type traps)
+- Attribute Access Syntax (resource attributes, span/log attributes,
+  existence checks, timestamp conversion)
+- SigNoz Dashboard Variables
+- Dashboard Panel Query Examples (timeseries, table)
+- Query Examples (per-minute counts, filtered counts, top-N audit)
+- Query Optimization Checklist
+
 All tables live in the `signoz_logs` database.
 
 ---

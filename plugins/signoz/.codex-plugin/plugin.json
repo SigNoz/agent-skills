@@ -1,7 +1,7 @@
 {
   "name": "signoz",
   "version": "2026.04.25",
-  "description": "Official SigNoz plugin for docs guidance and ClickHouse dashboard queries",
+  "description": "Official SigNoz plugin for docs, queries, dashboards, and alerts",
   "author": {
     "name": "SigNoz",
     "url": "https://signoz.io"
@@ -20,8 +20,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "SigNoz",
-    "shortDescription": "Official SigNoz skills for docs guidance and ClickHouse queries",
-    "longDescription": "Installs the official SigNoz skills for using SigNoz docs and writing ClickHouse queries for traces and logs in Codex.",
+    "shortDescription": "Official SigNoz skills for docs, queries, dashboards, and alerts",
+    "longDescription": "Installs the official SigNoz skills for using SigNoz docs, writing ClickHouse queries, generating observability queries, and creating, explaining, and modifying dashboards and alerts in Codex.",
     "developerName": "SigNoz",
     "category": "Productivity",
     "capabilities": [
@@ -31,7 +31,9 @@
     "websiteURL": "https://signoz.io",
     "defaultPrompt": [
       "Use SigNoz to help me find the right docs page for OpenTelemetry instrumentation.",
-      "Use SigNoz to write a ClickHouse query for a SigNoz dashboard panel over traces or logs."
+      "Use SigNoz to write a ClickHouse query for a SigNoz dashboard panel over traces or logs.",
+      "Use SigNoz to create a dashboard for monitoring my service.",
+      "Use SigNoz to set up an alert when error rate exceeds a threshold."
     ]
   }
 }

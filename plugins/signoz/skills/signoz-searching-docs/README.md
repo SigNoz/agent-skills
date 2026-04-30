@@ -1,4 +1,4 @@
-# signoz-docs
+# signoz-searching-docs
 
 Agent skill for answering SigNoz questions with official documentation from [signoz.io/docs](https://signoz.io/docs).
 
@@ -12,7 +12,7 @@ This skill ships inside the official `signoz` Claude plugin and the shared `skil
 ## Structure
 
 ```
-plugins/signoz/skills/signoz-docs/
+plugins/signoz/skills/signoz-searching-docs/
 ├── SKILL.md              # Entry point — goal, docs-fetch method, workflow, heuristic routing table
 ├── README.md
 └── heuristics/
