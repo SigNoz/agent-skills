@@ -144,10 +144,7 @@ import the template found in Step 1.
    `temporal.io/Temporal Cloud Metrics.json`). The tool writes raw JSON
    to stdout. It handles HTTP/network errors — if it exits non-zero,
    tell the user and offer Step 3c (custom build) instead.
-2. **Pass the template JSON through unchanged.** Templates are already
-   valid input to `signoz_create_dashboard`. Parse the JSON and pass its
-   fields through verbatim — do not rewrite widget, query, filter, or
-   variable shapes.
+2. **Do not make any change in the template.** 
 3. **Pre-flight no-data check.** Before calling `signoz_create_dashboard`,
    probe whether the template's signals are actually being ingested:
    - Walk the fetched JSON and collect what each widget queries:
@@ -181,28 +178,14 @@ import the template found in Step 1.
    - If **some** signals are present and others aren't, list which are
      missing and proceed only on confirmation.
    - If everything is present, proceed silently.
-5. **Shape check before create.** The `signoz_create_dashboard` tool rejects
-   stringified JSON for array/object fields with errors like
-   `cannot unmarshal string into ... layout of type []LayoutItem`. Verify
-   the values you are about to pass match the input schema's types — do
-   **not** wrap them in `JSON.stringify` / `json.dumps`:
-   - `tags` → array of strings, e.g. `["host", "infra"]` (not `"[\"host\"]"`).
-   - `layout` → array of `{i, x, y, w, h}` objects (not a JSON string).
-   - `widgets` → array of widget objects (not a JSON string).
-   - `variables` → object/map keyed by variable name (not a JSON string).
-   - `title`, `description` → plain strings.
-6. Pass `title`, `description`, `tags`, `layout`, `widgets`, and `variables`
-   to `signoz_create_dashboard`.
-7. Report what was created: title, panel count, sections.
-8. Offer customization. If the user requests changes, call
+7. Offer customization. If the user requests changes, call
    `signoz_get_dashboard`, then `signoz_update_dashboard` with the modified
    full JSON.
 
 #### Step 3c: Custom build (no template, or template fetch failed)
 
 Run this path when Step 1 found no template, or when the user opted for
-a custom build, or when `import_template.py` failed. Build a dashboard
-from scratch.
+a custom build. Build a dashboard from scratch.
 
 1. **Gather requirements** — ask the user:
    - What signals to monitor (metrics, traces, logs, or a combination)
@@ -252,10 +235,6 @@ from scratch.
   permission to skip Step 2 — you must still run `search_templates.py` before
   any `signoz_create_dashboard` call. "Create anyway" overrides the duplicate
   warning, not the template-first rule.
-- **No stringified JSON in tool args**: `signoz_create_dashboard` and
-  `signoz_update_dashboard` reject array/object fields passed as JSON strings.
-  `tags`, `layout`, `widgets` must be real arrays; `variables` must be a real
-  object. Never `JSON.stringify` / `json.dumps` these before passing them.
 - **No blind creation**: Always confirm with the user before creating. For
   templates: one confirmation. For custom: confirm the plan after gathering
   requirements.
@@ -276,8 +255,6 @@ from scratch.
   dashboard is a worse user outcome than one extra confirmation prompt.
   Skip the probe only if the user has explicitly opted out for this
   request.
-- **GitHub fetch failures**: If fetching a template JSON from GitHub fails, tell
-  the user and offer to build a custom version instead.
 - **Full state on update**: `signoz_update_dashboard` requires the complete
   dashboard JSON (not a partial patch). Always call `signoz_get_dashboard` first
   to get the current state, merge your changes into that full object, and pass
@@ -299,8 +276,7 @@ from scratch.
    Should I import it?"
 4. User confirms.
 5. Runs `python3 "<skill-base>/tools/import_template.py" "postgresql/postgresql.json"`.
-6. Runs the no-data probe, then calls `signoz_create_dashboard` with the
-   template JSON passed through verbatim.
+6. Runs the no-data probe, then calls `signoz_create_dashboard`
 7. Reports: "Created 'Postgres overview' dashboard with N panels across M
    sections. Want me to adjust any panels, add variables, or change the
    layout?"
@@ -324,29 +300,6 @@ from scratch.
    Infrastructure. Runs the no-data probe.
 7. Calls `signoz_create_dashboard`.
 8. Reports what was created, offers customization.
-
----
-
-**User:** "Create a host metrics dashboard"
-
-(This is the failure mode from earlier — many existing host dashboards
-plus a curated template. Template-search-first means we propose the
-template even though duplicates exist.)
-
-**Agent:**
-1. Runs `python3 "<skill-base>/tools/search_templates.py" "host metrics"` —
-   top result is `hostmetrics/hostmetrics.json` (title: "OpenTelemetry
-   Host Metrics Dashboard").
-2. Calls `signoz_list_dashboards` (paginated) — finds 8 dashboards
-   matching "host"/"system"/"infrastructure".
-3. Says: "There are already these similar dashboards: [list with name,
-   UUID, created-at]. I also found a pre-built 'OpenTelemetry Host
-   Metrics Dashboard' template. Want me to (a) modify an existing one,
-   (b) import the template as a new dashboard, or (c) stop?"
-4. User picks (b). Goes to Step 3b — fetches the template, probes for
-   no-data, creates the dashboard with the template JSON passed through
-   verbatim. **Does not** detour into a custom-build that re-discovers
-   host metrics from scratch.
 
 ---
 
