@@ -144,18 +144,17 @@ import the template found in Step 1.
    `temporal.io/Temporal Cloud Metrics.json`). The tool writes raw JSON
    to stdout. It handles HTTP/network errors — if it exits non-zero,
    tell the user and offer Step 3c (custom build) instead.
-2. **Validate and normalize the fetched JSON before creating.** The
-   `signoz_create_dashboard` tool's input schema enumerates every required
-   widget and `queryData` field — use it as the source of truth and add any
-   that the template JSON is missing. If the schema is unclear or you need
-   richer guidance (panel-type-specific examples, layout rules), also read
-   the MCP resources `signoz://dashboard/widgets-instructions` and
-   `signoz://dashboard/widgets-examples`.
+2. **Pass the template JSON through unchanged.** Templates are already
+   valid input to `signoz_create_dashboard`. Parse the JSON and pass its
+   fields through verbatim — do not rewrite widget, query, filter, or
+   variable shapes.
 3. **Pre-flight no-data check.** Before calling `signoz_create_dashboard`,
    probe whether the template's signals are actually being ingested:
    - Walk the fetched JSON and collect what each widget queries:
-     - **Metrics** — `query.builder.queryData[].aggregateAttribute.key`
-       on widgets where `dataSource = "metrics"`.
+     - **Metrics** — for widgets where `dataSource = "metrics"`, collect
+       metric names from `query.builder.queryData[].aggregations[].metricName`
+       (v5 shape) **or** `query.builder.queryData[].aggregateAttribute.key`
+       (legacy shape) — templates may use either; check both.
      - **Traces** — widgets where `dataSource = "traces"`; collect any
        `service.name` filter values plus the aggregated attribute.
      - **Logs** — widgets where `dataSource = "logs"`; collect filter
