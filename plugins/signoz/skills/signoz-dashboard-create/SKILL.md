@@ -128,22 +128,24 @@ configuration, plan the requested changes, then call
 Run this path when the user has confirmed in Step 2 that they want to
 import the template found in Step 1.
 
-> **Tool guardrail.** The only template tools are `search_templates.py`
-> and `import_template.py`. Do not invent other script names (no
-> `fetch_template.py`, no `create_from_template.py`, etc.).
-> `import_template.py` takes exactly one argument: the template `<path>`.
+> **Tool guardrail.** The only template-search tool is `search_templates.py`.
+> Template JSON is fetched via the `WebFetch` tool against the pinned
+> upstream commit (URL below) — do not invent other script names (no
+> `fetch_template.py`, no `create_from_template.py`, no
+> `import_template.py`).
 
-1. Fetch the template JSON:
+1. Fetch the template JSON via the `WebFetch` tool. Construct the URL as:
 
-   ```bash
-   python3 "<skill-base>/tools/import_template.py" "<path>"
+   ```
+   https://raw.githubusercontent.com/SigNoz/dashboards/61d374c50f9e1383e0eba3584fb81498f38c1f8d/<path>
    ```
 
-   where `<path>` is the `path` field from the Step 1 search result.
-   **Always quote the path** — some entries contain spaces (e.g.,
-   `temporal.io/Temporal Cloud Metrics.json`). The tool writes raw JSON
-   to stdout. It handles HTTP/network errors — if it exits non-zero,
-   tell the user and offer Step 3c (custom build) instead.
+   where `<path>` is the `path` field from the Step 1 search result
+   (URL-encode spaces as `%20` — e.g.
+   `temporal.io/Temporal%20Cloud%20Metrics.json`). Pass a prompt like
+   "Return the raw JSON body unchanged" so WebFetch does not summarize
+   it. If WebFetch fails or returns a non-JSON body, tell the user and
+   offer Step 3c (custom build) instead.
 2. **Validate and normalize the fetched JSON before creating.** The
    `signoz_create_dashboard` tool's input schema enumerates every required
    widget and `queryData` field — use it as the source of truth and add any
@@ -202,8 +204,8 @@ import the template found in Step 1.
 #### Step 3c: Custom build (no template, or template fetch failed)
 
 Run this path when Step 1 found no template, or when the user opted for
-a custom build, or when `import_template.py` failed. Build a dashboard
-from scratch.
+a custom build, or when the `WebFetch` of the template JSON failed.
+Build a dashboard from scratch.
 
 1. **Gather requirements** — ask the user:
    - What signals to monitor (metrics, traces, logs, or a combination)
@@ -277,8 +279,9 @@ from scratch.
   dashboard is a worse user outcome than one extra confirmation prompt.
   Skip the probe only if the user has explicitly opted out for this
   request.
-- **GitHub fetch failures**: If fetching a template JSON from GitHub fails, tell
-  the user and offer to build a custom version instead.
+- **GitHub fetch failures**: If `WebFetch` of a template JSON from GitHub fails
+  (network error, non-200, non-JSON body), tell the user and offer to build a
+  custom version instead.
 - **Full state on update**: `signoz_update_dashboard` requires the complete
   dashboard JSON (not a partial patch). Always call `signoz_get_dashboard` first
   to get the current state, merge your changes into that full object, and pass
@@ -299,7 +302,8 @@ from scratch.
    dashboard provides a high-level overview of your PostgreSQL databases.
    Should I import it?"
 4. User confirms.
-5. Runs `python3 "<skill-base>/tools/import_template.py" "postgresql/postgresql.json"`.
+5. Fetches the template via `WebFetch` against
+   `https://raw.githubusercontent.com/SigNoz/dashboards/61d374c50f9e1383e0eba3584fb81498f38c1f8d/postgresql/postgresql.json`.
 6. Reads `signoz://dashboard/widgets-instructions` and
    `signoz://dashboard/widgets-examples`, normalizes any missing required
    widget fields, runs the no-data probe, then calls
