@@ -93,7 +93,7 @@ If the alert never fired in the window, say so explicitly:
 and skip the history line.
 
 This single line grounds the explanation. Do **not** drill into specific
-fires here — that's `alert-investigate`.
+fires here — that's `signoz-investigating-alerts`.
 
 ### Step 4: Build the structured explanation
 
@@ -241,7 +241,7 @@ End with two or three actionable follow-ups:
 - "Want me to adjust the threshold or add a severity level?" (→
   `signoz:signoz_update_alert` directly — out of scope here)
 - "Want me to create a related alert for [gap noticed]?" (→
-  `alert-create`)
+  `signoz-creating-alerts`)
 
 ## Guardrails
 
