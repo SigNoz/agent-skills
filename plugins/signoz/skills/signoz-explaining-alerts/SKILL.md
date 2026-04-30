@@ -1,5 +1,5 @@
 ---
-name: signoz-alert-explain
+name: signoz-explaining-alerts
 description: >
   Describe what an existing SigNoz alert rule does in plain language —
   the signal it watches, the threshold and evaluation behavior, the
@@ -9,7 +9,7 @@ description: >
   "walk me through this rule", "how does my [Y] alert work", "is this
   alert configured correctly", or otherwise asks for an interpretation
   of an existing alert's configuration. Static explanation only — for
-  diagnosing a specific firing incident, use `signoz-alert-investigate`.
+  diagnosing a specific firing incident, use `signoz-investigating-alerts`.
 argument-hint: <alert name or rule id>
 ---
 
@@ -20,13 +20,13 @@ explanation. The skill is read-only and stays focused on the rule
 itself: what it watches, when it fires, where it notifies. A single
 line of fire-frequency data is included to ground the explanation, but
 this skill does **not** investigate any specific fire — that is
-`signoz-alert-investigate`'s job.
+`signoz-investigating-alerts`'s job.
 
 ## Prerequisites
 
-This skill calls SigNoz MCP server tools (`signoz_get_alert`,
-`signoz_list_alert_rules`, `signoz_get_alert_history`). Before running
-the workflow, confirm the `signoz_*` tools are available. If they are
+This skill calls SigNoz MCP server tools (`signoz:signoz_get_alert`,
+`signoz:signoz_list_alert_rules`, `signoz:signoz_get_alert_history`). Before running
+the workflow, confirm the `signoz:signoz_*` tools are available. If they are
 not, the SigNoz MCP server is not installed or configured — stop and
 direct the user to set it up:
 <https://signoz.io/docs/ai/signoz-mcp-server/>. Do not guess at alert
@@ -41,11 +41,10 @@ Use this skill when the user wants to:
 - Translate raw alert JSON into operational language.
 
 Do NOT use when the user wants to:
-- Create a new alert → `signoz-alert-create`.
+- Create a new alert → `signoz-creating-alerts`.
 - Diagnose why an alert fired or correlate signals around a fire window
-  → `signoz-alert-investigate`.
-- Modify an existing alert → call `signoz_update_alert` directly.
-- Run an ad-hoc query → `signoz-query-generate`.
+  → `signoz-investigating-alerts`.
+- Modify an existing alert → call `signoz:signoz_update_alert` directly.
 
 ## Required inputs
 
@@ -56,7 +55,7 @@ Do NOT use when the user wants to:
 If the input is missing or ambiguous, this skill is **best-effort** (not
 strict — read-only operations are cheap to recover from):
 
-1. Call `signoz_list_alert_rules`, paginate through every page, and find
+1. Call `signoz:signoz_list_alert_rules`, paginate through every page, and find
    the closest name match.
 2. State the interpretation in the response:
    "Interpreting your request as alert 'High Error Rate — Checkout' (id 42).
@@ -69,7 +68,7 @@ strict — read-only operations are cheap to recover from):
 
 If the user provided a numeric id, skip to Step 2. Otherwise:
 
-1. Call `signoz_list_alert_rules` and **paginate every page** —
+1. Call `signoz:signoz_list_alert_rules` and **paginate every page** —
    `pagination.hasMore` is true until the full list is walked.
 2. Match by name (case-insensitive substring). If multiple match,
    present the candidates and ask which one (interactive) or pick the
@@ -77,14 +76,14 @@ If the user provided a numeric id, skip to Step 2. Otherwise:
 
 ### Step 2: Fetch the full configuration
 
-Call `signoz_get_alert` with the rule id. This is **mandatory** — the
+Call `signoz:signoz_get_alert` with the rule id. This is **mandatory** — the
 list response does not include the full condition / thresholds /
 notification settings, and explanations based on the name alone are
 guesses.
 
 ### Step 3: Pull a one-line fire-frequency summary
 
-Call `signoz_get_alert_history` for the rule with a 7-day lookback. From
+Call `signoz:signoz_get_alert_history` for the rule with a 7-day lookback. From
 the response, derive a single line:
 
 > Fired N times in the last 7d (last fire: <relative-time>).
@@ -236,17 +235,17 @@ actually in the config:
 ### Step 6: Offer next steps
 
 End with two or three actionable follow-ups:
-- "Want me to investigate the most recent fire?" (→ `signoz-alert-investigate`)
+- "Want me to investigate the most recent fire?" (→ `signoz-investigating-alerts`)
 - "Want me to run the underlying query to see current values?" (→
-  `signoz-query-generate`)
+  `signoz-generating-queries`)
 - "Want me to adjust the threshold or add a severity level?" (→
-  `signoz_update_alert` directly — out of scope here)
+  `signoz:signoz_update_alert` directly — out of scope here)
 - "Want me to create a related alert for [gap noticed]?" (→
   `alert-create`)
 
 ## Guardrails
 
-- **Fetch before explaining.** Always call `signoz_get_alert`. Do not
+- **Fetch before explaining.** Always call `signoz:signoz_get_alert`. Do not
   base explanations on the rule name or list response alone.
 - **Always pull fire history.** The one-line frequency summary is
   cheap (one MCP call) and grounds the explanation. Skip it only if
@@ -264,25 +263,25 @@ End with two or three actionable follow-ups:
   the user asks. Explain is about understanding the rule, not
   inspecting current data.
 - **Paginate alert listing.** Before concluding an alert does not
-  exist, walk every page of `signoz_list_alert_rules`.
+  exist, walk every page of `signoz:signoz_list_alert_rules`.
 - **SigNoz evaluation model.** SigNoz uses `evalWindow` + `frequency`
   + `matchType`, not Prometheus-style `for` durations. Don't describe
   the evaluation model in Prometheus terms.
 - **Stay in scope.** Investigation of a specific fire window belongs
-  to `signoz-alert-investigate`. Modifications belong to
-  `signoz_update_alert`.
+  to `signoz-investigating-alerts`. Modifications belong to
+  `signoz:signoz_update_alert`.
 
 ## Examples
 
 **User:** "Explain my checkout error rate alert"
 
 **Agent:**
-1. `signoz_list_alert_rules` (paginated) → finds "High Error Rate —
+1. `signoz:signoz_list_alert_rules` (paginated) → finds "High Error Rate —
    Checkout" with id 42.
-2. `signoz_get_alert id=42` → full config (formula alert,
+2. `signoz:signoz_get_alert id=42` → full config (formula alert,
    `alertType=TRACES_BASED_ALERT`, two queries + formula F1, single
    critical threshold at 5%, `op=1`, `matchType=1`).
-3. `signoz_get_alert_history id=42 lookback=7d` → fired 3 times in
+3. `signoz:signoz_get_alert_history id=42 lookback=7d` → fired 3 times in
    last 7d, last fire 2h ago.
 4. Builds explanation:
    - **Overview**: traces-based alert, critical severity, currently
@@ -305,18 +304,18 @@ End with two or three actionable follow-ups:
 **User:** "Explain alert rule 17 — is it well configured?"
 
 **Agent:**
-1. `signoz_get_alert id=17` → metrics-based, `system.cpu.utilization`,
+1. `signoz:signoz_get_alert id=17` → metrics-based, `system.cpu.utilization`,
    threshold_rule, two thresholds (warning 80%, critical 90%),
    `matchType=3` on_average, filter
    `deployment.environment.name = 'production'`, groupBy `host.name`.
-2. `signoz_get_alert_history id=17` → has not fired in last 7d.
+2. `signoz:signoz_get_alert_history id=17` → has not fired in last 7d.
 3. Builds explanation, then assesses (since user asked):
    - Dual-threshold setup is good for graduated response.
    - `on_average` is appropriate for CPU — avoids false positives from
      momentary spikes.
    - 0 fires in 7d means the threshold has not been exercised. Could be
      fine (production is healthy) or too loose. If user expected it to
-     fire, suggest checking the metric directly with `signoz-query-generate`.
+     fire, suggest checking the metric directly with `signoz-generating-queries`.
    - Suggests adding `alertOnAbsent: true` so a host that stops
      reporting metrics doesn't slip through silently.
    - Annotations use default templates — suggests adding a runbook URL.
@@ -327,7 +326,7 @@ End with two or three actionable follow-ups:
 **User:** "Help me understand this anomaly detection alert" (alert id 88)
 
 **Agent:**
-1. `signoz_get_alert id=88` →
+1. `signoz:signoz_get_alert id=88` →
    `ruleType: anomaly_rule`, `algorithm=zscore`, `seasonality=daily`,
    target 3, metric `http.server.request.duration`, scope
    `service.name = 'api-gateway'`.

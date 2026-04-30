@@ -1,5 +1,5 @@
 ---
-name: signoz-alert-create
+name: signoz-creating-alerts
 description: >
   Create a new SigNoz alert rule from a natural-language intent — threshold,
   anomaly, log-volume, error-rate, latency, or absent-data alerts across
@@ -21,9 +21,9 @@ the same flow — the human just gets a chance to intervene at the preview step.
 
 ## Prerequisites
 
-This skill calls SigNoz MCP server tools (`signoz_create_alert`,
-`signoz_list_alerts`, `signoz_get_field_keys`, etc.). Before running the
-workflow, confirm the `signoz_*` tools are available. If they are not,
+This skill calls SigNoz MCP server tools (`signoz:signoz_create_alert`,
+`signoz:signoz_list_alerts`, `signoz:signoz_get_field_keys`, etc.). Before running the
+workflow, confirm the `signoz:signoz_*` tools are available. If they are not,
 the SigNoz MCP server is not installed or configured — stop and direct
 the user to set it up:
 <https://signoz.io/docs/ai/signoz-mcp-server/>. Do not try to fall back
@@ -39,12 +39,10 @@ Use this skill when the user wants to:
 - Catch silent data loss ("alert if data stops arriving from X").
 
 Do NOT use when the user wants to:
-- Understand what an existing alert monitors → `signoz-alert-explain`.
-- Diagnose why an existing alert fired → `signoz-alert-investigate`.
+- Understand what an existing alert monitors → `signoz-explaining-alerts`.
+- Diagnose why an existing alert fired → `signoz-investigating-alerts`.
 - Modify thresholds, queries, or routing on an existing alert → call
-  `signoz_update_alert` directly.
-- Build an ad-hoc query without an alert → `signoz-query-generate`.
-- Build a dashboard → `signoz-dashboard-create`.
+  `signoz:signoz_update_alert` directly.
 
 ## Required inputs (strict)
 
@@ -55,10 +53,10 @@ The skill enforces a strict input contract:
 | Input | Required | Source if missing |
 |---|---|---|
 | Alert intent (NL goal) | yes | `$ARGUMENTS` or recent user turn |
-| Resource attribute filter (e.g. `service.name`, `k8s.namespace.name`, `host.name`) | yes | discover via `signoz_get_field_keys` + `signoz_get_field_values` |
+| Resource attribute filter (e.g. `service.name`, `k8s.namespace.name`, `host.name`) | yes | discover via `signoz:signoz_get_field_keys` + `signoz:signoz_get_field_values` |
 | Threshold value(s) | inferred from intent | derive a sensible default and surface in the preview |
 | Severity | inferred from intent | default `warning`; promote to `critical` only if user said "page", "wake up", "critical" |
-| Notification channel | yes | `signoz_list_notification_channels` + offer "create new" |
+| Notification channel | yes | `signoz:signoz_list_notification_channels` + offer "create new" |
 
 If a required input is missing and cannot be discovered, emit a structured
 `needs_input` block and stop **before** calling any write tool:
@@ -74,7 +72,7 @@ needs_input:
 
 In interactive mode, the human picks from candidates. In autonomous mode, the
 caller fills the gap from upstream context or escalates. Either way, do not
-proceed to `signoz_create_alert` with a guessed value.
+proceed to `signoz:signoz_create_alert` with a guessed value.
 
 ## Workflow
 
@@ -107,12 +105,12 @@ When the user does not name a service / host / namespace, the SigNoz MCP
 guideline applies: **always prefer a resource-attribute filter**. Discover
 candidates instead of guessing:
 
-1. Call `signoz_get_field_keys` with `fieldContext=resource` to enumerate
+1. Call `signoz:signoz_get_field_keys` with `fieldContext=resource` to enumerate
    resource attributes for the chosen signal.
-2. Call `signoz_get_field_values` for the most likely attribute (typically
+2. Call `signoz:signoz_get_field_values` for the most likely attribute (typically
    `service.name`, then `host.name`, then `k8s.namespace.name`) to get
    concrete values.
-3. If the user mentioned a metric by name, call `signoz_list_metrics` with a
+3. If the user mentioned a metric by name, call `signoz:signoz_list_metrics` with a
    search term to verify the exact OTel metric name. Wrong names create
    alerts that never fire.
 
@@ -120,17 +118,20 @@ Surface the candidates in the `needs_input` block. Do not pick one.
 
 ### Step 3: Check for duplicate alerts
 
-Call `signoz_list_alerts` and **paginate through every page** —
+Call `signoz:signoz_list_alerts` and **paginate through every page** —
 `pagination.hasMore` is true until you have walked the full list. Check for
 existing alerts that match the user's intent (same signal + same scope +
 similar threshold). If a likely duplicate exists, surface it and ask whether
 to create a new one anyway, modify the existing one (out of scope here — use
-`signoz_update_alert`), or cancel.
+`signoz:signoz_update_alert`), or cancel.
 
 ### Step 4: Build the alert config
 
-Read `schema-reference.md` in this skill directory for the full alert JSON
-shape, field semantics, threshold codes, and validation rules.
+The MCP server is the source of truth for the alert JSON schema, threshold
+codes, and validation rules. Read the `signoz://alert/instructions` and
+`signoz://alert/examples` MCP resources for the canonical, version-current
+shape. Do not transcribe schema text into this skill — it will rot out of
+sync with the server.
 
 For most user intents, the config is one of a small number of patterns:
 
@@ -139,11 +140,11 @@ For most user intents, the config is one of a small number of patterns:
 | Single-metric threshold | inline (this skill) | "alert when CPU > 80%", "p99 latency > 2s" |
 | Log volume threshold | inline | "more than N error logs/min" |
 | Trace-based count or p-tile | inline | "p99 span duration > 2s on checkout" |
-| Error-rate formula (A/B*100) | inline (see `schema-reference.md` "Common patterns") | "error rate > 5%" |
+| Error-rate formula (A/B*100) | inline (see "Common query shapes" below) | "error rate > 5%" |
 | Anomaly detection (Z-score) | inline, but only with `METRIC_BASED_ALERT` | "alert me on anomalous traffic" |
 | Absent-data alert | inline | "alert if data stops arriving" |
-| ClickHouse SQL alert | delegate to `signoz-clickhouse-query` for query, then return here to wrap | non-trivial joins, custom aggregations |
-| PromQL alert | delegate to `signoz-query-generate` for the PromQL, then return here | when user already has PromQL |
+| ClickHouse SQL alert | delegate to `signoz-writing-clickhouse-queries` for query, then return here to wrap | non-trivial joins, custom aggregations |
+| PromQL alert | delegate to `signoz-generating-queries` for the PromQL, then return here | when user already has PromQL |
 
 **Threshold and matchType code mapping** (these are numeric strings, not
 words — the API rejects "above"):
@@ -169,19 +170,74 @@ words — the API rejects "above"):
 `service.name`, `host.name`, `k8s.namespace.name`,
 `deployment.environment.name`. Never `service`, `host`, or `env`.
 
+#### Common query shapes
+
+Three patterns cover most non-trivial alerts. The MCP resources above carry
+the full schema; these are quick references for the query block only.
+
+**Error rate** — two queries + formula `A * 100 / B`:
+
+```json
+{
+  "queries": [
+    { "type": "builder_query", "spec": { "name": "A", "signal": "traces",
+        "aggregations": [{ "expression": "count()" }],
+        "filter": { "expression": "hasError = true" } } },
+    { "type": "builder_query", "spec": { "name": "B", "signal": "traces",
+        "aggregations": [{ "expression": "count()" }],
+        "filter": { "expression": "" } } },
+    { "type": "builder_formula",
+      "spec": { "name": "F1", "expression": "A * 100 / B" } }
+  ],
+  "selectedQueryName": "F1"
+}
+```
+
+**p99 latency** — single trace query with `groupBy` for per-service
+breakdown. Threshold target is in **nanoseconds** (2s → 2000000000),
+`targetUnit: "ns"`:
+
+```json
+{
+  "queries": [
+    { "type": "builder_query", "spec": { "name": "A", "signal": "traces",
+        "aggregations": [{ "expression": "p99(durationNano)" }],
+        "groupBy": [{ "name": "service.name", "fieldContext": "resource",
+                      "fieldDataType": "string" }] } }
+  ]
+}
+```
+
+**Log volume spike** — count of error/fatal logs grouped by service:
+
+```json
+{
+  "queries": [
+    { "type": "builder_query", "spec": { "name": "A", "signal": "logs",
+        "aggregations": [{ "expression": "count()" }],
+        "filter": { "expression": "severity_text IN ('ERROR', 'FATAL')" },
+        "groupBy": [{ "name": "service.name", "fieldContext": "resource",
+                      "fieldDataType": "string" }] } }
+  ]
+}
+```
+
+For absent-data, anomaly, PromQL, and ClickHouse SQL alerts, read the
+`signoz://alert/examples` MCP resource for current shapes.
+
 ### Step 5: Resolve notification channels
 
 The skill **must** resolve at least one channel before save. An alert with no
 channels saves successfully and silently never notifies anyone — the second
 most common silent failure after bad queries.
 
-1. Call `signoz_list_notification_channels` to enumerate existing channels.
+1. Call `signoz:signoz_list_notification_channels` to enumerate existing channels.
 2. If the user named a channel ("send to slack-infra"), use it if it exists;
    if not, fall through.
 3. Otherwise present the user with two options:
    - **Pick from existing** — list channels with their type (Slack, PagerDuty,
      email, webhook) so the user can choose.
-   - **Create new inline** — call `signoz_create_notification_channel` with
+   - **Create new inline** — call `signoz:signoz_create_notification_channel` with
      channel parameters the user provides (name, type, type-specific config
      like Slack webhook URL or PagerDuty integration key).
 4. If neither path resolves a channel, emit
@@ -198,9 +254,9 @@ returns no data, or returns data that will never cross the threshold,
 produces an alert that silently fails to fire.
 
 1. Run the alert's primary query (or formula) over the last hour using:
-   - `signoz_execute_builder_query` for builder/formula queries.
-   - `signoz_query_metrics` for PromQL queries.
-   - `signoz_aggregate_logs` / `signoz_aggregate_traces` if those fit better.
+   - `signoz:signoz_execute_builder_query` for builder/formula queries.
+   - `signoz:signoz_query_metrics` for PromQL queries.
+   - `signoz:signoz_aggregate_logs` / `signoz:signoz_aggregate_traces` if those fit better.
 2. Inspect the result:
    - **No rows** → warn loudly. The alert may never fire. Ask the user to
      confirm the filter, metric name, or signal type.
@@ -215,7 +271,7 @@ produces an alert that silently fails to fire.
 ### Step 7: Preview the prepared config
 
 Emit a fenced JSON code block containing the exact payload that will be sent
-to `signoz_create_alert`, plus a one-paragraph plain-language summary:
+to `signoz:signoz_create_alert`, plus a one-paragraph plain-language summary:
 
 ```json
 {
@@ -240,9 +296,9 @@ intervene before Step 8.
 
 ### Step 8: Save and report
 
-1. Call `signoz_create_alert` with the JSON payload from Step 7.
-2. **Name collision** — if `signoz_create_alert` returns a duplicate-name
-   error, **do not** suffix-append or call `signoz_update_alert`. Stop and
+1. Call `signoz:signoz_create_alert` with the JSON payload from Step 7.
+2. **Name collision** — if `signoz:signoz_create_alert` returns a duplicate-name
+   error, **do not** suffix-append or call `signoz:signoz_update_alert`. Stop and
    tell the user the existing alert blocked creation; offer to use a
    different name or modify the existing alert (which is out of scope for
    this skill).
@@ -251,7 +307,7 @@ intervene before Step 8.
    - What it watches and at what threshold.
    - Which channels are wired up.
    - The dry-run summary ("would have fired N times in last 1h").
-   - Two follow-up offers: "Want to test the query live with `signoz-query-generate`?"
+   - Two follow-up offers: "Want to test the query live with `signoz-generating-queries`?"
      and "Want me to add a runbook URL to the annotations?"
 
 ## Guardrails
@@ -259,7 +315,7 @@ intervene before Step 8.
 - **Strict inputs over guessing.** Resource attribute and channel are
   required. If missing, emit `needs_input` and stop. Creating an alert on
   a guessed service is harder to undo than asking.
-- **Always paginate `signoz_list_alerts`.** Stopping at page 1 misses
+- **Always paginate `signoz:signoz_list_alerts`.** Stopping at page 1 misses
   duplicates and produces noise.
 - **Dry-run is mandatory.** Saving an alert whose query returns no data is
   a silent failure mode and must be prevented.
@@ -271,10 +327,10 @@ intervene before Step 8.
   `LOGS_BASED_ALERT`. Mismatches fail validation.
 - **Anomaly rules are metrics-only.** `anomaly_rule` + non-metric alertType
   is rejected.
-- **Channels must exist.** Use names from `signoz_list_notification_channels`
+- **Channels must exist.** Use names from `signoz:signoz_list_notification_channels`
   exactly, or create the channel inline first.
 - **Scope boundary.** This skill only creates new rules. Modifications use
-  `signoz_update_alert` directly.
+  `signoz:signoz_update_alert` directly.
 
 ## Examples
 
@@ -284,17 +340,17 @@ intervene before Step 8.
 1. Intent parsed: metric, CPU, scope `service.name = checkout`,
    thresholds 80% (warning) / 90% (critical), severity bumped to critical
    on the higher level because "page me" was used.
-2. `signoz_list_metrics searchText=cpu` → confirms `system.cpu.utilization`.
-3. `signoz_list_alerts` (paginated) → no existing CPU alert for checkout.
-4. `signoz_list_notification_channels` → presents existing channels;
+2. `signoz:signoz_list_metrics searchText=cpu` → confirms `system.cpu.utilization`.
+3. `signoz:signoz_list_alerts` (paginated) → no existing CPU alert for checkout.
+4. `signoz:signoz_list_notification_channels` → presents existing channels;
    user picks `slack-infra` for warning and `pagerduty-oncall` for critical.
 5. Builds JSON: `METRIC_BASED_ALERT`, `threshold_rule`,
    `signal=metrics`, two thresholds (`op="1"`, `matchType="3"` on_average,
    `targetUnit="percent"`), filter `service.name = 'checkout'`.
-6. Dry-run via `signoz_execute_builder_query` over last 1h: returns data,
+6. Dry-run via `signoz:signoz_execute_builder_query` over last 1h: returns data,
    would have fired 0 times (clean baseline).
 7. Emits JSON preview + summary.
-8. Calls `signoz_create_alert`. Reports created alert with ID, threshold
+8. Calls `signoz:signoz_create_alert`. Reports created alert with ID, threshold
    summary, channel routing, and dry-run result.
 
 ---
@@ -304,8 +360,8 @@ intervene before Step 8.
 **Agent:**
 1. Intent parsed: traces, error-rate formula, scope
    `service.name = payments`, threshold 5%, severity default warning.
-2. `signoz_get_field_keys fieldContext=resource signal=traces` confirms
-   `service.name`. `signoz_get_field_values` confirms `payments` exists.
+2. `signoz:signoz_get_field_keys fieldContext=resource signal=traces` confirms
+   `service.name`. `signoz:signoz_get_field_values` confirms `payments` exists.
 3. No existing payments error-rate alert.
 4. Builds formula alert: query A counts spans with `hasError = true` for
    `service.name = 'payments'`, query B counts all spans for the same
@@ -324,7 +380,7 @@ intervene before Step 8.
 **Agent:**
 1. Intent parsed: logs, volume threshold, scope = all services (groupBy
    `service.name`), threshold 1000/min, severity warning.
-2. `signoz_get_field_keys signal=logs fieldContext=resource` confirms
+2. `signoz:signoz_get_field_keys signal=logs fieldContext=resource` confirms
    `service.name` exists; **no service filter required** since the user
    said "any service" → groupBy provides the scoping.
 3. Builds: `LOGS_BASED_ALERT`, `signal=logs`,
@@ -346,7 +402,7 @@ intervene before Step 8.
 1. Intent parsed: metric, anomaly detection, scope
    `service.name = api-gateway`. Anomaly detection requires
    `METRIC_BASED_ALERT` + `anomaly_rule`.
-2. `signoz_list_metrics searchText=duration` → finds
+2. `signoz:signoz_list_metrics searchText=duration` → finds
    `http.server.request.duration`.
 3. Builds: `anomaly_rule`, `algorithm=zscore`, `seasonality=daily`,
    threshold target 3 (3 standard deviations), `op: "1"`, `matchType: "1"`.
@@ -358,10 +414,11 @@ intervene before Step 8.
 
 ## Additional resources
 
-- `schema-reference.md` — full alert config JSON schema, threshold codes,
-  filter expression syntax, and common patterns (error rate, p99 latency,
-  log volume spike, absent-data, anomaly).
-- `signoz-clickhouse-query` skill — for ClickHouse SQL alerts that need
+- `signoz://alert/instructions` and `signoz://alert/examples` MCP resources
+  — full alert config JSON schema, threshold codes, filter expression
+  syntax, and version-current pattern examples. Always preferred over any
+  transcribed copy.
+- `signoz-writing-clickhouse-queries` skill — for ClickHouse SQL alerts that need
   custom joins or aggregations.
-- `signoz-query-generate` skill — for authoring PromQL or testing queries
+- `signoz-generating-queries` skill — for authoring PromQL or testing queries
   before wrapping them in an alert.

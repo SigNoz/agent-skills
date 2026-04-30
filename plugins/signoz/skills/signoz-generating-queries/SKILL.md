@@ -1,22 +1,26 @@
 ---
-name: signoz-query-generate
+name: signoz-generating-queries
 description: >
-  Trigger when the user wants to generate, write, or run a query against their
-  observability data.  Includes requests like "show me error rates",
-  "query logs for timeout errors", "what's the p99 latency for the cart service",
-  "how many requests hit the payment endpoint", "find slow traces".
+  Generate, write, or run an ad-hoc query against SigNoz observability
+  data — metrics, logs, traces, or exceptions — without wrapping it in
+  a dashboard panel or alert. Make sure to use this skill whenever the
+  user asks "show me error rates", "query logs for timeout errors",
+  "what's the p99 latency for the cart service", "how many requests hit
+  the payment endpoint", "find slow traces", "errors in the last hour",
+  or otherwise asks an exploratory question that needs live observability
+  data — even if they don't say "query" or "search" explicitly.
 ---
 
 # Query Generate
 
 ## Prerequisites
 
-This skill calls SigNoz MCP server tools heavily (`signoz_execute_builder_query`,
-`signoz_query_metrics`, `signoz_search_logs`, `signoz_search_traces`,
-`signoz_aggregate_logs`, `signoz_aggregate_traces`, `signoz_get_field_keys`,
-`signoz_get_field_values`, `signoz_list_metrics`, `signoz_list_services`,
-`signoz_get_service_top_operations`, `signoz_get_trace_details`). Before
-running the workflow, confirm the `signoz_*` tools are available. If they
+This skill calls SigNoz MCP server tools heavily (`signoz:signoz_execute_builder_query`,
+`signoz:signoz_query_metrics`, `signoz:signoz_search_logs`, `signoz:signoz_search_traces`,
+`signoz:signoz_aggregate_logs`, `signoz:signoz_aggregate_traces`, `signoz:signoz_get_field_keys`,
+`signoz:signoz_get_field_values`, `signoz:signoz_list_metrics`, `signoz:signoz_list_services`,
+`signoz:signoz_get_service_top_operations`, `signoz:signoz_get_trace_details`). Before
+running the workflow, confirm the `signoz:signoz_*` tools are available. If they
 are not, the SigNoz MCP server is not installed or configured — stop and
 direct the user to set it up: <https://signoz.io/docs/ai/signoz-mcp-server/>.
 Do not fall back to raw HTTP calls or fabricate query results without the
@@ -31,10 +35,8 @@ Use this skill when the user asks to:
 - Investigate patterns (spikes, drops, trends over time)
 
 Do NOT use when:
-- User wants to create a dashboard → `signoz-dashboard-create`
-- User wants to modify a dashboard → `signoz-dashboard-modify`
-- User wants to create or modify an alert → alert skills
-- User wants to understand what a dashboard/alert shows → explain the entity directly
+- User wants raw ClickHouse SQL for a dashboard panel (custom joins, window
+  functions, regex over log bodies) → `signoz-writing-clickhouse-queries`
 
 ## Instructions
 
@@ -49,7 +51,7 @@ Map the user's intent to the right signal:
 | Find specific log entries, error messages, stack traces | **logs** | Text search, pattern matching, severity filtering. |
 | Find specific traces, slow requests, error spans | **traces** | Per-request detail, span attributes, duration filtering. |
 | Infrastructure metrics (CPU, memory, disk, network) | **metrics** | Always metrics for resource utilization. |
-| "How many X per Y" (count/rate grouped by dimension) | **traces** or **logs** (aggregate) | Use `signoz_aggregate_traces` or `signoz_aggregate_logs` for grouped counts. |
+| "How many X per Y" (count/rate grouped by dimension) | **traces** or **logs** (aggregate) | Use `signoz:signoz_aggregate_traces` or `signoz:signoz_aggregate_logs` for grouped counts. |
 
 If the signal is genuinely ambiguous, ask using `<assistant_question>`.
 
@@ -60,17 +62,17 @@ guess from training knowledge.
 
 Run discovery calls in parallel where possible:
 
-- **For metrics**: Call `signoz_list_metrics` with a `searchText` substring
+- **For metrics**: Call `signoz:signoz_list_metrics` with a `searchText` substring
   matching the user's intent (e.g., `searchText: "http"`, `searchText: "latency"`).
   The response includes metric type, temporality, and isMonotonic — pass these to
-  `signoz_query_metrics` to avoid extra lookups.
-- **For traces**: Call `signoz_list_services` to confirm the service name exists.
-  Optionally call `signoz_get_service_top_operations` for the service to find
-  operation names. Call `signoz_get_field_keys(signal: "traces")` if you need
+  `signoz:signoz_query_metrics` to avoid extra lookups.
+- **For traces**: Call `signoz:signoz_list_services` to confirm the service name exists.
+  Optionally call `signoz:signoz_get_service_top_operations` for the service to find
+  operation names. Call `signoz:signoz_get_field_keys(signal: "traces")` if you need
   to filter on a non-standard attribute.
-- **For logs**: Call `signoz_get_field_keys(signal: "logs")` if filtering on
+- **For logs**: Call `signoz:signoz_get_field_keys(signal: "logs")` if filtering on
   attributes beyond `body`, `severity_text`, and `service.name`. Call
-  `signoz_get_field_values` to validate specific filter values.
+  `signoz:signoz_get_field_values` to validate specific filter values.
 
 If the user already provides exact field names, service names, or metric names
 from context (e.g., from a dashboard or @mention), skip redundant discovery.
@@ -81,12 +83,12 @@ from context (e.g., from a dashboard or @mention), skip redundant discovery.
 
 | Question type | Tool | When to use |
 |---|---|---|
-| Metric time series or scalar | `signoz_query_metrics` | Any metrics query. Handles aggregation defaults automatically. Supports formulas via `formula` + `formulaQueries` params. |
-| Log search (find matching entries) | `signoz_search_logs` | Finding specific log lines. Use `searchText` for body text, `query` for field filters, `severity` for level filtering. |
-| Trace search (find matching spans) | `signoz_search_traces` | Finding specific traces/spans. Use `service`, `operation`, `error`, `minDuration`/`maxDuration` shortcuts plus `query` for field filters. |
-| Log aggregation (count, avg, percentiles) | `signoz_aggregate_logs` | "How many errors?", "error count by service", "p99 response time from logs". Set `requestType` to `scalar` for totals or `time_series` for trends. |
-| Trace aggregation (count, avg, percentiles) | `signoz_aggregate_traces` | "p99 latency for checkout", "error count per operation", "request rate by endpoint". Set `requestType` to `scalar` for totals or `time_series` for trends. |
-| Complex multi-query or formula | `signoz_execute_builder_query` | Only when the simpler tools above cannot express the query — e.g., joining multiple data sources, complex filter expressions, or queries needing the full Query Builder v5 schema. Read `signoz://traces/query-builder-guide` before using. |
+| Metric time series or scalar | `signoz:signoz_query_metrics` | Any metrics query. Handles aggregation defaults automatically. Supports formulas via `formula` + `formulaQueries` params. |
+| Log search (find matching entries) | `signoz:signoz_search_logs` | Finding specific log lines. Use `searchText` for body text, `query` for field filters, `severity` for level filtering. |
+| Trace search (find matching spans) | `signoz:signoz_search_traces` | Finding specific traces/spans. Use `service`, `operation`, `error`, `minDuration`/`maxDuration` shortcuts plus `query` for field filters. |
+| Log aggregation (count, avg, percentiles) | `signoz:signoz_aggregate_logs` | "How many errors?", "error count by service", "p99 response time from logs". Set `requestType` to `scalar` for totals or `time_series` for trends. |
+| Trace aggregation (count, avg, percentiles) | `signoz:signoz_aggregate_traces` | "p99 latency for checkout", "error count per operation", "request rate by endpoint". Set `requestType` to `scalar` for totals or `time_series` for trends. |
+| Complex multi-query or formula | `signoz:signoz_execute_builder_query` | Only when the simpler tools above cannot express the query — e.g., joining multiple data sources, complex filter expressions, or queries needing the full Query Builder v5 schema. Read `signoz://traces/query-builder-guide` before using. |
 
 **`requestType` decision for aggregations:**
 - `scalar` (default): "How many?", "What is the p99?", "Which service has the most?"
@@ -105,8 +107,8 @@ from context (e.g., from a dashboard or @mention), skip redundant discovery.
   `query` expressions.
 - Combine shortcut params with `query`/`filter` for additional constraints — they
   are ANDed together.
-- For `signoz_query_metrics`, pass `metricType`, `temporality`, and `isMonotonic`
-  from the `signoz_list_metrics` response to avoid an extra auto-fetch round trip.
+- For `signoz:signoz_query_metrics`, pass `metricType`, `temporality`, and `isMonotonic`
+  from the `signoz:signoz_list_metrics` response to avoid an extra auto-fetch round trip.
 
 ### Step 5: Handle results
 
@@ -129,7 +131,7 @@ from context (e.g., from a dashboard or @mention), skip redundant discovery.
 - If an aggregation reveals an interesting pattern (spike, outlier service),
   offer to drill into individual traces or logs for that scope.
 - If a trace search returns interesting spans, offer to fetch full trace details
-  via `signoz_get_trace_details`.
+  via `signoz:signoz_get_trace_details`.
 
 ## Guardrails
 
@@ -146,9 +148,8 @@ from context (e.g., from a dashboard or @mention), skip redundant discovery.
   especially preferring resource attributes in filters for faster queries.
 - **No raw ClickHouse SQL**: Always use the Query Builder tools. Never construct
   raw SQL.
-- **Scope boundary**: This skill queries data. If the user's query results lead
-  to wanting a dashboard, redirect to `signoz-dashboard-create`. If they want an alert,
-  redirect to the alert skill.
+- **Scope boundary**: This skill queries data. If the user wants to wrap the
+  query into a recurring alert, redirect to `signoz-creating-alerts`.
 - **Emit `apply_filter` on the final message.** When the user asks you to
   write, build, generate, or show a query, include an `apply_filter` action
   on your final assistant message with the resolved `compositeQuery` from
@@ -163,9 +164,9 @@ from context (e.g., from a dashboard or @mention), skip redundant discovery.
 **User:** "Show me the error rate for the checkout service in the last hour"
 
 **Agent:**
-1. Calls `signoz_list_metrics(searchText: "error")` — finds
+1. Calls `signoz:signoz_list_metrics(searchText: "error")` — finds
    `signoz_calls_total` metric.
-2. Calls `signoz_query_metrics` with `metricName: "signoz_calls_total"`,
+2. Calls `signoz:signoz_query_metrics` with `metricName: "signoz_calls_total"`,
    `filter: "service.name = 'checkout'"`, `formula: "A / B * 100"` where A is
    error count and B is total count, `timeRange: "1h"`.
 3. Presents: "Error rate for checkout-service: 2.3% over the last hour (14:00–
@@ -178,7 +179,7 @@ from context (e.g., from a dashboard or @mention), skip redundant discovery.
 **User:** "Find timeout errors in logs"
 
 **Agent:**
-1. Calls `signoz_search_logs(searchText: "timeout", severity: "ERROR",
+1. Calls `signoz:signoz_search_logs(searchText: "timeout", severity: "ERROR",
    timeRange: "1h")`.
 2. Presents: "Found 23 timeout errors in the last hour. Most are from
    payment-service (18) and gateway (5). Common pattern: 'context deadline
@@ -191,7 +192,7 @@ from context (e.g., from a dashboard or @mention), skip redundant discovery.
 **User:** "What's the p99 latency for the cart service?"
 
 **Agent:**
-1. Calls `signoz_aggregate_traces(aggregation: "p99",
+1. Calls `signoz:signoz_aggregate_traces(aggregation: "p99",
    aggregateOn: "durationNano", service: "cart-service",
    requestType: "scalar", timeRange: "1h")`.
 2. Presents: "p99 latency for cart-service: 1.2s over the last hour."
@@ -202,7 +203,7 @@ from context (e.g., from a dashboard or @mention), skip redundant discovery.
 **User:** "When did errors spike for the frontend?"
 
 **Agent:**
-1. Calls `signoz_aggregate_traces(aggregation: "count", error: "true",
+1. Calls `signoz:signoz_aggregate_traces(aggregation: "count", error: "true",
    service: "frontend", requestType: "time_series", timeRange: "6h")`.
 2. Presents: "Error count for frontend over the last 6 hours. Spike at 11:30 UTC
    — error count jumped from ~5/min to ~45/min, returning to baseline by 12:15."

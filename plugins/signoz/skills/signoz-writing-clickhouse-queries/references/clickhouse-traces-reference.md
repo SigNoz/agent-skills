@@ -1,6 +1,20 @@
 
 # ClickHouse Traces Query Reference for SigNoz
 
+## Contents
+
+- Table Schemas (`distributed_signoz_index_v3`,
+  `distributed_traces_v3_resource`, `distributed_signoz_error_index_v2`)
+- Mandatory Optimization Patterns
+  - Resource Filter CTE
+  - Timestamp Bucketing
+  - Use Indexed Columns Over Map Access
+  - Use Pre-extracted Columns
+- Attribute Access Syntax (resource attributes, existence checks)
+- Dashboard Panel Query Templates (timeseries, table)
+- Query Examples (error spans per service, average duration by method)
+- Query Optimization Checklist
+
 All tables live in the `signoz_traces` database.
 
 ---

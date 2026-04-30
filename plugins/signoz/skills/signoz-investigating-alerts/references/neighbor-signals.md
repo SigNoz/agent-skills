@@ -72,7 +72,7 @@ Tier 2 against that service's row from the table above.
    filter.** If the alert filters on both `k8s.namespace.name` and
    `service.name`, prefer the k8s row plus `service.name` cross-cuts.
 2. **Skip a signal if the data is not available.** Don't fabricate
-   queries against metrics that don't exist — call `signoz_list_metrics`
+   queries against metrics that don't exist — call `signoz:signoz_list_metrics`
    to verify metric names before querying.
 3. **Cap signal pulls at 6 queries per tier** to keep context bounded.
    Pick the most informative for the alert's signal type.

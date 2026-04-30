@@ -1,19 +1,25 @@
 ---
-name: signoz-dashboard-modify
+name: signoz-modifying-dashboards
 description: >
-  Trigger when the user wants to modify, update, or change an existing dashboard.
-  Includes requests like "add a panel to my dashboard", "change the query on this
-  panel", "remove the latency widget", "rename my dashboard", "update the filters",
-  "rearrange the layout", "add a variable", "change panel type from graph to table".
+  Modify an existing SigNoz dashboard — add or remove panels, edit a
+  panel's query, threshold, or unit, rename the dashboard, change a
+  panel type (graph ↔ table ↔ value), rearrange the layout, add or edit
+  variables, or update tags. Make sure to use this skill whenever the
+  user says "add a panel to my dashboard", "change the query on this
+  panel", "remove the latency widget", "rename my dashboard", "update
+  the filters", "rearrange the layout", "add a variable", "change panel
+  type from graph to table", or otherwise asks to change something on a
+  dashboard that already exists — even if they don't say "modify" or
+  "edit" explicitly.
 ---
 
 # Dashboard Modify
 
 ## Prerequisites
 
-This skill calls SigNoz MCP server tools (`signoz_get_dashboard`,
-`signoz_update_dashboard`, `signoz_list_dashboards`, `signoz_list_metrics`).
-Before running the workflow, confirm the `signoz_*` tools are available.
+This skill calls SigNoz MCP server tools (`signoz:signoz_get_dashboard`,
+`signoz:signoz_update_dashboard`, `signoz:signoz_list_dashboards`, `signoz:signoz_list_metrics`).
+Before running the workflow, confirm the `signoz:signoz_*` tools are available.
 If they are not, the SigNoz MCP server is not installed or configured —
 stop and direct the user to set it up:
 <https://signoz.io/docs/ai/signoz-mcp-server/>. Do not fall back to raw
@@ -32,9 +38,7 @@ Use this skill when the user asks to:
 - Update tags on a dashboard
 
 Do NOT use when:
-- User wants to create a new dashboard from scratch → `signoz-dashboard-create`
-- User wants to understand what a dashboard shows → `signoz-dashboard-explain`
-- User wants to query data without modifying a dashboard → `signoz-query-generate`
+- User wants to understand what a dashboard shows → `signoz-explaining-dashboards`
 
 ## Instructions
 
@@ -45,7 +49,7 @@ dashboard name, UUID, or it is clear from context (e.g., an @mention or auto-con
 providing a dashboard resource), use that.
 
 If the target dashboard is ambiguous:
-1. Call `signoz_list_dashboards` to list existing dashboards. **Paginate through
+1. Call `signoz:signoz_list_dashboards` to list existing dashboards. **Paginate through
    all pages** — check `pagination.hasMore` in the response. If `hasMore` is true,
    call again with `offset` set to `pagination.nextOffset` and repeat until all
    pages are exhausted. Never stop at the first page.
@@ -53,8 +57,8 @@ If the target dashboard is ambiguous:
 
 ### Step 2: Fetch the current dashboard state
 
-Call `signoz_get_dashboard` with the dashboard UUID to retrieve its full
-configuration. This is **mandatory** — `signoz_update_dashboard` requires the
+Call `signoz:signoz_get_dashboard` with the dashboard UUID to retrieve its full
+configuration. This is **mandatory** — `signoz:signoz_update_dashboard` requires the
 complete post-update state, not a partial patch. Never skip this step.
 
 Examine the response to understand:
@@ -157,7 +161,7 @@ Merge the planned changes into the full dashboard JSON from Step 2.
     top-level `layout` array, apply the same change to the matching entry in
     `panelMap[rowId].widgets`. These are duplicated and must stay consistent.
 
-Call `signoz_update_dashboard` with the dashboard UUID and the **complete** modified
+Call `signoz:signoz_update_dashboard` with the dashboard UUID and the **complete** modified
 dashboard JSON.
 
 ### Step 5: Report the result
@@ -166,10 +170,10 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
 
 ## Guardrails
 
-- **Full state on update**: `signoz_update_dashboard` requires the complete
-  dashboard JSON (not a partial patch). Always call `signoz_get_dashboard` first
+- **Full state on update**: `signoz:signoz_update_dashboard` requires the complete
+  dashboard JSON (not a partial patch). Always call `signoz:signoz_get_dashboard` first
   to get the current state, merge your changes into that full object, and pass
-  the result to `signoz_update_dashboard`. Never construct an update payload from
+  the result to `signoz:signoz_update_dashboard`. Never construct an update payload from
   scratch.
 - **Preserve what you don't change**: Never drop or overwrite widgets, variables,
   layout items, or panelMap entries that are outside the scope of the user's request.
@@ -187,31 +191,32 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
   attribute names in filters, groupBy, and variables. Use `service.name` not
   `service`, `host.name` not `host`, `deployment.environment.name` not `env`.
 - **No metric guessing**: If adding or changing queries and you are not sure what
-  metrics are available, ask the user or call `signoz_list_metrics` to discover
+  metrics are available, ask the user or call `signoz:signoz_list_metrics` to discover
   available metrics. Wrong metric names produce empty panels.
 - **Paginate dashboard listing**: When searching for a dashboard by name, always
-  paginate through all pages of `signoz_list_dashboards` before concluding a
+  paginate through all pages of `signoz:signoz_list_dashboards` before concluding a
   dashboard does not exist.
 - **UUIDs for new objects**: Every new widget, layout item, variable, and query
   needs a unique UUID (`crypto.randomUUID()` format). Never use sequential IDs
   or short strings.
-- **Scope boundary**: This skill modifies existing dashboards. If the user wants to
-  create a new dashboard, redirect to `signoz-dashboard-create`.
+- **Scope boundary**: This skill modifies existing dashboards. To create a new
+  dashboard from scratch, point the user at the SigNoz dashboard editor in the
+  UI — there is no creation skill in this plugin yet.
 
 ## Examples
 
 **User:** "Add an error rate panel to my Redis dashboard"
 
 **Agent:**
-1. Calls `signoz_list_dashboards` (paginates all pages) — finds "Redis Overview"
+1. Calls `signoz:signoz_list_dashboards` (paginates all pages) — finds "Redis Overview"
    dashboard with UUID `abc-123`.
-2. Calls `signoz_get_dashboard` with UUID `abc-123` — gets full configuration with
+2. Calls `signoz:signoz_get_dashboard` with UUID `abc-123` — gets full configuration with
    8 existing panels.
-3. Calls `signoz_list_metrics` to find available Redis error metrics.
+3. Calls `signoz:signoz_list_metrics` to find available Redis error metrics.
 4. Creates a new graph widget (with UUID, all required fields, and a formula query
    for error rate), adds a layout entry at the next available `y` position, and
    adds it to the appropriate row's `panelMap`.
-5. Calls `signoz_update_dashboard` with the full modified JSON (all 9 panels).
+5. Calls `signoz:signoz_update_dashboard` with the full modified JSON (all 9 panels).
 6. Reports: "Added an 'Error Rate' graph panel to your Redis Overview dashboard
    under the Overview section. Want me to adjust anything?"
 
@@ -220,12 +225,12 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
 **User:** "Change the latency panel from a graph to a table on my API dashboard"
 
 **Agent:**
-1. Identifies "API Monitoring" dashboard from context, calls `signoz_get_dashboard`.
+1. Identifies "API Monitoring" dashboard from context, calls `signoz:signoz_get_dashboard`.
 2. Finds the panel titled "Request Latency" — if multiple panels could match,
    confirms with user: "I found 'Request Latency'. Convert that one to a table?"
 3. Changes `panelTypes` from `"graph"` to `"table"`, adds `columnUnits` and
    `columnWidths` if missing, keeps the query intact.
-4. Calls `signoz_update_dashboard` with the full modified JSON (all panels
+4. Calls `signoz:signoz_update_dashboard` with the full modified JSON (all panels
    preserved).
 5. Reports: "Changed 'Request Latency' from a graph to a table. Want me to adjust
    column widths or add column units?"
@@ -235,7 +240,7 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
 **User:** "Remove the CPU panel and rename the dashboard to 'Service Health'"
 
 **Agent:**
-1. Fetches the dashboard via `signoz_get_dashboard`.
+1. Fetches the dashboard via `signoz:signoz_get_dashboard`.
 2. Finds the "CPU Usage" panel. Confirms: "I'll remove the 'CPU Usage' panel and
    rename the dashboard to 'Service Health'. Proceed?" (Removal is destructive —
    always confirm.)
@@ -243,6 +248,6 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
 4. Removes the widget from `widgets`, its layout entry, and its panelMap reference.
    Leaves all other panel positions unchanged (the frontend grid closes gaps
    automatically). Updates `title` and `name` to "Service Health".
-5. Calls `signoz_update_dashboard` with the full modified JSON.
+5. Calls `signoz:signoz_update_dashboard` with the full modified JSON.
 6. Reports: "Removed the 'CPU Usage' panel and renamed the dashboard to 'Service
    Health'. Anything else to adjust?"

@@ -1,19 +1,24 @@
 ---
-name: signoz-dashboard-explain
+name: signoz-explaining-dashboards
 description: >
-  Trigger when the user wants to understand, interpret, or get an overview of an
-  existing dashboard. Includes requests like "explain this dashboard", "what does
-  my Redis dashboard show", "walk me through the panels on this dashboard",
-  "what should I watch for on this dashboard", "help me understand this dashboard".
+  Explain what an existing SigNoz dashboard shows in plain operational
+  language — the panels, queries, variables, and what to watch for on
+  each. Make sure to use this skill whenever the user asks "explain this
+  dashboard", "what does my [X] dashboard show", "walk me through the
+  panels", "what should I watch for on this dashboard", or "help me
+  understand this dashboard", or otherwise asks for an interpretation of
+  a dashboard's contents — even if they don't say "explain" explicitly.
+  Also use it when someone is onboarding to a service and wants to
+  understand what its existing observability looks like.
 ---
 
 # Dashboard Explain
 
 ## Prerequisites
 
-This skill calls SigNoz MCP server tools (`signoz_get_dashboard`,
-`signoz_list_dashboards`). Before running the workflow, confirm the
-`signoz_*` tools are available. If they are not, the SigNoz MCP server
+This skill calls SigNoz MCP server tools (`signoz:signoz_get_dashboard`,
+`signoz:signoz_list_dashboards`). Before running the workflow, confirm the
+`signoz:signoz_*` tools are available. If they are not, the SigNoz MCP server
 is not installed or configured — stop and direct the user to set it up:
 <https://signoz.io/docs/ai/signoz-mcp-server/>. Do not guess at a
 dashboard's contents from its title alone.
@@ -27,9 +32,7 @@ Use this skill when the user asks to:
 - Understand the variables, filters, or queries on a dashboard
 
 Do NOT use when:
-- User wants to create a new dashboard → `signoz-dashboard-create`
-- User wants to modify an existing dashboard → `signoz-dashboard-modify`
-- User wants to query data without a dashboard context → `signoz-query-generate`
+- User wants to modify an existing dashboard → `signoz-modifying-dashboards`
 
 ## Instructions
 
@@ -40,7 +43,7 @@ dashboard name, UUID, or it is clear from context (e.g., an @mention or
 auto-context providing a dashboard resource), use that.
 
 If the target dashboard is ambiguous:
-1. Call `signoz_list_dashboards` to list existing dashboards. **Paginate through
+1. Call `signoz:signoz_list_dashboards` to list existing dashboards. **Paginate through
    all pages** — check `pagination.hasMore` in the response. If `hasMore` is true,
    call again with `offset` set to `pagination.nextOffset` and repeat until all
    pages are exhausted. Never stop at the first page.
@@ -48,7 +51,7 @@ If the target dashboard is ambiguous:
 
 ### Step 2: Fetch the full dashboard configuration
 
-Call `signoz_get_dashboard` with the dashboard UUID. This is **mandatory** — you
+Call `signoz:signoz_get_dashboard` with the dashboard UUID. This is **mandatory** — you
 need the complete JSON to explain the dashboard accurately. Never guess based on
 the title alone.
 
@@ -120,12 +123,11 @@ adding panels for X to cover Y."
 After the explanation, offer actionable follow-ups:
 - "Want me to run the queries from any specific panel to check if they're returning
   data?"
-- "Want me to add any missing panels or thresholds?" (→ `signoz-dashboard-modify`)
-- "Want me to create a companion dashboard for [related area]?" (→ `signoz-dashboard-create`)
+- "Want me to add any missing panels or thresholds?" (→ `signoz-modifying-dashboards`)
 
 ## Guardrails
 
-- **Fetch before explaining**: Always call `signoz_get_dashboard` to get the full
+- **Fetch before explaining**: Always call `signoz:signoz_get_dashboard` to get the full
   configuration. Never explain based on the dashboard title or listing alone.
 - **Interpret, don't dump**: Translate queries into plain operational language. Never
   show raw query JSON to the user unless they specifically ask.
@@ -138,24 +140,23 @@ After the explanation, offer actionable follow-ups:
   explain skill is about understanding the dashboard structure, not inspecting
   current data.
 - **Paginate dashboard listing**: When searching for a dashboard by name, always
-  paginate through all pages of `signoz_list_dashboards` before concluding a
+  paginate through all pages of `signoz:signoz_list_dashboards` before concluding a
   dashboard does not exist.
 - **All query types**: Handle builder, ClickHouse SQL, and PromQL queries — each
   requires a different interpretation approach. For builder queries, read the
   aggregations, filter expression, and groupBy. For raw SQL/PromQL, parse the
   query string and explain the intent.
 - **Scope boundary**: This skill explains dashboards. If the user wants to change
-  something after your explanation, redirect to `signoz-dashboard-modify`. If they want a
-  new dashboard, redirect to `signoz-dashboard-create`.
+  something after your explanation, redirect to `signoz-modifying-dashboards`.
 
 ## Examples
 
 **User:** "Explain my PostgreSQL dashboard"
 
 **Agent:**
-1. Calls `signoz_list_dashboards` (paginates all pages) — finds "PostgreSQL
+1. Calls `signoz:signoz_list_dashboards` (paginates all pages) — finds "PostgreSQL
    Overview" dashboard with UUID `abc-123`.
-2. Calls `signoz_get_dashboard` with UUID `abc-123` — gets full configuration.
+2. Calls `signoz:signoz_get_dashboard` with UUID `abc-123` — gets full configuration.
 3. Provides structured explanation:
    - **Overview**: "This dashboard monitors PostgreSQL database health across
      connections, query performance, buffer cache efficiency, and replication. It
@@ -179,7 +180,7 @@ provided via @mention or auto-context)
 
 **Agent:**
 1. Extracts dashboard UUID from the provided context.
-2. Calls `signoz_get_dashboard` — gets full configuration.
+2. Calls `signoz:signoz_get_dashboard` — gets full configuration.
 3. Provides a focused panel-by-panel walkthrough grouped by row sections,
    explaining what each panel shows and what to watch for.
 4. Skips the health/gaps sections unless something notable stands out, since the

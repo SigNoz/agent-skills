@@ -6,15 +6,14 @@ Official SigNoz skills for Claude Code, Codex, Cursor, and the [skills.sh](https
 
 | Skill | Description |
 |-------|-------------|
-| [signoz-alert-create](plugins/signoz/skills/signoz-alert-create/SKILL.md) | Create SigNoz alert rules for threshold breaches, error rates, latency, anomaly detection, and absent-data conditions across metrics, logs, and traces. |
-| [signoz-alert-explain](plugins/signoz/skills/signoz-alert-explain/SKILL.md) | Explain and interpret an existing SigNoz alert rule's configuration, evaluation behavior, notification routing, and recent fire frequency. |
-| [signoz-alert-investigate](plugins/signoz/skills/signoz-alert-investigate/SKILL.md) | Diagnose why a SigNoz alert fired by correlating its signal with neighbor metrics, traces, and logs around the fire window, and ranking likely causes. |
-| [signoz-dashboard-create](plugins/signoz/skills/signoz-dashboard-create/SKILL.md) | Create new SigNoz dashboards or import pre-built templates for services and infrastructure. |
-| [signoz-dashboard-explain](plugins/signoz/skills/signoz-dashboard-explain/SKILL.md) | Explain panels, queries, and layout of an existing SigNoz dashboard. |
-| [signoz-dashboard-modify](plugins/signoz/skills/signoz-dashboard-modify/SKILL.md) | Modify an existing SigNoz dashboard: add, remove, or edit panels, variables, queries, and layout. |
-| [signoz-query-generate](plugins/signoz/skills/signoz-query-generate/SKILL.md) | Generate queries against SigNoz observability data (traces, logs, metrics). |
-| [signoz-clickhouse-query](plugins/signoz/skills/signoz-clickhouse-query/SKILL.md) | Optimized ClickHouse queries for SigNoz OpenTelemetry traces and logs. |
-| [signoz-docs](plugins/signoz/skills/signoz-docs/SKILL.md) | SigNoz docs guidance for instrumentation, setup, querying, alerts, and APIs. |
+| [signoz-creating-alerts](plugins/signoz/skills/signoz-creating-alerts/SKILL.md) | Create SigNoz alert rules for threshold breaches, error rates, latency, anomaly detection, and absent-data conditions across metrics, logs, and traces. |
+| [signoz-explaining-alerts](plugins/signoz/skills/signoz-explaining-alerts/SKILL.md) | Explain and interpret an existing SigNoz alert rule's configuration, evaluation behavior, notification routing, and recent fire frequency. |
+| [signoz-investigating-alerts](plugins/signoz/skills/signoz-investigating-alerts/SKILL.md) | Diagnose why a SigNoz alert fired by correlating its signal with neighbor metrics, traces, and logs around the fire window, and ranking likely causes. |
+| [signoz-explaining-dashboards](plugins/signoz/skills/signoz-explaining-dashboards/SKILL.md) | Explain panels, queries, and layout of an existing SigNoz dashboard. |
+| [signoz-modifying-dashboards](plugins/signoz/skills/signoz-modifying-dashboards/SKILL.md) | Modify an existing SigNoz dashboard: add, remove, or edit panels, variables, queries, and layout. |
+| [signoz-generating-queries](plugins/signoz/skills/signoz-generating-queries/SKILL.md) | Generate queries against SigNoz observability data (traces, logs, metrics). |
+| [signoz-writing-clickhouse-queries](plugins/signoz/skills/signoz-writing-clickhouse-queries/SKILL.md) | Optimized ClickHouse queries for SigNoz OpenTelemetry traces and logs. |
+| [signoz-searching-docs](plugins/signoz/skills/signoz-searching-docs/SKILL.md) | SigNoz docs guidance for instrumentation, setup, querying, alerts, and APIs. |
 
 ## Installation
 
@@ -52,8 +51,8 @@ Not yet on the public Cursor Marketplace. Install via a Team Marketplace:
 
 ```sh
 npx skills add SigNoz/agent-skills                                   # all skills
-npx skills add SigNoz/agent-skills --skill signoz-docs                # specific skill
-npx skills add SigNoz/agent-skills --skill signoz-clickhouse-query    # specific skill
+npx skills add SigNoz/agent-skills --skill signoz-searching-docs                # specific skill
+npx skills add SigNoz/agent-skills --skill signoz-writing-clickhouse-queries    # specific skill
 ```
 
 ## Repository Structure
@@ -69,15 +68,14 @@ npx skills add SigNoz/agent-skills --skill signoz-clickhouse-query    # specific
 │   ├── .cursor-plugin/plugin.json          # Cursor plugin manifest
 │   ├── hooks/                              # Auto-allow hooks
 │   └── skills/
-│       ├── signoz-alert-create/
-│       ├── signoz-alert-explain/
-│       ├── signoz-alert-investigate/
-│       ├── signoz-clickhouse-query/
-│       ├── signoz-dashboard-create/
-│       ├── signoz-dashboard-explain/
-│       ├── signoz-dashboard-modify/
-│       ├── signoz-docs/
-│       └── signoz-query-generate/
+│       ├── signoz-creating-alerts/
+│       ├── signoz-explaining-alerts/
+│       ├── signoz-investigating-alerts/
+│       ├── signoz-writing-clickhouse-queries/
+│       ├── signoz-explaining-dashboards/
+│       ├── signoz-modifying-dashboards/
+│       ├── signoz-searching-docs/
+│       └── signoz-generating-queries/
 └── README.md
 ```
 
