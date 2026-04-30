@@ -299,10 +299,8 @@ from scratch.
    Should I import it?"
 4. User confirms.
 5. Runs `python3 "<skill-base>/tools/import_template.py" "postgresql/postgresql.json"`.
-6. Reads `signoz://dashboard/widgets-instructions` and
-   `signoz://dashboard/widgets-examples`, normalizes any missing required
-   widget fields, runs the no-data probe, then calls
-   `signoz_create_dashboard`.
+6. Runs the no-data probe, then calls `signoz_create_dashboard` with the
+   template JSON passed through verbatim.
 7. Reports: "Created 'Postgres overview' dashboard with N panels across M
    sections. Want me to adjust any panels, add variables, or change the
    layout?"
@@ -345,9 +343,10 @@ template even though duplicates exist.)
    UUID, created-at]. I also found a pre-built 'OpenTelemetry Host
    Metrics Dashboard' template. Want me to (a) modify an existing one,
    (b) import the template as a new dashboard, or (c) stop?"
-4. User picks (b). Goes to Step 3b — fetches the template, normalizes,
-   probes for no-data, creates the dashboard. **Does not** detour into a
-   custom-build that re-discovers host metrics from scratch.
+4. User picks (b). Goes to Step 3b — fetches the template, probes for
+   no-data, creates the dashboard with the template JSON passed through
+   verbatim. **Does not** detour into a custom-build that re-discovers
+   host metrics from scratch.
 
 ---
 
