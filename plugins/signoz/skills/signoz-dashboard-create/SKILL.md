@@ -128,36 +128,30 @@ configuration, plan the requested changes, then call
 Run this path when the user has confirmed in Step 2 that they want to
 import the template found in Step 1.
 
-> **Tool guardrail.** The only template-search tool is `search_templates.py`.
-> Template JSON is fetched via the `WebFetch` tool against the pinned
-> upstream commit (URL below) — do not invent other script names (no
-> `fetch_template.py`, no `create_from_template.py`, no
-> `import_template.py`).
+> **Tool guardrail.** The only template tools are `search_templates.py`
+> and `import_template.py`. Do not invent other script names (no
+> `fetch_template.py`, no `create_from_template.py`, etc.).
+> `import_template.py` takes exactly one argument: the template `<path>`.
 
-1. Fetch the template JSON via the `WebFetch` tool. Construct the URL as:
+1. Fetch the template JSON:
 
+   ```bash
+   python3 "<skill-base>/tools/import_template.py" "<path>"
    ```
-   https://raw.githubusercontent.com/SigNoz/dashboards/61d374c50f9e1383e0eba3584fb81498f38c1f8d/<path>
-   ```
 
-   where `<path>` is the `path` field from the Step 1 search result
-   (URL-encode spaces as `%20` — e.g.
-   `temporal.io/Temporal%20Cloud%20Metrics.json`). Pass a prompt like
-   "Return the raw JSON body unchanged" so WebFetch does not summarize
-   it. If WebFetch fails or returns a non-JSON body, tell the user and
-   offer Step 3c (custom build) instead.
-2. **Validate and normalize the fetched JSON before creating.** The
-   `signoz_create_dashboard` tool's input schema enumerates every required
-   widget and `queryData` field — use it as the source of truth and add any
-   that the template JSON is missing. If the schema is unclear or you need
-   richer guidance (panel-type-specific examples, layout rules), also read
-   the MCP resources `signoz://dashboard/widgets-instructions` and
-   `signoz://dashboard/widgets-examples`.
+   where `<path>` is the `path` field from the Step 1 search result.
+   **Always quote the path** — some entries contain spaces (e.g.,
+   `temporal.io/Temporal Cloud Metrics.json`). The tool writes raw JSON
+   to stdout. It handles HTTP/network errors — if it exits non-zero,
+   tell the user and offer Step 3c (custom build) instead.
+2. **Do not make any change in the template.** 
 3. **Pre-flight no-data check.** Before calling `signoz_create_dashboard`,
    probe whether the template's signals are actually being ingested:
    - Walk the fetched JSON and collect what each widget queries:
-     - **Metrics** — `query.builder.queryData[].aggregateAttribute.key`
-       on widgets where `dataSource = "metrics"`.
+     - **Metrics** — for widgets where `dataSource = "metrics"`, collect
+       metric names from `query.builder.queryData[].aggregations[].metricName`
+       (v5 shape) **or** `query.builder.queryData[].aggregateAttribute.key`
+       (legacy shape) — templates may use either; check both.
      - **Traces** — widgets where `dataSource = "traces"`; collect any
        `service.name` filter values plus the aggregated attribute.
      - **Logs** — widgets where `dataSource = "logs"`; collect filter
@@ -184,28 +178,14 @@ import the template found in Step 1.
    - If **some** signals are present and others aren't, list which are
      missing and proceed only on confirmation.
    - If everything is present, proceed silently.
-5. **Shape check before create.** The `signoz_create_dashboard` tool rejects
-   stringified JSON for array/object fields with errors like
-   `cannot unmarshal string into ... layout of type []LayoutItem`. Verify
-   the values you are about to pass match the input schema's types — do
-   **not** wrap them in `JSON.stringify` / `json.dumps`:
-   - `tags` → array of strings, e.g. `["host", "infra"]` (not `"[\"host\"]"`).
-   - `layout` → array of `{i, x, y, w, h}` objects (not a JSON string).
-   - `widgets` → array of widget objects (not a JSON string).
-   - `variables` → object/map keyed by variable name (not a JSON string).
-   - `title`, `description` → plain strings.
-6. Pass `title`, `description`, `tags`, `layout`, `widgets`, and `variables`
-   to `signoz_create_dashboard`.
-7. Report what was created: title, panel count, sections.
-8. Offer customization. If the user requests changes, call
+7. Offer customization. If the user requests changes, call
    `signoz_get_dashboard`, then `signoz_update_dashboard` with the modified
    full JSON.
 
 #### Step 3c: Custom build (no template, or template fetch failed)
 
 Run this path when Step 1 found no template, or when the user opted for
-a custom build, or when the `WebFetch` of the template JSON failed.
-Build a dashboard from scratch.
+a custom build. Build a dashboard from scratch.
 
 1. **Gather requirements** — ask the user:
    - What signals to monitor (metrics, traces, logs, or a combination)
@@ -255,10 +235,6 @@ Build a dashboard from scratch.
   permission to skip Step 2 — you must still run `search_templates.py` before
   any `signoz_create_dashboard` call. "Create anyway" overrides the duplicate
   warning, not the template-first rule.
-- **No stringified JSON in tool args**: `signoz_create_dashboard` and
-  `signoz_update_dashboard` reject array/object fields passed as JSON strings.
-  `tags`, `layout`, `widgets` must be real arrays; `variables` must be a real
-  object. Never `JSON.stringify` / `json.dumps` these before passing them.
 - **No blind creation**: Always confirm with the user before creating. For
   templates: one confirmation. For custom: confirm the plan after gathering
   requirements.
@@ -279,9 +255,6 @@ Build a dashboard from scratch.
   dashboard is a worse user outcome than one extra confirmation prompt.
   Skip the probe only if the user has explicitly opted out for this
   request.
-- **GitHub fetch failures**: If `WebFetch` of a template JSON from GitHub fails
-  (network error, non-200, non-JSON body), tell the user and offer to build a
-  custom version instead.
 - **Full state on update**: `signoz_update_dashboard` requires the complete
   dashboard JSON (not a partial patch). Always call `signoz_get_dashboard` first
   to get the current state, merge your changes into that full object, and pass
@@ -302,12 +275,8 @@ Build a dashboard from scratch.
    dashboard provides a high-level overview of your PostgreSQL databases.
    Should I import it?"
 4. User confirms.
-5. Fetches the template via `WebFetch` against
-   `https://raw.githubusercontent.com/SigNoz/dashboards/61d374c50f9e1383e0eba3584fb81498f38c1f8d/postgresql/postgresql.json`.
-6. Reads `signoz://dashboard/widgets-instructions` and
-   `signoz://dashboard/widgets-examples`, normalizes any missing required
-   widget fields, runs the no-data probe, then calls
-   `signoz_create_dashboard`.
+5. Runs `python3 "<skill-base>/tools/import_template.py" "postgresql/postgresql.json"`.
+6. Runs the no-data probe, then calls `signoz_create_dashboard`
 7. Reports: "Created 'Postgres overview' dashboard with N panels across M
    sections. Want me to adjust any panels, add variables, or change the
    layout?"
@@ -331,28 +300,6 @@ Build a dashboard from scratch.
    Infrastructure. Runs the no-data probe.
 7. Calls `signoz_create_dashboard`.
 8. Reports what was created, offers customization.
-
----
-
-**User:** "Create a host metrics dashboard"
-
-(This is the failure mode from earlier — many existing host dashboards
-plus a curated template. Template-search-first means we propose the
-template even though duplicates exist.)
-
-**Agent:**
-1. Runs `python3 "<skill-base>/tools/search_templates.py" "host metrics"` —
-   top result is `hostmetrics/hostmetrics.json` (title: "OpenTelemetry
-   Host Metrics Dashboard").
-2. Calls `signoz_list_dashboards` (paginated) — finds 8 dashboards
-   matching "host"/"system"/"infrastructure".
-3. Says: "There are already these similar dashboards: [list with name,
-   UUID, created-at]. I also found a pre-built 'OpenTelemetry Host
-   Metrics Dashboard' template. Want me to (a) modify an existing one,
-   (b) import the template as a new dashboard, or (c) stop?"
-4. User picks (b). Goes to Step 3b — fetches the template, normalizes,
-   probes for no-data, creates the dashboard. **Does not** detour into a
-   custom-build that re-discovers host metrics from scratch.
 
 ---
 
