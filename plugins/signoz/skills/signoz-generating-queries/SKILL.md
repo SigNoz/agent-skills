@@ -36,7 +36,8 @@ Use this skill when the user asks to:
 
 Do NOT use when:
 - User wants raw ClickHouse SQL for a dashboard panel (custom joins, window
-  functions, regex over log bodies) → `signoz-writing-clickhouse-queries`
+  functions, regex over log bodies) — that's a separate dashboard-panel SQL
+  workflow, not this skill.
 
 ## Instructions
 
