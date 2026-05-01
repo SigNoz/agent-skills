@@ -116,6 +116,50 @@ candidates instead of guessing:
 
 Surface the candidates in the `needs_input` block. Do not pick one.
 
+### Step 2.5: Probe data existence for the chosen filter (fail fast)
+
+Before authoring any alert config, confirm the **specific combination** the
+alert will watch (metric × service × any other filter) actually emits data.
+The most common silent failure is "metric exists in the catalog *and* the
+service exists in the catalog, but the service doesn't emit that metric"
+— each piece checks out in isolation, the alert saves successfully, and it
+silently never fires.
+
+Run a single probe over the last 1 hour using the same filter the alert
+will use, but with the simplest aggregation that confirms data exists:
+
+- **Metrics**: `signoz:signoz_query_metrics` (PromQL) or `signoz:signoz_execute_builder_query`
+  with `count()` (or `count_distinct(service.name)` if scope-discovering).
+- **Logs**: `signoz:signoz_aggregate_logs` with `count()` over the filter.
+- **Traces**: `signoz:signoz_aggregate_traces` with `count()` over the filter.
+
+Inspect the result:
+
+- **Probe returns rows** → proceed to Step 3.
+- **Probe returns empty** → STOP. Do not build an alert config the user
+  will then be asked to throw away. Emit a `needs_input` block describing
+  what was missing and offer concrete recovery:
+  - Service doesn't emit the metric → call
+    `signoz:signoz_get_field_values signal=metrics name=service.name metricName=<metric>`
+    to list the services that *do* emit it; let the user pick a different
+    service or a different metric.
+  - Wrong attribute name (`service` instead of `service.name`) → suggest
+    the semantic-convention name and re-probe.
+  - Service emits the metric but not in the expected time range → widen
+    the probe window once (e.g. last 24h) before declaring no-data.
+
+**Exception — log-based crash / panic / OOMKilled / FATAL alerts.** These
+intentionally have zero matches in a healthy system. The probe will
+return empty by design. Do not stop; instead, surface the zero-match
+result and ask the user to confirm before save. Treat this exception
+narrowly: it applies to "alert me when bad thing happens" log queries,
+not to alerts that depend on continuous data flow.
+
+This probe is cheap (one query, ~100ms), and catching the no-data case
+early avoids the worst UX failure mode of this skill — the user reading
+through a fully-authored JSON payload and only then learning the alert
+can never fire.
+
 ### Step 3: Check for duplicate alerts
 
 Call `signoz:signoz_list_alerts` and **paginate through every page** —
@@ -146,16 +190,20 @@ For most user intents, the config is one of a small number of patterns:
 | ClickHouse SQL alert | delegate to `signoz-writing-clickhouse-queries` for query, then return here to wrap | non-trivial joins, custom aggregations |
 | PromQL alert | delegate to `signoz-generating-queries` for the PromQL, then return here | when user already has PromQL |
 
-**Threshold and matchType code mapping** (these are numeric strings, not
-words — the API rejects "above"):
+**Threshold `op` and `matchType` values.** v2alpha1 accepts the
+human-readable strings (`"above"`, `"on_average"`); the legacy numeric
+codes (`"1"`, `"3"`) are also accepted but harder to read in the UI. Prefer
+the words. **Anomaly rules only support `op: "above"`** — the engine
+already treats z-score breaches as two-sided when the threshold is
+positive, so `"above_or_below"` is rejected and unnecessary.
 
-| Comparison | op |  | Evaluation behavior | matchType |
-|---|---|---|---|---|
-| above / exceeds / > | "1" |  | breach at any point | "1" (at_least_once) |
-| below / under / < | "2" |  | breach for entire window | "2" (all_the_times) |
-| equal / = | "3" |  | average breaches | "3" (on_average) |
-| not equal / != | "4" |  | sum breaches | "4" (in_total) |
-|  |  |  | last value breaches | "5" (last) |
+| Comparison | `op` | Evaluation behavior | `matchType` |
+|---|---|---|---|
+| above / exceeds / > | `"above"` | breach at any point | `"at_least_once"` |
+| below / under / < | `"below"` | breach for entire window | `"all_the_times"` |
+| equal / = | `"equals"` | average breaches | `"on_average"` |
+| not equal / != | `"not_equals"` | sum breaches | `"in_total"` |
+|  |  | last value breaches | `"last"` |
 
 **Defaults the skill applies (and surfaces in the preview):**
 - `evalWindow: 5m0s`, `frequency: 1m0s` — change only if the intent implies
@@ -164,26 +212,70 @@ words — the API rejects "above"):
   transient spikes.
 - `matchType: "1"` (at_least_once) for error counts / error rates — catches
   any breach.
-- `severity: warning` — promote to `critical` only on urgency cues.
+
+**Severity defaults — derive from the intrinsic urgency of the alert, not
+just the user's words.** The user saying "alert me" doesn't force `warning`
+when the condition itself describes a critical event. Use this table; an
+explicit user cue overrides it ("just FYI" → demote, "page me" / "wake me
+up" → promote).
+
+| Alert intent | Default severity |
+|---|---|
+| Pod crash / OOMKilled / CrashLoopBackOff / panic / FATAL log signals | critical |
+| Service down / no-data on a production service | critical |
+| Error rate above any non-trivial threshold (>1%) | critical |
+| Error logs / exception spikes | warning |
+| Latency degradation (p95/p99 above target) | warning |
+| CPU / memory / disk pressure | warning |
+| Request-rate / traffic anomaly | warning |
+| SLO budget burn (info-level burn rate) | info / warning |
+
+When the user's intent is ambiguous on severity (no urgency cue, no
+clearly-critical condition), default to `warning` and surface the choice
+in the preview so they can adjust.
 
 **OTel attribute names** — always use semantic conventions:
 `service.name`, `host.name`, `k8s.namespace.name`,
 `deployment.environment.name`. Never `service`, `host`, or `env`.
+
+**Annotation templates** — the on-call engineer sees the notification, not
+the alert config. A notification that says "Pod crash detected" with no
+service name, no count, and no value is nearly useless at 3am. Always
+include the moving values:
+
+- `summary` — single-line headline. Include the resource scope and the
+  numeric value: `"checkoutservice error rate {{$value}}% above 3%"`.
+- `description` — longer message. Include `{{$value}}`, `{{$threshold}}`,
+  the groupBy values (e.g. `{{$labels.service_name}}`), and a sentence on
+  what to do or where to look. For count-based alerts include the count
+  explicitly: `"{{$value}} crash log lines in the last 5 minutes from
+  service {{$labels.service_name}}"`.
+
+Use `{{$value}}` for the breaching value, `{{$threshold}}` for the target,
+and `{{$labels.<key>}}` for groupBy values (note SigNoz substitutes the
+dotted attribute name with underscores: `service.name` → `service_name`).
 
 #### Common query shapes
 
 Three patterns cover most non-trivial alerts. The MCP resources above carry
 the full schema; these are quick references for the query block only.
 
-**Error rate** — two queries + formula `A * 100 / B`:
+**Error rate** — two queries + formula `A * 100 / B`. **Set
+`disabled: true` on the component queries A and B** so only the formula
+F1 renders in the alert chart and notification — the raw counts are
+intermediate, not the alert signal. Forgetting this clutters the alert
+preview with three series and confuses the on-call engineer reading the
+notification.
 
 ```json
 {
   "queries": [
     { "type": "builder_query", "spec": { "name": "A", "signal": "traces",
+        "disabled": true,
         "aggregations": [{ "expression": "count()" }],
         "filter": { "expression": "hasError = true" } } },
     { "type": "builder_query", "spec": { "name": "B", "signal": "traces",
+        "disabled": true,
         "aggregations": [{ "expression": "count()" }],
         "filter": { "expression": "" } } },
     { "type": "builder_formula",
@@ -247,26 +339,37 @@ For multi-severity alerts, attach channels per threshold:
 `thresholds.spec[N].channels` is an array — typically warning → Slack only,
 critical → Slack + PagerDuty.
 
-### Step 6: Dry-run the query
+### Step 6: Validate the threshold (would-have-fired count)
 
-Before save, validate the query semantically. A query that compiles but
-returns no data, or returns data that will never cross the threshold,
-produces an alert that silently fails to fire.
+Step 2.5 already confirmed the underlying data exists. Step 6 is about
+the *threshold* — given the full proposed query (including formulas,
+groupBy, and unit conversions) and the proposed threshold, would this
+alert have fired a sensible number of times in the last hour?
 
-1. Run the alert's primary query (or formula) over the last hour using:
+1. Run the alert's full primary query (or formula) over the last hour using:
    - `signoz:signoz_execute_builder_query` for builder/formula queries.
    - `signoz:signoz_query_metrics` for PromQL queries.
    - `signoz:signoz_aggregate_logs` / `signoz:signoz_aggregate_traces` if those fit better.
-2. Inspect the result:
-   - **No rows** → warn loudly. The alert may never fire. Ask the user to
-     confirm the filter, metric name, or signal type.
-   - **Has rows** → compute how many points in the last hour breached the
-     proposed threshold. Surface this in the preview as
-     "would have fired N times in the last 1h" — this catches both
-     too-tight (would have fired 200 times = alert storm) and too-loose
-     (0 fires = threshold may be wrong) configs.
-3. If the query is anomaly-based, skip the breach count (anomaly thresholds
-   are Z-scores, not raw values) — just verify the query returns data.
+2. Compute how many evaluation points in the last hour breached the
+   proposed threshold. Surface this in the preview as
+   **"would have fired N times in the last 1h"**:
+   - **N = 0** → the threshold may be too loose or the gating too strict.
+     Mention this so the user can adjust if intent was tighter.
+   - **N is large (e.g. > 30)** → likely alert storm. Surface and
+     recommend tightening or adding hysteresis (`recoveryTarget`).
+   - **N is small and non-zero** → calibrated; proceed.
+3. **Exceptions:**
+   - **Anomaly alerts** — skip the breach count entirely (Z-scores aren't
+     directly comparable to raw values). Step 2.5 already verified the
+     underlying metric × service has data; nothing more to validate here.
+   - **Log-based crash / panic / OOMKilled / FATAL alerts** — these
+     intentionally have zero matches in a healthy system. Step 2.5 has
+     already surfaced the zero-match result and obtained user confirmation;
+     skip the breach count.
+
+If Step 2.5 was somehow skipped (e.g. a downstream skill is invoking this
+flow mid-stream), the no-data stop rule applies here too: empty result →
+emit `needs_input` instead of saving an alert that will never fire.
 
 ### Step 7: Preview the prepared config
 
