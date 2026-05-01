@@ -1,7 +1,7 @@
 {
   "name": "signoz",
   "displayName": "SigNoz",
-  "version": "2026.04.30",
+  "version": "2026.05.01",
   "description": "Official SigNoz plugin for docs, queries, dashboards, and alerts",
   "author": {
     "name": "SigNoz"
