@@ -8,8 +8,11 @@ Usage:
 
 Walks the ``SigNoz/dashboards`` repo at the given SHA, locates each
 template JSON, extracts title/description/tags, and emits the bundled
-index. Also updates the ``PINNED_SHA`` constant in
-``tools/fetch_template.py``.
+index.
+
+The runtime fetcher (``tools/import_template.py``) tracks the moving
+tip of ``main`` and has no pinned-SHA constant, so this script only
+writes the catalog snapshot — it does not edit any other file.
 
 This is a maintenance tool. It is not invoked at runtime and may hit
 the public GitHub API without authentication; rerun with a token
@@ -30,7 +33,6 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 DEFAULT_OUTPUT = Path(__file__).resolve().parent.parent / "templates.json"
-FETCH_TEMPLATE_FILE = Path(__file__).resolve().parent.parent / "tools" / "fetch_template.py"
 
 GITHUB_TREE_URL = "https://api.github.com/repos/SigNoz/dashboards/git/trees/{sha}?recursive=1"
 GITHUB_RAW_URL = "https://raw.githubusercontent.com/SigNoz/dashboards/{sha}/{path}"
@@ -116,15 +118,6 @@ def _build_entry(sha: str, path: str) -> dict[str, Any] | None:
     }
 
 
-def _update_pinned_sha(new_sha: str) -> None:
-    source = FETCH_TEMPLATE_FILE.read_text(encoding="utf-8")
-    pattern = re.compile(r'^PINNED_SHA = "[0-9a-f]+"$', flags=re.MULTILINE)
-    if not pattern.search(source):
-        raise RuntimeError("PINNED_SHA line not found in fetch_template.py")
-    updated = pattern.sub(f'PINNED_SHA = "{new_sha}"', source, count=1)
-    FETCH_TEMPLATE_FILE.write_text(updated, encoding="utf-8")
-
-
 def regenerate(sha: str, output: Path) -> int:
     paths = _list_template_paths(sha)
     if not paths:
@@ -148,7 +141,6 @@ def regenerate(sha: str, output: Path) -> int:
         json.dumps(entries, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
-    _update_pinned_sha(sha)
     sys.stderr.write(f"Wrote {len(entries)} entries to {output}\n")
     return 0
 
