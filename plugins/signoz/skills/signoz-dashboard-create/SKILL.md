@@ -181,10 +181,7 @@ import the template found in Step 1.
 4. **Create the dashboard.** Call `signoz_create_dashboard` with the
    template JSON. Pass the top-level fields (`title`, `description`,
    `tags`, `layout`, `widgets`, `variables`) as their native types — do
-   **not** stringify arrays or objects. If the server rejects the
-   payload (e.g. v5 panel-validator errors), report the exact error to
-   the user and stop; do not silently reshape widget queries to make
-   validation pass.
+   **not** stringify arrays or objects.
 5. **Report and offer customization.** Tell the user what was created
    (title, panel count, sections). If the user requests changes, call
    `signoz_get_dashboard` to fetch the current state, then
