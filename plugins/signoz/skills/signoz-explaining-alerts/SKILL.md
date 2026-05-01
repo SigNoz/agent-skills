@@ -95,110 +95,122 @@ and skip the history line.
 This single line grounds the explanation. Do **not** drill into specific
 fires here — that's `signoz-investigating-alerts`.
 
-### Step 4: Build the structured explanation
+### Step 4: Build the explanation
 
-Use this exact section order. Skip a section if there's nothing
-meaningful to say (e.g., omit the Anomaly section unless `ruleType` is
-`anomaly_rule`).
+The single most useful thing for the user is a tight summary. Lead
+with a **TL;DR that directly answers the question they asked**, not a
+generic alert summary. The TL;DR is the only thing some users will
+read — burying their answer under a fixed template forces them to
+scroll for what they wanted in the first place.
 
-**1. Overview** — one paragraph:
-- Signal type (metrics / logs / traces / exceptions) and what it watches.
-- Severity (`labels.severity`).
-- State: enabled vs `disabled`; if SigNoz returns a current state
-  (`firing`, `inactive`), include it.
-- The one-line fire-frequency summary from Step 3.
-- A short audit trail: created/updated timestamps and authors
-  (`createAt`, `updateAt`, `createBy`, `updateBy`) so the user knows
-  the alert's age and last maintainer.
+Match the TL;DR shape to the user's question:
 
-**2. Query breakdown** — translate the query into operational language.
-The shape depends on `compositeQuery.queryType`:
+- **"What does this alert do?" / "Explain X"** — describe what fires:
+  > **TL;DR**: Fires when `<condition>` for `<scope>`, notifies
+  > `<channel>`. `<fire-frequency line>`.
 
-- **Builder (metrics)** — name the metric, time aggregation, space
-  aggregation, filter, and groupBy. Example: "Measures
-  `system.cpu.utilization`, averaged over time, averaged across CPU
-  cores, filtered to `deployment.environment.name = 'production'`,
-  grouped by `host.name`."
-- **Builder (logs / traces)** — explain the aggregation expression
-  (e.g., "counts log lines matching..."), filter, and groupBy. For
-  traces, note `durationNano` (nanoseconds) when the unit conversion
-  matters.
-- **Formula** — explain each sub-query (A, B, ...) separately, then
-  the formula expression and what it computes (e.g., "F1 = A * 100 / B
-  → error percentage"). State which `selectedQueryName` the alert
-  triggers on.
-- **PromQL** — translate the expression in plain English.
-- **ClickHouse SQL** — translate the SQL intent.
+- **"Is it configured correctly?" / "Audit this" / "Anything I should
+  change?"** — lead with the **verdict and the top 1–3 changes**, not
+  the description of what fires:
+  > **TL;DR**: Mostly well-configured, but recommend: (1) add
+  > `alertOnAbsent` — currently a crashed service stays silent; (2)
+  > fix annotation template `{{$topic}}` → `{{$labels.topic}}` (won't
+  > interpolate); (3) split critical to PagerDuty (both tiers
+  > currently route to Slack). `<fire-frequency line>`.
 
-For filters, decode operators: `=` equals, `!=` not equals, `IN` /
-`NOT IN` set membership, `EXISTS` / `NOT EXISTS` field presence,
-`LIKE` / `ILIKE` pattern match, `CONTAINS` substring, `REGEXP` regex.
-For `IN` / `NOT IN` lists, enumerate the values so the user can verify
-the list is intentional.
+- **"How does X work?" / "Explain the count guard"** — answer the
+  mechanism in 1–2 sentences before any framing:
+  > **TL;DR**: The count guard is a `having: count() > 50` clause on
+  > query A — any 1-minute bucket with ≤50 spans is dropped before
+  > evaluation, so low-traffic minutes can't fire the alert.
 
-For groupBy, name the dimension and explain the practical effect:
-"fires separately per service" if `service.name` is included.
+- **"What's the threshold?" / focused config question** — state the
+  exact thing they asked about:
+  > **TL;DR**: Threshold is **3 standard deviations** (z-score), not
+  > a raw rate value. Daily seasonality means the model compares
+  > each hour against historical norms for that hour.
 
-**3. Threshold and firing condition** — decode the threshold spec:
+Always include the fire-frequency line and `disabled` status if
+non-default — those ground every kind of TL;DR. But put the answer to
+the user's specific question first.
 
-- **`op` codes** → words: "1" above, "2" below, "3" equal, "4" not
-  equal.
-- **`matchType` codes** → words: "1" at_least_once (breach at any
-  point in window), "2" all_the_times (breach for entire window), "3"
-  on_average (average over window breaches), "4" in_total (sum over
-  window breaches), "5" last (most recent value).
-- Each threshold level: `name` (severity), `target`, `targetUnit`, the
-  channels attached. If multiple levels, explain each.
-- `recoveryTarget` if set → explain hysteresis. If absent, note the
-  alert resolves the moment the value drops back across the threshold,
-  which can flap if the value hovers near the boundary.
-- **Unit handling**: `targetUnit` is the unit the user set the threshold
-  in (e.g., "ms"). The query may emit a different native unit (e.g.,
-  ns for `durationNano`). SigNoz converts the query output to
-  `targetUnit` before comparing. State the threshold in `targetUnit`
-  (e.g., "fires when p99 latency exceeds 500 ms"), not in the native
-  unit.
+After the TL;DR, write the explanation in prose, organized into the
+four sections below. **Skip any section that has nothing meaningful to
+add** — empty severity labels, default notification settings, vanilla
+annotations don't deserve a header. Short and skimmable beats
+perfunctorily complete; the user is not reading a checklist.
 
-**4. Evaluation timing** — explain `evalWindow` and `frequency`:
+**1. What it watches** — one short paragraph. Combine signal type
+(metrics / logs / traces / exceptions), what the query measures, and
+scope. Translate the query to operational language; for formulas, name
+each sub-query (A, B, …) and state what F1 (or whichever
+`selectedQueryName` triggers) computes — e.g. "F1 = A × 100 / B → error
+percentage". Decode filter operators (`=` equals, `!=` not equals,
+`IN` / `NOT IN`, `LIKE` / `ILIKE`, `CONTAINS`, `REGEXP`, `EXISTS` /
+`NOT EXISTS`); enumerate `IN` / `NOT IN` value lists so the user can
+verify them. Name each `groupBy` dimension and its practical effect
+("fires separately per service" for `service.name`).
 
-> The alert checks every `frequency` using the last `evalWindow` of
-> data, so a spike that lasts less than `evalWindow` could still
-> trigger it depending on `matchType`.
+For **anomaly rules** (`ruleType: anomaly_rule`), explicitly state that
+the threshold is in **standard deviations from the learned pattern, not
+the raw value** — this is the most common point of confusion. Include
+`algorithm` (zscore), `seasonality` (hourly / daily / weekly), and how
+lower/higher targets shift sensitivity (lower → more noise, higher →
+only extreme deviations).
 
-**5. Absent-data behavior** — if `alertOnAbsent: true`, explain that
-the alert fires when no data arrives for `absentFor` (in milliseconds —
-e.g., `300000` is 5 minutes). If absent or false, note that silent
-data loss (crashed service, broken instrumentation) will not trigger
-this alert.
+**2. When it fires** — one paragraph covering threshold + timing.
+Decode the threshold spec into plain English using these mappings:
 
-**6. Notification routing** — explain:
-- `preferredChannels` and per-threshold `channels`: where each severity
-  level routes.
-- `notificationSettings.groupBy`: how notifications are grouped to
-  reduce noise.
-- `notificationSettings.renotify`: whether re-notification is on, the
-  interval, and which states (`firing`, `nodata`).
-- `notificationSettings.usePolicy`: whether label-based routing
-  policies apply.
-- If `notificationSettings` is absent, default behavior applies: no
-  grouping, no re-notification, no label-based routing.
+- `op` codes: `1` above, `2` below, `3` equal, `4` not equal.
+- `matchType` codes: `1` at_least_once (any point in window), `2`
+  all_the_times (entire window), `3` on_average (window average), `4`
+  in_total (window sum), `5` last (most recent point).
 
-**7. Labels and annotations** — explain `labels.severity` plus any
-custom labels (team, service, environment) that drive routing. Decode
-`annotations.description` template variables: `{{$value}}` (current
-value), `{{$threshold}}` (threshold target), `{{$labels.key}}` (label
-value — note dots become underscores: `service.name` →
-`{{$labels.service_name}}`).
+State each threshold tier's `name`, `target`, `targetUnit`, and
+attached channels. **Always state the threshold in `targetUnit`, not
+the native query unit** (e.g. "fires when p99 exceeds 500 ms", not
+"…exceeds 500 000 000 ns"). Note `recoveryTarget` if set (hysteresis);
+if absent, mention flap risk when the value hovers near the boundary.
+Describe timing as "checks every `<frequency>` over the last
+`<evalWindow>`", and mention that with `at_least_once` a single-point
+breach triggers, while `all_the_times` requires the full window.
 
-**8. Rule type context** — note `ruleType` and what it implies:
-- `threshold_rule` — static threshold comparison (most common).
-- `promql_rule` — PromQL expression evaluated against the metrics
-  store.
-- `anomaly_rule` — Z-score seasonal anomaly detection. State the
-  `algorithm` (zscore), `seasonality` (hourly / daily / weekly), and
-  that the threshold is in standard deviations from the expected
-  pattern, not raw value. Lower target → more sensitive (more
-  noise); higher target → only extreme deviations.
+**3. Where it notifies** — channels per tier (resolved by name from
+`signoz_list_notification_channels` if needed), `notificationSettings.groupBy`
+(how notifications are bundled), `renotify` (interval + which states),
+`usePolicy` (label-based routing). Skip this section entirely if
+notification settings are vanilla and the user already saw the channel
+in the TL;DR.
+
+**4. Notable concerns** — flag *only* what's non-default and worth the
+user's attention. Don't list every absent field; focus on the
+high-leverage ones:
+
+- **`alertOnAbsent` missing** when the signal is critical: silent data
+  loss (crashed service, broken instrumentation) won't trigger the
+  alert. Always call this out for production-tier rules.
+- **`alertOnAbsent: true` but `nodata` not in `renotify.alertStates`**:
+  the absent-data fire pages once and then goes silent — easy to miss.
+- **Template variable bugs**: `{{$topic}}` won't interpolate; the
+  correct form is `{{$labels.topic}}`. Dots in label keys become
+  underscores (`service.name` → `{{$labels.service_name}}`).
+- **Multiple severity tiers but `labels.severity` missing on the rule**
+  — breaks label-based routing policies. Common gap.
+- **All tiers route to the same channel** — defeats the point of
+  graduated thresholds.
+- **High-cardinality `groupBy`** (e.g. `pod.name` × `partition`) →
+  notification-storm risk during cluster-wide events.
+- **Annotation/description text contradicts `matchType`** (e.g.
+  description says "for over 5 minutes" but `matchType=at_least_once`
+  fires on first breach within the window).
+- **Alert name doesn't match the filter target** (e.g. name says
+  "checkout" but filter targets `payments`) — call this out.
+
+If none of these apply, omit the section. Better silent than padded.
+
+If the user asked only "what does this alert do", stop here. The audit
+(Step 5) is for "is it configured correctly" / "audit this" /
+"anything I should change" requests.
 
 ### Step 5: Assess the configuration (only if asked)
 
@@ -277,26 +289,31 @@ End with two or three actionable follow-ups:
 
 **Agent:**
 1. `signoz:signoz_list_alert_rules` (paginated) → finds "High Error Rate —
-   Checkout" with id 42.
-2. `signoz:signoz_get_alert id=42` → full config (formula alert,
-   `alertType=TRACES_BASED_ALERT`, two queries + formula F1, single
-   critical threshold at 5%, `op=1`, `matchType=1`).
-3. `signoz:signoz_get_alert_history id=42 lookback=7d` → fired 3 times in
-   last 7d, last fire 2h ago.
-4. Builds explanation:
-   - **Overview**: traces-based alert, critical severity, currently
-     enabled. Fired 3 times in the last 7d (last fire 2h ago). Created
-     by alice 2 weeks ago, last updated by bob yesterday.
-   - **Query breakdown**: query A counts spans with `hasError = true`
-     for `service.name = 'checkout'`. Query B counts all spans for the
-     same service. Formula F1 = A * 100 / B → error percentage. The
-     alert triggers on F1.
-   - **Threshold**: fires when error rate goes above 5% at any point in
-     the evaluation window (`at_least_once`). Single critical
-     threshold, channel `pagerduty-oncall`.
-   - **Evaluation**: checks every 1 min over the last 5 min.
-   - **Notification**: pagerduty-oncall on critical; re-notify every
-     4h while firing.
+   Checkout" id 42.
+2. `signoz:signoz_get_alert id=42` → traces formula (A errored spans / B
+   total spans × 100), single critical threshold at 5%, `op=1`,
+   `matchType=1`, channel `pagerduty-oncall`.
+3. `signoz:signoz_get_alert_history id=42 lookback=7d` → fired 3 times,
+   last fire 2h ago.
+4. Replies:
+
+   > **TL;DR**: Fires when checkout error rate (errored spans / total
+   > spans) exceeds 5% at any point in the last 5 min, pages
+   > `pagerduty-oncall`. Fired 3 times in the last 7d (last 2h ago).
+   >
+   > **What it watches** — traces from `service.name = 'checkout'`.
+   > Query A counts spans with `hasError = true`, query B counts all
+   > spans, F1 = A × 100 / B is the error percentage; the alert
+   > triggers on F1.
+   >
+   > **When it fires** — `op=above`, `matchType=at_least_once`, target
+   > 5%. Checks every 1 min over the last 5 min — a single elevated
+   > minute fires it.
+   >
+   > **Notable** — no `recoveryTarget` (could flap near 5%); no
+   > `alertOnAbsent` (a checkout outage that drops traffic to zero
+   > won't trigger this rule).
+
 5. Offers: "Want me to investigate the fire from 2h ago?"
 
 ---
@@ -304,21 +321,33 @@ End with two or three actionable follow-ups:
 **User:** "Explain alert rule 17 — is it well configured?"
 
 **Agent:**
-1. `signoz:signoz_get_alert id=17` → metrics-based, `system.cpu.utilization`,
-   threshold_rule, two thresholds (warning 80%, critical 90%),
-   `matchType=3` on_average, filter
-   `deployment.environment.name = 'production'`, groupBy `host.name`.
+1. `signoz:signoz_get_alert id=17` → metrics, `system.cpu.utilization`,
+   two thresholds (warning 80%, critical 90%), `matchType=3` on_average,
+   filter `deployment.environment.name = 'production'`, groupBy
+   `host.name`.
 2. `signoz:signoz_get_alert_history id=17` → has not fired in last 7d.
-3. Builds explanation, then assesses (since user asked):
-   - Dual-threshold setup is good for graduated response.
-   - `on_average` is appropriate for CPU — avoids false positives from
-     momentary spikes.
-   - 0 fires in 7d means the threshold has not been exercised. Could be
-     fine (production is healthy) or too loose. If user expected it to
-     fire, suggest checking the metric directly with `signoz-generating-queries`.
-   - Suggests adding `alertOnAbsent: true` so a host that stops
-     reporting metrics doesn't slip through silently.
-   - Annotations use default templates — suggests adding a runbook URL.
+3. The user asked "is it well configured?" — the TL;DR leads with the
+   **verdict**, not a generic description. Then explanation + full
+   audit:
+
+   > **TL;DR**: Mostly well-configured (dual-threshold + `on_average`
+   > is the right call for CPU), but two gaps to fix: (1) no
+   > `alertOnAbsent` — a crashed agent silently stops reporting and
+   > this rule won't catch it; (2) annotations are default — a
+   > runbook URL would help on-call. Has not fired in the last 7d
+   > (could mean production is healthy or thresholds too loose).
+   >
+   > **What it watches** — `system.cpu.utilization` on
+   > `deployment.environment.name = 'production'`, grouped by
+   > `host.name` (fires per host).
+   >
+   > **When it fires** — `op=above`, `matchType=on_average`, two tiers
+   > (warning 80%, critical 90%) over a 5-min window. Short spikes
+   > don't fire — smoothing is correct for CPU.
+   >
+   > **Notable concerns** — same as TL;DR fixes above; nothing else
+   > non-default.
+
 4. Offers next steps.
 
 ---
@@ -326,22 +355,25 @@ End with two or three actionable follow-ups:
 **User:** "Help me understand this anomaly detection alert" (alert id 88)
 
 **Agent:**
-1. `signoz:signoz_get_alert id=88` →
-   `ruleType: anomaly_rule`, `algorithm=zscore`, `seasonality=daily`,
-   target 3, metric `http.server.request.duration`, scope
-   `service.name = 'api-gateway'`.
+1. `signoz:signoz_get_alert id=88` → `ruleType: anomaly_rule`,
+   `algorithm=zscore`, `seasonality=daily`, target 3, metric
+   `http.server.request.duration`, scope `service.name = 'api-gateway'`.
 2. History: fired 1 time in last 7d.
-3. Explanation:
-   - **Overview**: metrics-based anomaly detection alert on
-     `http.server.request.duration` for api-gateway. Fired once in last
-     7d.
-   - **Anomaly specifics**: uses Z-score with daily seasonality.
-     Instead of a fixed threshold, the alert learns the daily pattern
-     of latency and fires when the value deviates by more than 3
-     standard deviations from the expected pattern. This adapts to
-     traffic patterns — higher latency at peak hours won't false-trigger
-     if that's normal.
-   - **Threshold interpretation**: target 3 means 3 standard deviations.
-     Lower (e.g., 2) → more sensitive, more noise. Higher (e.g., 4) →
-     only extreme deviations.
+3. Replies:
+
+   > **TL;DR**: Fires when api-gateway request latency deviates by more
+   > than **3 standard deviations** (not raw latency, not a fixed value)
+   > from its learned daily pattern. Fired once in the last 7d.
+   >
+   > **What it watches** — `http.server.request.duration` for
+   > `service.name = 'api-gateway'`, evaluated as a Z-score anomaly
+   > with **daily seasonality** — the model learns the typical pattern
+   > for each hour of day, so peak-hour latency won't false-trigger if
+   > it matches the historical norm for that hour.
+   >
+   > **When it fires** — when |Z-score| > 3, i.e. the value is more
+   > than 3 standard deviations away from the expected pattern. Lower
+   > target → more sensitive (more noise); higher → only extreme
+   > deviations. The threshold is **not** in seconds or milliseconds.
+
 4. Offers to investigate the recent fire.
