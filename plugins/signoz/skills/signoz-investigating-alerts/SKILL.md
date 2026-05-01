@@ -47,7 +47,7 @@ Do NOT use when the user wants to:
 - Modify an alert (raise threshold, add hysteresis) → call
   `signoz:signoz_update_alert` directly.
 - Run a free-form ad-hoc investigation without an alert as the anchor →
-  `signoz-generating-queries` or `signoz-writing-clickhouse-queries`.
+  `signoz-generating-queries`.
 
 ## Required inputs
 
@@ -180,17 +180,41 @@ fire-window and baseline-window calls cleanly.
 
 ### Step 5: Build the structured output
 
-Use this exact section order. Keep each section tight — this is a
-report, not an essay.
+Use this exact section order. Lead with a TL;DR — engineers under
+pressure scan the top first and stop reading once they have what
+they need. Compression plus proof: every claim cites the MCP query
+that produced it; no generic "check logs / verify connectivity"
+filler.
 
-**1. What fired**
-One paragraph: the alert (id, name), the fire window (absolute and
-relative time, e.g., "fired 2h ago at 14:32 UTC"), peak magnitude
-("error rate hit 12.4% vs. 5% threshold — 148% over"), fire duration,
-and the fire pattern (`one-off` / `sustained` / `flapping` /
-`recurring` / `marginal`).
+**1. TL;DR** — one or two sentences, no more. Leading hypothesis,
+overall confidence, blast radius, and the single most useful next
+action. Example:
+> "checkoutservice error rate hit 12.4% (threshold 5%) for 8m at
+> 14:32 UTC — most likely cause is payments-api timing out
+> (high confidence). Open trace `7af3a09b…` to see the failing call."
 
-**2. Likely causes** (ranked, max 3)
+If no hypothesis reaches medium confidence, the leading line is
+"No clear root cause found." rather than a low-confidence guess
+dressed up as the answer.
+
+**2. What fired**
+The alert (id, name), the fire window (absolute UTC + relative),
+peak magnitude ("error rate hit 12.4% vs. 5% threshold — 148% over"),
+fire duration, and the fire pattern (`one-off` / `sustained` /
+`flapping` / `recurring` / `marginal`).
+
+**3. Investigation trail**
+A scannable list of what was checked, with ✅ for confirmed signals
+and ❌ for ruled out, each followed by a one-line finding. The point
+is that the reader can see what work the AI did and what it found —
+this is where trust is earned. Example:
+- ✅ Tier 1 — peak error rate 12.4%, fire was real (not marginal).
+- ✅ Tier 2 — payments error rate +8900%, p99 +1180%; downstream
+  cascade.
+- ❌ CPU / memory pressure — flat through the fire window.
+- ✅ Tier 3 — 30 error traces all hit payments-api, same message.
+
+**4. Likely causes** (ranked, max 3)
 Each cause has three parts:
 - **Hypothesis** — one sentence, specific. Bad: "service is unhealthy".
   Good: "checkout is timing out on calls to payments-api".
@@ -198,23 +222,38 @@ Each cause has three parts:
   underlying query inline so the user can re-run it. State the
   neighbor signal, the delta vs baseline, the trace/log pattern that
   supports it.
-- **Confidence** — `high` (multi-tier evidence converges), `medium`
-  (one tier's evidence), `low` (only one signal moved).
+- **Confidence** — `high` requires ≥2 of: temporal precedence,
+  topology / dependency edge, shared service or entity, correlated
+  metric/log/trace evidence, recent deploy or config change.
+  `medium` is one tier's evidence with at least one of those
+  signals. `low` is a single signal moved with no corroboration —
+  in that case label it a "co-occurring signal," not a cause.
 
 If only Tier 1 ran (marginal fire / no neighbor anomalies), output
 fewer hypotheses with `low` confidence and explicitly call out the
 limitation.
 
-**3. Suggested next steps**
-Action items the user can take. Be concrete:
-- Specific dashboard or trace to open
-  (e.g., "open trace 7af3... in the SigNoz UI").
-- Specific query to run with `signoz-generating-queries` or
-  `signoz-writing-clickhouse-queries`.
-- "Tune this alert" if the fire was marginal (link to
-  `signoz:signoz_update_alert`).
+**5. Ruled out**
+Short but explicit. List candidates the evidence eliminated and the
+one-line reason why. Skip the section if there's nothing meaningful
+to rule out — but if you considered something and dropped it, say so
+here so the user doesn't waste time re-checking it.
+
+**6. Suggested next steps**
+Action items the user can take. Be concrete and use SigNoz-native
+handles so the user can act immediately:
+- Specific trace, dashboard, or alert to open
+  (e.g., "open trace `7af3a09b…` in the SigNoz UI").
+- Specific query to run with `signoz-generating-queries` — paste
+  the exact filter and time window.
+- "Tune this alert" if the fire was marginal — name the field
+  (`matchType`, `target`, `recoveryTarget`) and the change to make
+  via `signoz:signoz_update_alert`.
 - "Open an incident" or "page the owning team" if the cause is
   cross-service.
+
+Do not pad with generic advice ("verify connectivity", "check
+dashboards") — that's noise during an active incident.
 
 ## Out of scope (v1)
 
@@ -239,6 +278,32 @@ Action items the user can take. Be concrete:
   evidence is missing, lower confidence and say so.
 - **Show the supporting query** with each hypothesis so the user can
   reproduce and dig deeper.
+- **Compression plus proof.** TL;DR is one or two sentences max; the
+  full report is a triage card, not a postmortem. Engineers under
+  pressure should be able to skim the top and act. Every section
+  earns its place by adding evidence the user couldn't already see
+  in the alert payload.
+- **Correlation ≠ causation.** Label something a cause only when at
+  least two of the following converge: temporal precedence (signal
+  moved before symptom), topology / dependency edge, shared service
+  or entity, correlated metric/log/trace evidence, or a recent
+  deploy/config change. A single time-aligned anomaly is a
+  "co-occurring signal," not a cause — say so explicitly.
+- **Don't restate the alert or recommend the obvious.** "Check
+  logs", "verify connectivity", "investigate dashboards" — the
+  reader of this output already knows they need to. Replace generic
+  suggestions with specific queries, traces, or filters they can run
+  immediately.
+- **No fabricated identifiers.** Trace IDs, span names, alert rule
+  IDs, channel names, deploy IDs — every identifier in the output
+  must come from a real MCP response. Don't invent placeholders that
+  look plausible.
+- **Honest uncertainty wins.** If no hypothesis reaches medium
+  confidence, the answer is "No clear root cause found — here's
+  what we checked and what's ruled out." Do not promote a
+  low-confidence guess to the leading hypothesis just to sound
+  useful. False positives waste active incident time more than false
+  negatives.
 - **Prefer resource-attribute filters** in every drill-down query.
   This is the SigNoz MCP guideline and it directly affects query
   speed at scale.
@@ -274,15 +339,34 @@ Action items the user can take. Be concrete:
    30 traces, all hitting the same downstream URL. Logs show
    matching "payments client timeout" lines, 142 occurrences.
 6. **Output**:
+
+   > **TL;DR**: checkoutservice error rate hit 12.4% (threshold 5%)
+   > for 8m at 14:32 UTC. Most likely cause: payments-api timing out
+   > (high confidence — converging trace + log + neighbor evidence).
+   > Open trace `7af3a09b…` to see the failing call.
+
    - **What fired**: alert 42 fired 2h ago at 14:32 UTC, sustained
      8m. Error rate peaked at 12.4% (148% over threshold).
+   - **Investigation trail**:
+     - ✅ Tier 1 — peak 12.4% vs 5% threshold, pre-fire baseline 0.3%.
+       Real fire.
+     - ✅ Tier 2 — payments error rate +8900%, p99 latency +1180%,
+       throughput −42%.
+     - ❌ CPU / memory pressure on checkout — flat.
+     - ✅ Tier 3 — 30 error traces all hit payments-api with
+       `context deadline exceeded`; 142 matching timeout logs.
    - **Likely causes** (high confidence): payments service errors
-     cascading into checkout. Evidence: payments error rate +8900%,
-     checkout p99 latency +1180%, 142 client-timeout logs and 30 error
-     traces all calling payments-api. Single coherent root cause.
-   - **Next steps**: open trace 7af3...; check payments service
-     directly with `signoz-explaining-alerts` if a payments alert exists,
-     otherwise `signoz-generating-queries` for payments error rate over last 4h.
+     cascading into checkout. Evidence converges across topology
+     (checkout → payments edge), temporal precedence (payments
+     errors lead checkout p99), and shared entity (every error
+     trace targets the payments-api URL).
+   - **Ruled out**: checkout-side resource pressure (CPU/memory
+     flat); upstream traffic spike (throughput dropped, didn't
+     spike).
+   - **Next steps**: open trace `7af3a09b…` in the SigNoz UI; if
+     payments has its own alert, run `signoz-explaining-alerts` on
+     it, otherwise `signoz-generating-queries` for payments error
+     rate over the last 4h.
 
 ---
 
@@ -297,12 +381,27 @@ Action items the user can take. Be concrete:
    `matchType = at_least_once` made each blip trigger.
 4. Early-stop kicks in. Skip tiers 2/3.
 5. **Output**:
-   - **What fired**: alert 88 has been flapping — 7 fires in last 1h,
-     each 2-4m. Peak only 5% over threshold.
-   - **Likely causes** (medium): threshold tuned too tight or
-     `matchType` is too sensitive. Evidence: every fire was within
-     5% of threshold; baseline already runs at 70-75%. Not a real
-     anomaly, just flapping near the boundary.
+
+   > **TL;DR**: alert 88 has been flapping on `prod-api-3` — 7 fires
+   > in the last 1h, each 2–4m, all within 5% of the 80% threshold.
+   > No clear root cause; this is threshold tuning, not an incident.
+   > Switch `matchType` to `on_average` or add hysteresis to stop
+   > the noise.
+
+   - **What fired**: alert 88, host `prod-api-3`, fire pattern
+     `flapping`. 7 fires in the last 1h, each 2–4m. Peak 84% (5%
+     over the 80% threshold).
+   - **Investigation trail**:
+     - ✅ Tier 1 — every fire was within 5% of threshold; duration
+       short; baseline already at 70–75%. Marginal fire — early-stop
+       triggered, Tier 2/3 skipped.
+   - **Likely causes** (low / co-occurring signal only): threshold
+     tuned too tight or `matchType` is too sensitive. Evidence:
+     every fire was within 5% of threshold; baseline already runs
+     at 70–75%. Not promoted to a "cause" — single signal, no
+     corroboration.
+   - **Ruled out**: real CPU saturation incident (peaks too small
+     and short-lived; baseline already near threshold).
    - **Next steps**: change `matchType` to `on_average` (smooths
      transient spikes) OR raise threshold to 85% with hysteresis
      (`recoveryTarget: 75`). Use `signoz:signoz_update_alert` to apply.
@@ -329,17 +428,36 @@ Action items the user can take. Be concrete:
    restarting" (1,200 occurrences). Top trace error: graceful-shutdown
    exceptions.
 6. **Output**:
+
+   > **TL;DR**: log volume alert 14 fired at 03:12 UTC for
+   > `service.name = inventory`, sustained 22m at 240% over threshold.
+   > Most likely cause: inventory pods OOM-killed and restarted 4
+   > times (high confidence). Check container memory limits for the
+   > inventory deployment.
+
    - **What fired**: alert 14 fired at 03:12 UTC for service
-     inventory, sustained 22m, 240% over threshold.
-   - **Likely causes** (high): inventory pods OOM-killed and
-     restarted 4 times during the window. Evidence: 1,200 OOM log
-     lines, 4 pod restarts, CPU/memory dropped to zero between
-     restarts, error logs spiked from restart noise rather than a
-     true error rate change in the application.
-   - **Next steps**: check container memory limits for inventory pods;
-     review recent deploys; consider whether the alert should exclude
-     restart-related error patterns or whether the underlying
-     OOM is the real concern.
+     `inventory`, sustained 22m, 240% over threshold.
+   - **Investigation trail**:
+     - ✅ Tier 1 — peak 3,400 errors/min vs 1,000/min threshold;
+       pre-fire baseline 12/min. Real fire.
+     - ✅ Tier 2 — request error rate +600%; CPU/memory collapsed
+       (−80%/−60%); 4 pod restarts in window.
+     - ❌ p99 latency — only +30%, not a latency-driven incident.
+     - ✅ Tier 3 — top log message "OOMKilled restarting" (1,200
+       occurrences); top trace error: graceful-shutdown exceptions.
+   - **Likely causes** (high confidence): inventory pods OOM-killed
+     and restarted 4 times during the window. Evidence converges
+     across topology (single service), temporal precedence (memory
+     fell to zero before error spike), shared entity (all log lines
+     from `service.name = inventory`), and a single coherent
+     pattern (OOM → restart → graceful-shutdown noise).
+   - **Ruled out**: a true application error-rate change (errors
+     are restart noise, not request-path failures); upstream
+     traffic surge (throughput unchanged).
+   - **Next steps**: check container memory limits for inventory
+     pods; review recent deploys; consider whether the alert should
+     exclude restart-related error patterns or whether the
+     underlying OOM is the real concern.
 
 ## Additional resources
 
@@ -351,7 +469,5 @@ Action items the user can take. Be concrete:
 - `signoz-explaining-alerts` skill — to decode the rule before
   investigating, if the user is unfamiliar with what the alert
   monitors.
-- `signoz-writing-clickhouse-queries` skill — for drill-down queries that need
-  raw ClickHouse SQL.
 - `signoz-generating-queries` skill — for ad-hoc follow-up queries on the same
   resource scope.
