@@ -36,20 +36,61 @@ Do NOT use when:
 
 ## Instructions
 
-The three steps below run in order: **template search → duplicate check →
-build**. The template search comes first deliberately. If we checked
-duplicates first, then asked "create anyway?", a user who says yes is
-easily misread as "skip templates and build custom" — and a custom build
-when a curated template exists is a worse outcome than one extra prompt.
-Searching templates up front means by the time we ask the user anything,
-we already know whether we're proposing a template import or a custom
-build, and the duplicate check can compare against the *actual title we'd
-create* (template title or custom title), not just the user's raw words.
+The flow runs in order: **duplicate check → user picks modify-or-create →
+on create, template lookup decides template-import vs custom-build**.
+Duplicate check comes first so we never silently create a second copy of
+something that already exists. Once the user has chosen to create a new
+dashboard, the template lookup is an internal implementation detail — if
+a curated template exists we use it, otherwise we build from scratch.
+The user is offered exactly two choices: modify an existing dashboard, or
+create a new one.
 
-### Step 1: Search the template catalog
+### Step 1: Check for duplicates
 
-Run the search tool via Bash from the skill's base directory (shown in the
-initial skill-load message):
+Call `signoz_list_dashboards` to see what dashboards already exist.
+**Paginate through all pages** — check `pagination.hasMore` in the
+response. If `hasMore` is true, call again with `offset` set to
+`pagination.nextOffset` and repeat until all pages are exhausted. Only
+after checking every page can you conclude no similar dashboard exists.
+
+**Match aggressively.** For each existing dashboard, compare its lowercased
+`name` and `tags` against the user's request. A match is any of:
+- lowercased name contains the technology/domain keyword (e.g. "redis",
+  "postgres", "k8s"/"kubernetes", "docker"/"container", "host");
+- any tag matches the keyword;
+- existing name and the user's request share the root token (e.g.
+  "Redis - Overview" vs a request for a Redis dashboard).
+
+### Step 2: Ask the user — modify or create
+
+Present exactly two options:
+
+- **Duplicates found:** "There are already these similar dashboards:
+  [list with name, UUID, created-at]. Want me to (a) modify one of these,
+  (b) create a new dashboard anyway, or (c) stop?"
+- **No duplicates:** "I'll create a new dashboard for this. Proceed?"
+  (No "modify" option when there's nothing to modify.)
+
+Wait for the user's choice. If they pick "modify", go to Step 3a. If they
+pick "create new" (or confirm creation), go to Step 3b. If they pick
+"stop", stop.
+
+### Step 3: Create or modify
+
+#### Step 3a: Modify an existing dashboard
+
+Call `signoz_get_dashboard` with the chosen UUID to fetch the full
+configuration, plan the requested changes, then call
+`signoz_update_dashboard` with the complete updated JSON. Stop here.
+
+#### Step 3b: Create a new dashboard
+
+Run the template lookup first. The user has already agreed to create a
+new dashboard — the lookup just decides *how* we build it, no extra
+confirmation prompt.
+
+Run the search tool via Bash from the skill's base directory (shown in
+the initial skill-load message):
 
 ```bash
 python3 "<skill-base>/tools/search_templates.py" "<query>" --limit 5
@@ -70,63 +111,15 @@ python3 "<skill-base>/tools/search_templates.py" --list-categories
 python3 "<skill-base>/tools/search_templates.py" "" --category "Apm" --limit 10
 ```
 
-A category-only call (empty query) returns every template in that
-category, ordered by title.
+Branch on the result:
+- **Template found** (top result is clearly relevant to the user's
+  request) — proceed to Step 3b-i (template import). Briefly tell the
+  user "I found a pre-built [title] template and will use it" so they
+  know what's being created; do not block on a yes/no.
+- **No template** (empty array, or top result is unrelated) — proceed to
+  Step 3b-ii (custom build).
 
-You leave Step 1 with one of two outcomes — carry it into Step 2:
-- **Template candidate found** — note the top match's `title`, `path`,
-  `category`, and `description`.
-- **No template** — the JSON array is empty, or the top result is clearly
-  unrelated to the user's request. Mark this request as a custom build.
-
-Do **not** confirm template import with the user yet — first do the
-duplicate check in Step 2, so a single confirmation can cover both
-"there's already a similar dashboard" and "I'm about to import this
-template / build a custom one".
-
-### Step 2: Check for duplicates
-
-Call `signoz_list_dashboards` to see what dashboards already exist.
-**Paginate through all pages** — check `pagination.hasMore` in the
-response. If `hasMore` is true, call again with `offset` set to
-`pagination.nextOffset` and repeat until all pages are exhausted. Only
-after checking every page can you conclude no similar dashboard exists.
-
-**Match aggressively.** For each existing dashboard, compare its lowercased
-`name` and `tags` against both the user's request **and** the Step 1
-outcome (the template title if a template was found, otherwise the
-keywords you'd use for a custom build). A match is any of:
-- lowercased name contains the technology/domain keyword (e.g. "redis",
-  "postgres", "k8s"/"kubernetes", "docker"/"container", "host");
-- any tag matches the keyword;
-- existing name and the candidate title share the root token (e.g.
-  "Redis - Overview" vs "Redis overview").
-
-**Decide what to ask the user based on Step 1 + Step 2 results:**
-
-| Step 1 result    | Step 2 result   | What to ask                                                                                                                                                  |
-| ---------------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Template found   | No duplicates   | "I found a pre-built [title] dashboard template — [description]. Should I import it?" (use file/category fallback if description is empty)                   |
-| Template found   | Duplicates      | "There are already these similar dashboards: [list with name, UUID, created-at]. I also found a pre-built [title] template. Want me to (a) modify an existing one, (b) import the template as a new dashboard, or (c) stop?" |
-| No template      | No duplicates   | "I don't have a pre-built template for this. I can build a custom one — want me to proceed and gather requirements?"                                         |
-| No template      | Duplicates      | "There are already these similar dashboards: [list]. I don't have a pre-built template, so a new one would be custom-built. Want me to (a) modify an existing one, (b) build a new custom one, or (c) stop?" |
-
-Wait for the user's choice before proceeding. If they pick "modify",
-go to Step 3a. If they pick "import the template" or "build custom",
-go to the matching path in Step 3. If they pick "stop", stop.
-
-### Step 3: Create or modify
-
-#### Step 3a: Modify an existing dashboard
-
-Call `signoz_get_dashboard` with the chosen UUID to fetch the full
-configuration, plan the requested changes, then call
-`signoz_update_dashboard` with the complete updated JSON. Stop here.
-
-#### Step 3b: Import a template (only if Step 1 found one)
-
-Run this path when the user has confirmed in Step 2 that they want to
-import the template found in Step 1.
+#### Step 3b-i: Import the template
 
 > **Tool guardrail.** The only template tools are `search_templates.py`
 > and `import_template.py`. Do not invent other script names (no
@@ -139,11 +132,11 @@ import the template found in Step 1.
    python3 "<skill-base>/tools/import_template.py" "<path>"
    ```
 
-   where `<path>` is the `path` field from the Step 1 search result.
+   where `<path>` is the `path` field from the Step 3b search result.
    **Always quote the path** — some entries contain spaces (e.g.,
    `temporal.io/Temporal Cloud Metrics.json`). The tool writes raw JSON
    to stdout. It handles HTTP/network errors — if it exits non-zero,
-   tell the user and offer Step 3c (custom build) instead.
+   tell the user and fall back to Step 3b-ii (custom build).
 2. **Do not make any change in the template.** 
 3. **Pre-flight no-data check.** Before calling `signoz_create_dashboard`,
    probe whether the template's signals are actually being ingested:
@@ -187,10 +180,10 @@ import the template found in Step 1.
    `signoz_get_dashboard` to fetch the current state, then
    `signoz_update_dashboard` with the modified full JSON.
 
-#### Step 3c: Custom build (no template, or template fetch failed)
+#### Step 3b-ii: Custom build (no template, or template fetch failed)
 
-Run this path when Step 1 found no template, or when the user opted for
-a custom build. Build a dashboard from scratch.
+Run this path when the Step 3b template lookup found no match, or when
+the template fetch failed. Build a dashboard from scratch.
 
 1. **Gather requirements** — ask the user:
    - What signals to monitor (metrics, traces, logs, or a combination)
@@ -211,11 +204,11 @@ a custom build. Build a dashboard from scratch.
    names (not shorthand) in filters, groupBy, and variables.
 4. **Pre-flight no-data check.** Before calling `signoz_create_dashboard`,
    probe a representative subset of the metrics / attributes you used,
-   using the same MCP tools listed in Step 3b.3 (`signoz_list_metrics`
+   using the same MCP tools listed in Step 3b-i.3 (`signoz_list_metrics`
    for metrics, `signoz_aggregate_traces` / `signoz_aggregate_logs` for
    trace/log presence, `signoz_get_field_values` for variable values).
    If none return data in the last hour, warn the user (same wording as
-   Step 2.4) and wait for confirmation before creating.
+   Step 3b-i.3) and wait for confirmation before creating.
 5. **Shape check before create.** The `signoz_create_dashboard` tool rejects
    stringified JSON for array/object fields with errors like
    `cannot unmarshal string into ... layout of type []LayoutItem` /
@@ -234,17 +227,17 @@ a custom build. Build a dashboard from scratch.
 
 ## Guardrails
 
-- **Template-first**: Always check the template catalog before proposing a custom
-  build. Never build from scratch when a matching template exists. If the user
-  picks "(b) create anyway" in Step 1's duplicate-check branch, that is **not**
-  permission to skip Step 2 — you must still run `search_templates.py` before
-  any `signoz_create_dashboard` call. "Create anyway" overrides the duplicate
-  warning, not the template-first rule.
-- **No blind creation**: Always confirm with the user before creating. For
-  templates: one confirmation. For custom: confirm the plan after gathering
-  requirements.
-- **No duplicate dashboards**: Always call `signoz_list_dashboards` first and
-  paginate through all pages before concluding no similar dashboard exists.
+- **Duplicate check first**: Always call `signoz_list_dashboards` (paginated)
+  before anything else. The user's only two upfront options are "modify an
+  existing one" or "create a new one" — never offer template-import as a
+  separate top-level choice.
+- **Template-first on the create path**: Once the user has chosen to create
+  a new dashboard, always run `search_templates.py` before any
+  `signoz_create_dashboard` call. If a matching template exists, use it
+  silently (just inform the user); only build from scratch when no
+  template matches.
+- **No blind creation**: For custom builds, confirm the plan with the user
+  after gathering requirements before calling `signoz_create_dashboard`.
 - **Valid JSON only**: When building custom dashboards, follow the v5 schema
   as documented in the `signoz://dashboard/*` MCP resources. Required widget
   and `queryData` fields are listed in `signoz://dashboard/widgets-instructions`
@@ -256,7 +249,7 @@ a custom build. Build a dashboard from scratch.
 - **No metric guessing**: For custom builds, if you are not sure what metrics are
   available, ask the user. Wrong metric names produce empty panels.
 - **No-data warning before create**: Always run the pre-flight probe
-  (Step 3b.3 / Step 3c.4) before `signoz_create_dashboard`. A "No data"
+  (Step 3b-i.3 / Step 3b-ii.4) before `signoz_create_dashboard`. A "No data"
   dashboard is a worse user outcome than one extra confirmation prompt.
   Skip the probe only if the user has explicitly opted out for this
   request.
@@ -272,16 +265,15 @@ a custom build. Build a dashboard from scratch.
 **User:** "Create a dashboard for my PostgreSQL database"
 
 **Agent:**
-1. Runs `python3 "<skill-base>/tools/search_templates.py" "postgresql"` —
-   top result is `postgresql/postgresql.json`.
-2. Calls `signoz_list_dashboards` (paginated) — no existing PostgreSQL
+1. Calls `signoz_list_dashboards` (paginated) — no existing PostgreSQL
    dashboard.
-3. Confirms: "I found a pre-built PostgreSQL dashboard template — this
-   dashboard provides a high-level overview of your PostgreSQL databases.
-   Should I import it?"
-4. User confirms.
+2. Says: "I'll create a new dashboard for PostgreSQL. Proceed?"
+3. User confirms.
+4. Runs `python3 "<skill-base>/tools/search_templates.py" "postgresql"` —
+   top result is `postgresql/postgresql.json`. Tells the user: "I found a
+   pre-built PostgreSQL template and will use it."
 5. Runs `python3 "<skill-base>/tools/import_template.py" "postgresql/postgresql.json"`.
-6. Runs the no-data probe, then calls `signoz_create_dashboard`
+6. Runs the no-data probe, then calls `signoz_create_dashboard`.
 7. Reports: "Created 'Postgres overview' dashboard with N panels across M
    sections. Want me to adjust any panels, add variables, or change the
    layout?"
@@ -291,32 +283,32 @@ a custom build. Build a dashboard from scratch.
 **User:** "Create a dashboard to track our payment processing pipeline"
 
 **Agent:**
-1. Runs `python3 "<skill-base>/tools/search_templates.py" "payment processing"` —
-   empty array, no match. Marks request as custom build.
-2. Calls `signoz_list_dashboards` (paginated) — no existing payment
+1. Calls `signoz_list_dashboards` (paginated) — no existing payment
    dashboard.
-3. Says: "I don't have a pre-built template for payment processing. I can
-   build a custom one — want me to proceed and gather requirements?"
-4. User confirms. Gathers requirements: transaction count, latency, error
-   rate, services involved, filter needs.
-5. Reads `signoz://dashboard/instructions`, `widgets-instructions`, and
+2. Says: "I'll create a new dashboard for the payment processing
+   pipeline. Proceed?"
+3. User confirms.
+4. Runs `python3 "<skill-base>/tools/search_templates.py" "payment processing"` —
+   empty array. Falls through to custom build.
+5. Gathers requirements: transaction count, latency, error rate, services
+   involved, filter needs.
+6. Reads `signoz://dashboard/instructions`, `widgets-instructions`, and
    `widgets-examples` for JSON structure.
-6. Builds dashboard with sections: Overview, Latency, Errors,
+7. Builds dashboard with sections: Overview, Latency, Errors,
    Infrastructure. Runs the no-data probe.
-7. Calls `signoz_create_dashboard`.
-8. Reports what was created, offers customization.
+8. Calls `signoz_create_dashboard`.
+9. Reports what was created, offers customization.
 
 ---
 
 **User:** "Set up monitoring for Redis"
 
 **Agent:**
-1. Runs `python3 "<skill-base>/tools/search_templates.py" "redis"` — top
-   result is `redis/redis.json`.
-2. Calls `signoz_list_dashboards` (paginated) — finds existing "Redis
+1. Calls `signoz_list_dashboards` (paginated) — finds existing "Redis
    Overview" dashboard.
-3. Says: "There's already a 'Redis Overview' dashboard. I also found a
-   pre-built Redis template. Want me to (a) modify the existing one, (b)
-   import the template as a new dashboard, or (c) stop?"
-4. If user picks (a) — Step 3a: calls `signoz_get_dashboard`, plans
+2. Says: "There's already a 'Redis Overview' dashboard. Want me to (a)
+   modify it, (b) create a new dashboard anyway, or (c) stop?"
+3. If user picks (a) — Step 3a: calls `signoz_get_dashboard`, plans
    changes, calls `signoz_update_dashboard` with the full updated JSON.
+4. If user picks (b) — Step 3b: runs `search_templates.py "redis"`, finds
+   `redis/redis.json`, imports it (Step 3b-i).
