@@ -209,17 +209,13 @@ Run this path when the Step 3b template lookup found no match, or when
 On your terminal message after a successful create/import, emit message
 actions per the rules below. Defaults are off — absence is safe.
 
-- **`apply_filter` — never emit.** Queries built during dashboard
-  construction are intermediate, not the deliverable. Verbatim from the
-  spec: *"Do NOT include `apply_filter` for queries used during
-  dashboard construction."* If the user wanted a runnable query they
-  would have asked for one — route that intent to
-  `signoz-generating-queries`.
 - **`open_docs` — only when a docs link is the unblock.** Emit when the
   no-data probe (Step 3b-i.1 / 3b-ii.4) shows the user's signals are
   not being ingested and the next concrete step is instrumentation —
-  link the receiver / instrumentation page for that technology. Do not
-  emit on a successful create just to point at general dashboard docs.
+  link the receiver / instrumentation page for that technology. Use
+  `signoz-searching-docs` to find the canonical URL rather than guessing
+  one; pass the result through verbatim. Do not emit on a successful
+  create just to point at general dashboard docs.
 - **`follow_up` — emit on the terminal message after create/import.**
   Suggest 2–4 concrete next prompts grounded in *what was just built*
   (the technology, panel/section names from the response, variables
