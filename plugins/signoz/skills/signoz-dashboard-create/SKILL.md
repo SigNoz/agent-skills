@@ -13,13 +13,14 @@ description: >
 ## Prerequisites
 
 This skill calls SigNoz MCP server tools (`signoz_create_dashboard`,
-`signoz_list_dashboards`, `signoz_list_metrics`, `signoz_get_field_values`,
-`signoz_aggregate_logs`, `signoz_aggregate_traces`, etc.). Before running
-the workflow, confirm the `signoz_*` tools are available. If they are not,
-the SigNoz MCP server is not installed or configured — stop and direct the
-user to set it up: <https://signoz.io/docs/ai/signoz-mcp-server/>. Do not
-fall back to raw HTTP calls or fabricate dashboard JSON without the MCP
-tools.
+`signoz_list_dashboards`, `signoz_list_dashboard_templates`,
+`signoz_import_dashboard`, `signoz_list_metrics`,
+`signoz_get_field_values`, `signoz_aggregate_logs`,
+`signoz_aggregate_traces`, etc.). Before running the workflow, confirm
+the `signoz_*` tools are available. If they are not, the SigNoz MCP
+server is not installed or configured — stop and direct the user to set
+it up: <https://signoz.io/docs/ai/signoz-mcp-server/>. Do not fall back
+to raw HTTP calls or fabricate dashboard JSON without the MCP tools.
 
 ## When to use
 
@@ -89,79 +90,56 @@ Run the template lookup first. The user has already agreed to create a
 new dashboard — the lookup just decides *how* we build it, no extra
 confirmation prompt.
 
-Run the search tool via Bash from the skill's base directory (shown in
-the initial skill-load message):
-
-```bash
-python3 "<skill-base>/tools/search_templates.py" "<query>" --limit 5
-```
-
-The query should be the user's request boiled down to the technology or
-domain words (e.g., "postgresql", "redis", "kubernetes nodes", "host
-metrics"). The tool emits a JSON array of `{id, title, path, description,
-category, score}` entries.
+Call `signoz_list_dashboard_templates` with `searchContext` set to the
+user's raw request. The tool returns the full catalog as a JSON array of
+`{id, title, path, description, category, keywords}` entries. Read the
+list and pick the entry whose `title`/`description`/`keywords`/`category`
+best matches the user's intent — this is a model judgment, not a keyword
+score.
 
 **Narrowing by category (optional).** When the user's request is broad
-(e.g. "give me an APM dashboard", "something for Kubernetes") and the
-keyword search returns too many or too few hits, you can list the
-categories first and search inside one:
-
-```bash
-python3 "<skill-base>/tools/search_templates.py" --list-categories
-python3 "<skill-base>/tools/search_templates.py" "" --category "Apm" --limit 10
-```
+(e.g. "give me an APM dashboard", "something for Kubernetes"), pass
+`category` to restrict the catalog (case-insensitive), e.g.
+`category="Apm"` or `category="K8S Infra Metrics"`. Present the narrowed
+list to the user and ask them to pick before importing.
 
 Branch on the result:
-- **Template found** (top result is clearly relevant to the user's
-  request) — proceed to Step 3b-i (template import). Briefly tell the
-  user "I found a pre-built [title] template and will use it" so they
-  know what's being created; do not block on a yes/no.
-- **No template** (empty array, or top result is unrelated) — proceed to
-  Step 3b-ii (custom build).
+- **Template found** (a catalog entry is clearly relevant) — proceed to
+  Step 3b-i (template import). Briefly tell the user "I found a pre-built
+  [title] template and will use it" so they know what's being created;
+  do not block on a yes/no.
+- **No template** (nothing in the catalog matches) — proceed to Step
+  3b-ii (custom build).
 
 #### Step 3b-i: Import the template
 
-> **Tool guardrail.** The only template tools are `search_templates.py`
-> and `import_template.py`. Do not invent other script names (no
-> `fetch_template.py`, no `create_from_template.py`, etc.).
-> `import_template.py` takes exactly one argument: the template `<path>`.
+> **Tool guardrail.** The only template tools are
+> `signoz_list_dashboard_templates` and `signoz_import_dashboard`. Do not
+> shell out, fetch raw GitHub URLs, or invent other tool names.
+> `signoz_import_dashboard` takes the template `path` from the catalog
+> entry and creates the dashboard in one call — you do not need to fetch
+> the JSON yourself or call `signoz_create_dashboard` afterwards.
 
-1. Fetch the template JSON:
-
-   ```bash
-   python3 "<skill-base>/tools/import_template.py" "<path>"
-   ```
-
-   where `<path>` is the `path` field from the Step 3b search result.
-   **Always quote the path** — some entries contain spaces (e.g.,
-   `temporal.io/Temporal Cloud Metrics.json`). The tool writes raw JSON
-   to stdout. It handles HTTP/network errors — if it exits non-zero,
-   tell the user and fall back to Step 3b-ii (custom build).
-2. **Do not make any change in the template.** 
-3. **Pre-flight no-data check.** Before calling `signoz_create_dashboard`,
-   probe whether the template's signals are actually being ingested:
-   - Walk the fetched JSON and collect what each widget queries:
-     - **Metrics** — for widgets where `dataSource = "metrics"`, collect
-       metric names from `query.builder.queryData[].aggregations[].metricName`
-       (v5 shape) **or** `query.builder.queryData[].aggregateAttribute.key`
-       (legacy shape) — templates may use either; check both.
-     - **Traces** — widgets where `dataSource = "traces"`; collect any
-       `service.name` filter values plus the aggregated attribute.
-     - **Logs** — widgets where `dataSource = "logs"`; collect filter
-       attribute keys.
-     - **Raw ClickHouse / PromQL** — extract the metric names referenced
-       in the SQL/PromQL string.
-   - Probe up to ~5 representative signals using these MCP tools (one
-     per metric/attribute — keep the total small):
-     - Metrics: `signoz_list_metrics` with `searchText=<metric_name>`
-       and `timeRange=1h`. Empty result → metric is not being ingested.
-     - Traces: `signoz_aggregate_traces` with `aggregation=count`,
-       `service=<svc>` (or `filter=<attr> EXISTS`), `timeRange=1h`.
-       A zero count → no traces.
-     - Logs: `signoz_aggregate_logs` with `aggregation=count`,
-       `filter=<attr> EXISTS`, `timeRange=1h`. A zero count → no logs.
-     - Resource attribute values referenced by template variables:
-       `signoz_get_field_values` with the matching `signal` and `name`.
+1. **Pre-flight no-data check.** Before calling `signoz_import_dashboard`,
+   probe whether the template's signals are actually being ingested.
+   Since we don't fetch the template body up front, base the probe on
+   the catalog entry's `category`, `title`, and `keywords` plus the
+   user's stated technology. Pick up to ~5 representative signals and
+   check them — keep the total small:
+   - **Metric-based templates** (most infra/runtime templates — e.g.
+     PostgreSQL, Redis, JVM, hostmetrics, k8s): call `signoz_list_metrics`
+     with `searchText=<technology prefix>` (e.g. `postgresql`, `redis`,
+     `jvm`, `system.`, `k8s.`) and `timeRange=1h`. Empty result → metric
+     family is not being ingested.
+   - **Trace-based templates** (APM-style): call `signoz_aggregate_traces`
+     with `aggregation=count`, an appropriate filter (e.g. `service.name
+     EXISTS`), `timeRange=1h`. A zero count → no traces.
+   - **Log-based templates**: call `signoz_aggregate_logs` with
+     `aggregation=count`, a relevant filter, `timeRange=1h`. A zero
+     count → no logs.
+   - **Variable values** (when the template clearly relies on a resource
+     attribute, e.g. `service.name`, `k8s.cluster.name`): call
+     `signoz_get_field_values` to confirm there are values to pick from.
    - If **none** of the probed signals return data, warn the user
      verbatim: "I couldn't find data for [list] in the last hour — this
      template is for [technology] and it doesn't look like that data is
@@ -171,19 +149,20 @@ Branch on the result:
    - If **some** signals are present and others aren't, list which are
      missing and proceed only on confirmation.
    - If everything is present, proceed silently.
-4. **Create the dashboard.** Call `signoz_create_dashboard` with the
-   template JSON. Pass the top-level fields (`title`, `description`,
-   `tags`, `layout`, `widgets`, `variables`) as their native types — do
-   **not** stringify arrays or objects.
-5. **Report and offer customization.** Tell the user what was created
-   (title, panel count, sections). If the user requests changes, call
-   `signoz_get_dashboard` to fetch the current state, then
-   `signoz_update_dashboard` with the modified full JSON.
+2. **Create the dashboard.** Call `signoz_import_dashboard` with the
+   `path` from the chosen catalog entry (e.g.
+   `postgresql/postgresql.json`). The server fetches the JSON, validates
+   it, and creates the dashboard in one call.
+3. **Report and offer customization.** Tell the user what was created
+   (title, panel count, sections — read these from the response). If the
+   user requests changes, call `signoz_get_dashboard` to fetch the
+   current state, then `signoz_update_dashboard` with the modified full
+   JSON.
 
-#### Step 3b-ii: Custom build (no template, or template fetch failed)
+#### Step 3b-ii: Custom build (no template, or import failed)
 
 Run this path when the Step 3b template lookup found no match, or when
-the template fetch failed. Build a dashboard from scratch.
+`signoz_import_dashboard` failed. Build a dashboard from scratch.
 
 1. **Gather requirements** — ask the user:
    - What signals to monitor (metrics, traces, logs, or a combination)
@@ -204,11 +183,11 @@ the template fetch failed. Build a dashboard from scratch.
    names (not shorthand) in filters, groupBy, and variables.
 4. **Pre-flight no-data check.** Before calling `signoz_create_dashboard`,
    probe a representative subset of the metrics / attributes you used,
-   using the same MCP tools listed in Step 3b-i.3 (`signoz_list_metrics`
+   using the same MCP tools listed in Step 3b-i.1 (`signoz_list_metrics`
    for metrics, `signoz_aggregate_traces` / `signoz_aggregate_logs` for
    trace/log presence, `signoz_get_field_values` for variable values).
    If none return data in the last hour, warn the user (same wording as
-   Step 3b-i.3) and wait for confirmation before creating.
+   Step 3b-i.1) and wait for confirmation before creating.
 5. **Shape check before create.** The `signoz_create_dashboard` tool rejects
    stringified JSON for array/object fields with errors like
    `cannot unmarshal string into ... layout of type []LayoutItem` /
@@ -232,10 +211,10 @@ the template fetch failed. Build a dashboard from scratch.
   existing one" or "create a new one" — never offer template-import as a
   separate top-level choice.
 - **Template-first on the create path**: Once the user has chosen to create
-  a new dashboard, always run `search_templates.py` before any
-  `signoz_create_dashboard` call. If a matching template exists, use it
-  silently (just inform the user); only build from scratch when no
-  template matches.
+  a new dashboard, always run `signoz_list_dashboard_templates` before any
+  `signoz_create_dashboard` call. If a matching template exists, import it
+  via `signoz_import_dashboard` (just inform the user); only build from
+  scratch when no template matches.
 - **No blind creation**: For custom builds, confirm the plan with the user
   after gathering requirements before calling `signoz_create_dashboard`.
 - **Valid JSON only**: When building custom dashboards, follow the v5 schema
@@ -249,10 +228,10 @@ the template fetch failed. Build a dashboard from scratch.
 - **No metric guessing**: For custom builds, if you are not sure what metrics are
   available, ask the user. Wrong metric names produce empty panels.
 - **No-data warning before create**: Always run the pre-flight probe
-  (Step 3b-i.3 / Step 3b-ii.4) before `signoz_create_dashboard`. A "No data"
-  dashboard is a worse user outcome than one extra confirmation prompt.
-  Skip the probe only if the user has explicitly opted out for this
-  request.
+  (Step 3b-i.1 / Step 3b-ii.4) before `signoz_import_dashboard` /
+  `signoz_create_dashboard`. A "No data" dashboard is a worse user
+  outcome than one extra confirmation prompt. Skip the probe only if the
+  user has explicitly opted out for this request.
 - **Full state on update**: `signoz_update_dashboard` requires the complete
   dashboard JSON (not a partial patch). Always call `signoz_get_dashboard` first
   to get the current state, merge your changes into that full object, and pass
@@ -269,12 +248,12 @@ the template fetch failed. Build a dashboard from scratch.
    dashboard.
 2. Says: "I'll create a new dashboard for PostgreSQL. Proceed?"
 3. User confirms.
-4. Runs `python3 "<skill-base>/tools/search_templates.py" "postgresql"` —
-   top result is `postgresql/postgresql.json`. Tells the user: "I found a
-   pre-built PostgreSQL template and will use it."
-5. Runs `python3 "<skill-base>/tools/import_template.py" "postgresql/postgresql.json"`.
-6. Runs the no-data probe, then calls `signoz_create_dashboard`.
-7. Reports: "Created 'Postgres overview' dashboard with N panels across M
+4. Calls `signoz_list_dashboard_templates` with the user's request as
+   `searchContext` — picks the `postgresql/postgresql.json` entry. Tells
+   the user: "I found a pre-built PostgreSQL template and will use it."
+5. Runs the no-data probe (`signoz_list_metrics searchText=postgresql`),
+   then calls `signoz_import_dashboard` with `path=postgresql/postgresql.json`.
+6. Reports: "Created 'Postgres overview' dashboard with N panels across M
    sections. Want me to adjust any panels, add variables, or change the
    layout?"
 
@@ -288,8 +267,8 @@ the template fetch failed. Build a dashboard from scratch.
 2. Says: "I'll create a new dashboard for the payment processing
    pipeline. Proceed?"
 3. User confirms.
-4. Runs `python3 "<skill-base>/tools/search_templates.py" "payment processing"` —
-   empty array. Falls through to custom build.
+4. Calls `signoz_list_dashboard_templates` — nothing in the catalog
+   matches "payment processing". Falls through to custom build.
 5. Gathers requirements: transaction count, latency, error rate, services
    involved, filter needs.
 6. Reads `signoz://dashboard/instructions`, `widgets-instructions`, and
@@ -310,5 +289,6 @@ the template fetch failed. Build a dashboard from scratch.
    modify it, (b) create a new dashboard anyway, or (c) stop?"
 3. If user picks (a) — Step 3a: calls `signoz_get_dashboard`, plans
    changes, calls `signoz_update_dashboard` with the full updated JSON.
-4. If user picks (b) — Step 3b: runs `search_templates.py "redis"`, finds
-   `redis/redis.json`, imports it (Step 3b-i).
+4. If user picks (b) — Step 3b: calls `signoz_list_dashboard_templates`,
+   picks `redis/redis.json`, imports it via `signoz_import_dashboard`
+   (Step 3b-i).
