@@ -6,7 +6,7 @@ This skill ships inside the official `signoz` Claude plugin and the shared `skil
 
 ## How it works
 
-1. **Docs fetch** — SigNoz docs support `Accept: text/markdown`, so the agent can fetch clean markdown instead of scraping HTML.
+1. **Docs fetch** — Prefers the SigNoz MCP server tools (`signoz:signoz_search_docs`, `signoz:signoz_fetch_doc`) when available, and falls back to direct HTTP fetch with `Accept: text/markdown` (which SigNoz docs support natively) so the agent gets clean markdown instead of scraping HTML.
 2. **Domain heuristics** — Decision trees route the user to the right guide before fetching docs, which avoids jumping to a random page without understanding the setup.
 
 ## Structure
