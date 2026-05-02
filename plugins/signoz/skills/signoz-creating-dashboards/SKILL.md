@@ -204,30 +204,6 @@ Run this path when the Step 3b template lookup found no match, or when
    changes, call `signoz:signoz_get_dashboard` to fetch the current state, then use
    `signoz:signoz_update_dashboard` with the modified full dashboard JSON.
 
-## Message actions
-
-On your terminal message after a successful create/import, emit message
-actions per the rules below. Defaults are off — absence is safe.
-
-- **`open_docs` — only when a docs link is the unblock.** Emit when the
-  no-data probe (Step 3b-i.1 / 3b-ii.4) shows the user's signals are
-  not being ingested and the next concrete step is instrumentation —
-  link the receiver / instrumentation page for that technology. Use
-  `signoz-searching-docs` to find the canonical URL rather than guessing
-  one; pass the result through verbatim. Do not emit on a successful
-  create just to point at general dashboard docs.
-- **`follow_up` — emit on the terminal message after create/import.**
-  Suggest 2–4 concrete next prompts grounded in *what was just built*
-  (the technology, panel/section names from the response, variables
-  present, signals the user did not pick). Avoid generic
-  "anything else?" prompts. Good follow-ups for this flow:
-  - "Add an alert for [specific metric/panel on the dashboard]"
-  - "Create a similar dashboard for [related service the user mentioned]"
-  - "Add a variable for [environment / service.name / cluster]"
-  - After a no-data warning: "How do I ingest [technology] data into SigNoz?"
-  - After a custom build: "Add a [logs|traces|metrics] section" — only if
-    the user did not already include that signal.
-
 ## Guardrails
 
 - **Duplicate check first**: Always call `signoz:signoz_list_dashboards` (paginated)
