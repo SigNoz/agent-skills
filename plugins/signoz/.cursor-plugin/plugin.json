@@ -1,8 +1,8 @@
 {
   "name": "signoz",
   "displayName": "SigNoz",
-  "version": "2026.04.25",
-  "description": "Official SigNoz plugin for docs guidance and ClickHouse dashboard queries",
+  "version": "2026.05.02.1",
+  "description": "Official SigNoz plugin for docs, queries, dashboards, and alerts",
   "author": {
     "name": "SigNoz"
   },

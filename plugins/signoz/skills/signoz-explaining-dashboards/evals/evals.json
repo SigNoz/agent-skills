@@ -1,0 +1,55 @@
+{
+  "skill_name": "signoz-explaining-dashboards",
+  "evals": [
+    {
+      "id": 1,
+      "name": "redis-full-explain",
+      "prompt": "Can you walk me through my 'Redis - Overview' dashboard? Want to understand what each panel shows and what to keep an eye on.",
+      "expected_output": "Structured explanation of the Redis dashboard: overview, the host variable, panels grouped by row sections (About Redis, Overview, Performance Metrics, Memory Metrics, Base Activity Metrics, Logs), what to watch for per panel, and any health observations. Should notice that several panels have disabled queries and that some panels reuse the same hit-rate formula.",
+      "files": [],
+      "assertions": [
+        {"id": "a1", "text": "Output includes a high-level overview describing the dashboard's purpose (monitoring Redis)"},
+        {"id": "a2", "text": "Output names the 'host' variable AND identifies it as DYNAMIC"},
+        {"id": "a3", "text": "Output groups panels using the dashboard's row sections (About Redis, Overview, Performance Metrics, Memory Metrics, Base Activity Metrics, Logs)"},
+        {"id": "a4", "text": "Output explains the cache hit-rate formula (A / (A + B)) * 100 in plain language"},
+        {"id": "a5", "text": "Output gives 'what to watch for' guidance specific to Redis (mentions at least one of: evictions, fragmentation ratio, replication lag, blocked clients, slowlog)"},
+        {"id": "a6", "text": "Output flags at least one structural issue: disabled queries on multiple panels, duplicate Cache hit rate panels, or 'Hit rate'/'Cache hit rate' shown as 'value' panel-type instead of graph"},
+        {"id": "a7", "text": "Output does NOT dump raw dashboard JSON or large query objects"},
+        {"id": "a8", "text": "Output ends with concrete next-step offers (e.g., run queries, add panels/thresholds, modify dashboard)"}
+      ]
+    },
+    {
+      "id": 2,
+      "name": "jvm-beginner-walkthrough",
+      "prompt": "I'm new to JVM monitoring — help me understand my 'JVM Metrics Dashboard'. What do these metrics actually mean and which panels matter most for day-to-day vs. debugging?",
+      "expected_output": "Beginner-friendly explanation: explains what JVM heap, GC, threads, and class loading actually mean in plain language, walks through the value panels (heap used, threads, CPU, classes), then the time-series and the memory-pool table, and clearly distinguishes daily-watch panels from debugging-only panels. Should mention the service_name TEXTBOX variable.",
+      "files": [],
+      "assertions": [
+        {"id": "a1", "text": "Output explains in beginner-friendly terms what JVM heap memory means"},
+        {"id": "a2", "text": "Output explains in beginner-friendly terms what garbage collection (GC) means"},
+        {"id": "a3", "text": "Output names the 'service_name' variable AND identifies it as TEXTBOX"},
+        {"id": "a4", "text": "Output explicitly distinguishes which panels matter for daily watch vs debugging-only (the prompt asked for this)"},
+        {"id": "a5", "text": "Output walks through the four value panels (heap used, threads, CPU, classes)"},
+        {"id": "a6", "text": "Output mentions the Memory Pool Details table groups by jvm_memory_type and jvm_memory_pool_name"},
+        {"id": "a7", "text": "Output mentions that GC Duration uses a rate aggregation (not raw counter)"},
+        {"id": "a8", "text": "Output does NOT dump raw dashboard JSON or large query objects"}
+      ]
+    },
+    {
+      "id": 3,
+      "name": "otel-collector-watch-for",
+      "prompt": "explain the OpenTelemetry Collector Metrics Dashboard to me — specifically I want to know what I should be watching for and whether there are any obvious gaps or problems with how it's set up",
+      "expected_output": "Explanation focused on what to watch for and structural observations of the large 65-widget dashboard. Should group panels by the 7 row sections, surface key health indicators (e.g., dropped spans/metrics, queue size, exporter failures), and flag structural issues like counters without rate, missing thresholds, or unused variables.",
+      "files": [],
+      "assertions": [
+        {"id": "a1", "text": "Output groups panels by row sections (the dashboard has 7 rows)"},
+        {"id": "a2", "text": "Output highlights at least 3 critical things to watch (e.g., dropped spans/metrics, queue size, exporter failures, memory limiter, refused items, batch send failures)"},
+        {"id": "a3", "text": "Output surfaces structural observations or gaps (e.g., counters without rate function, missing thresholds, unused variables, very wide step intervals, high-cardinality groupBy, or duplicate panels)"},
+        {"id": "a4", "text": "Output mentions both variables on the dashboard"},
+        {"id": "a5", "text": "Output does NOT dump raw dashboard JSON or large query objects"},
+        {"id": "a6", "text": "Output is well-organized despite the 65 widgets — does not enumerate every panel as a flat list with no grouping"},
+        {"id": "a7", "text": "Output addresses both parts of the prompt: what to watch AND structural problems/gaps"}
+      ]
+    }
+  ]
+}

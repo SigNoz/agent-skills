@@ -1,2 +1,8 @@
 .DS_Store
 *.local
+__pycache__/
+*.pyc
+.claude
+
+# Skill eval workspaces and local eval prompts (skill-creator output)
+plugins/*/skills/*-workspace/

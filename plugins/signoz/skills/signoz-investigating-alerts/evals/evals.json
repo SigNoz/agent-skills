@@ -1,0 +1,40 @@
+{
+  "skill_name": "signoz-investigating-alerts",
+  "evals": [
+    {
+      "id": 0,
+      "eval_name": "full-rca-firing",
+      "prompt": "The 'RED — p99 Latency > 2s by Service' alert (019ddf83-7d04-74c4-97c7-fea13d72c091) is firing. Investigate the most recent fire and tell me the root cause.",
+      "expected_output": "Agent runs full 3-tier flow: signoz_get_alert + signoz_get_alert_history (find recent fire), then Tier-1 re-runs the alert query around the fire window to get peak/baseline/breach magnitude/duration; Tier-2 pulls neighbor signals (error rate, throughput, dependency latency) and compares fire vs baseline window; Tier-3 pulls top error traces + error logs around the fire window. Outputs ranked hypotheses with evidence + supporting query, plus next steps.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "eval_name": "fuzzy-match-rca",
+      "prompt": "I got paged about a checkout error rate alert, can you investigate the most recent fire?",
+      "expected_output": "Agent paginates signoz_list_alert_rules to resolve 'checkout error rate' (multiple candidates exist: 'checkout-svc Error Rate > 3%' METRIC_BASED + TRACES_BASED, plus eval-1 alerts). Picks the one with actual fire history (TRACES_BASED 019dd4cb fired ~7d ago at ~14:32 UTC), states the assumption clearly, then runs full RCA on that fire window. Tier-2 baseline is prior-day same hour; flags if baseline data is sparse since fire is 7d old.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "eval_name": "marginal-flap-detection",
+      "prompt": "Why did the 'test alerts-1' alert fire? Investigate. (rule id 0199e817-3d9f-7a12-99e8-038749ea9562)",
+      "expected_output": "Agent fetches alert + history. If breach magnitude is small (<10% over threshold) AND fire duration short, OR if fires are flapping, classifies as 'marginal fire' per Tier-1 early-stop. Skips Tier-2/3 and outputs a single 'threshold may be too tight, recommend tuning' hypothesis with low-medium confidence rather than fabricating root causes. If fires are flapping, identifies the pattern explicitly.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "eval_name": "never-fired-stop",
+      "prompt": "RCA for the [eval-3-ws-anomaly] frontend service request rate anomaly alert please. Rule ID 019de287-6752-7629-83e4-375919d56dd8.",
+      "expected_output": "Agent fetches alert + history. Detects that the alert is disabled and has never fired (history empty). Stops per skill guardrail with the message 'Alert has not fired in the last 7d, so there is no fire window to investigate.' Suggests using signoz-explaining-alerts to explain the rule, or to enable the alert. Does NOT proceed to Tier-1/2/3 against synthetic data.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "eval_name": "trace-formula-firing",
+      "prompt": "Investigate why alert 019d7041-1937-769f-b0e4-9d4ff846eb43 ('trace formula alert') is firing.",
+      "expected_output": "Agent fetches alert + history. Identifies it as a TRACES_BASED formula alert. Runs Tier-1 to confirm fire is real and quantify magnitude. If real, runs Tier-2 against neighbor signals for the same resource scope (note: the alert may have an empty/missing service filter — agent should handle this gracefully). Surfaces ranked hypotheses with evidence and queries.",
+      "files": []
+    }
+  ]
+}

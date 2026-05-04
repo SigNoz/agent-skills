@@ -1,0 +1,95 @@
+{
+  "skill_name": "signoz-searching-docs",
+  "evals": [
+    {
+      "id": 0,
+      "eval_name": "mcp-path-narrow-language",
+      "prompt": "How do I configure the OTLP exporter for a Python application sending traces to SigNoz Cloud?",
+      "expected_output": "Agent calls signoz:signoz_search_docs with the user's natural-language query and section_slug='apm-distributed-tracing' (or similar). Trusts BM25 ranking — does not invent its own keyword scoring. Picks the Python-specific instrumentation guide from top results, calls signoz:signoz_fetch_doc on the canonical URL, and answers with the OTLP endpoint, headers (signoz-ingestion-key), protocol, and a Python code snippet. Cites the canonical https://signoz.io/docs/... URL. Does not fetch unrelated language guides.",
+      "files": [],
+      "assertions": [
+        {"id": "uses_mcp_search", "text": "Agent calls signoz_search_docs (MCP tool) rather than only HTTP fetching."},
+        {"id": "narrows_section", "text": "Agent passes a section_slug for tracing/APM (e.g. apm-distributed-tracing) to narrow the BM25 search."},
+        {"id": "fetches_python_page", "text": "Agent fetches a Python-specific instrumentation guide via signoz_fetch_doc, not a generic overview."},
+        {"id": "cites_canonical_url", "text": "Answer cites at least one canonical https://signoz.io/docs/... URL."},
+        {"id": "answer_includes_key_setup", "text": "Answer includes OTLP endpoint, signoz-ingestion-key header, and a Python code snippet or env var setup."},
+        {"id": "no_unrelated_languages", "text": "Agent does not fetch unrelated language guides (Java/Go/Node) just because they share keywords."}
+      ]
+    },
+    {
+      "id": 1,
+      "eval_name": "heuristic-gated-k8s-logs",
+      "prompt": "How do I send logs from my Kubernetes pods to SigNoz?",
+      "expected_output": "Agent recognizes 'logs' + 'Kubernetes' as triggers for the Sending Logs heuristic. Reads heuristics/sending-logs.md BEFORE fetching docs. Applies the decision tree: identifies infrastructure logs in K8s, recommends k8s-infra agent (which collects pod logs automatically) or File + OTel Collector path. Mentions the duplicate-logs gotcha if SDK OTLP is also in use. Then fetches the k8s-infra or pod-logs docs page via MCP (or HTTP fallback) and cites canonical URLs. Does not jump straight to a random language guide.",
+      "files": [],
+      "assertions": [
+        {"id": "reads_heuristic_first", "text": "Agent reads heuristics/sending-logs.md BEFORE fetching any docs page."},
+        {"id": "applies_decision_tree", "text": "Agent applies the heuristic decision tree: identifies K8s + infrastructure logs and routes to k8s-infra agent or File + OTel Collector."},
+        {"id": "mentions_k8s_infra", "text": "Answer mentions the k8s-infra agent (Helm chart) which collects pod logs automatically."},
+        {"id": "mentions_duplicate_gotcha", "text": "Answer surfaces the duplicate-logs gotcha if SDK OTLP and k8s-infra are both used."},
+        {"id": "fetches_relevant_docs", "text": "Agent fetches the k8s pod logs collection guide or k8s-infra configuration page."},
+        {"id": "cites_canonical_url", "text": "Answer cites at least one canonical https://signoz.io/docs/... URL."}
+      ]
+    },
+    {
+      "id": 2,
+      "eval_name": "multi-page-alerts-config-and-troubleshoot",
+      "prompt": "How do I configure alert rules in SigNoz, and how do I troubleshoot when they fire unexpectedly?",
+      "expected_output": "Agent recognizes the task spans two needs: alert setup AND troubleshooting. Calls signoz:signoz_search_docs with section_slug='alerts' and fetches TWO pages — one on alert configuration, one on alert troubleshooting/debugging. Synthesizes both into a single answer: setup steps first, then debugging guidance. Cites both canonical URLs. Does not pad with loosely-related pages just because they share keywords.",
+      "files": [],
+      "assertions": [
+        {"id": "fetches_multiple_pages", "text": "Agent fetches at least 2 distinct docs pages — one on alert configuration, one on troubleshooting."},
+        {"id": "uses_alerts_section_slug", "text": "Agent passes section_slug='alerts' to signoz_search_docs."},
+        {"id": "synthesizes_both_topics", "text": "Answer covers BOTH alert configuration AND troubleshooting unexpected fires."},
+        {"id": "cites_both_urls", "text": "Answer cites at least 2 canonical https://signoz.io/docs/... URLs."},
+        {"id": "no_padding", "text": "Agent does not fetch loosely-related pages (dashboards, metrics overview) just because they share keywords."}
+      ]
+    },
+    {
+      "id": 3,
+      "eval_name": "sub-section-heading-narrow",
+      "prompt": "Which authentication header does the SigNoz Cloud ingestion endpoint require, and where do I get its value?",
+      "expected_output": "Agent calls signoz:signoz_search_docs with section_slug='setup' or 'signoz-apis' to find the SigNoz Cloud ingestion / auth page. Calls signoz:signoz_fetch_doc with a heading anchor scoped to the auth/ingestion-key sub-section rather than fetching the whole page. Answers with the canonical header name (signoz-ingestion-key) and where users obtain the value (SigNoz Cloud settings UI). Cites the canonical URL with the section anchor. Does not invent a header name from training memory without grounding in fetched docs.",
+      "files": [],
+      "assertions": [
+        {"id": "uses_mcp_search", "text": "Agent calls signoz_search_docs (MCP tool)."},
+        {"id": "uses_relevant_section", "text": "Agent passes section_slug for setup, signoz-apis, or similar relevant section."},
+        {"id": "uses_heading_anchor", "text": "Agent calls signoz_fetch_doc with a heading parameter to narrow to the auth sub-section."},
+        {"id": "answer_names_canonical_header", "text": "Answer names the canonical header signoz-ingestion-key."},
+        {"id": "answer_explains_value_source", "text": "Answer explains where to obtain the value (SigNoz Cloud settings UI / ingestion settings)."},
+        {"id": "grounded_in_docs", "text": "Answer is grounded in fetched docs (cites a canonical URL); does not invent header from training memory."}
+      ]
+    },
+    {
+      "id": 4,
+      "eval_name": "no-heuristic-topic-dashboards",
+      "prompt": "How do I create a dashboard panel that shows p99 latency for my metrics?",
+      "expected_output": "Agent recognizes there is no heuristic row for dashboards. Goes directly to signoz:signoz_search_docs with the user's query and section_slug='dashboards'. Does NOT invent a heuristic claim or pretend to follow one. Picks the dashboard panel / metrics query guide from top BM25 results, fetches it, and answers with the panel-builder steps. Cites canonical URL.",
+      "files": [],
+      "assertions": [
+        {"id": "no_false_heuristic", "text": "Agent does NOT claim to follow a heuristic for dashboards (none exists)."},
+        {"id": "uses_mcp_search", "text": "Agent calls signoz_search_docs (MCP tool) directly."},
+        {"id": "uses_dashboards_section", "text": "Agent passes section_slug='dashboards' to narrow the search."},
+        {"id": "fetches_dashboard_guide", "text": "Agent fetches a dashboard panel / metrics-query guide page."},
+        {"id": "answer_explains_panel_steps", "text": "Answer explains concrete dashboard panel construction steps (panel type, query, p99 aggregation, group/legend)."},
+        {"id": "cites_canonical_url", "text": "Answer cites at least one canonical https://signoz.io/docs/... URL."}
+      ]
+    },
+    {
+      "id": 5,
+      "eval_name": "query-builder-howto",
+      "prompt": "How do I use the SigNoz query builder to compute p95 latency grouped by service.name?",
+      "expected_output": "Agent calls signoz:signoz_search_docs with section_slug='querying' (no heuristic exists for querying — agent must not invent one). Picks the query builder docs page from BM25 results and fetches it. Answers with the concrete UI steps: choose traces signal, select duration metric, set aggregation to p95, set group-by to service.name. Grounds the answer in fetched docs content. Cites the canonical URL. Does NOT delegate to signoz-generating-queries — this is a docs lookup ('how do I use the query builder'), not query generation.",
+      "files": [],
+      "assertions": [
+        {"id": "no_false_heuristic", "text": "Agent does NOT claim to follow a heuristic for querying (none exists)."},
+        {"id": "uses_mcp_search", "text": "Agent calls signoz_search_docs (MCP tool)."},
+        {"id": "uses_querying_section", "text": "Agent passes section_slug='querying' to narrow the search."},
+        {"id": "fetches_query_builder_doc", "text": "Agent fetches a query-builder docs page (not a generic traces overview)."},
+        {"id": "answer_explains_qb_steps", "text": "Answer explains query-builder UI steps for p95 by service.name."},
+        {"id": "no_action_skill_handoff", "text": "Agent does NOT delegate to signoz-generating-queries; treats this as a docs lookup."},
+        {"id": "cites_canonical_url", "text": "Answer cites at least one canonical https://signoz.io/docs/... URL."}
+      ]
+    }
+  ]
+}
