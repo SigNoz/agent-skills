@@ -14,6 +14,7 @@ Official SigNoz skills for Claude Code, Codex, Cursor, and the [skills.sh](https
 | [signoz-generating-queries](plugins/signoz/skills/signoz-generating-queries/SKILL.md) | Generate queries against SigNoz observability data (traces, logs, metrics). |
 | [signoz-writing-clickhouse-queries](plugins/signoz/skills/signoz-writing-clickhouse-queries/SKILL.md) | Optimized ClickHouse queries for SigNoz OpenTelemetry traces and logs. |
 | [signoz-searching-docs](plugins/signoz/skills/signoz-searching-docs/SKILL.md) | SigNoz docs guidance for instrumentation, setup, querying, alerts, and APIs. |
+| [signoz-managing-views](plugins/signoz/skills/signoz-managing-views/SKILL.md) | Create, list, inspect, update, or delete SigNoz saved Explorer views (logs, traces, metrics) via the SigNoz MCP server. |
 
 ## Installation
 
@@ -75,7 +76,8 @@ npx skills add SigNoz/agent-skills --skill signoz-writing-clickhouse-queries    
 │       ├── signoz-explaining-dashboards/
 │       ├── signoz-modifying-dashboards/
 │       ├── signoz-searching-docs/
-│       └── signoz-generating-queries/
+│       ├── signoz-generating-queries/
+│       └── signoz-managing-views/
 └── README.md
 ```
 
