@@ -1,16 +1,14 @@
 ---
 name: signoz-managing-views
 description: >
-  Create, list, get, update, rename, or delete a SigNoz saved Explorer
-  view (the reusable filter/panel snapshots that live on the Logs, Traces, and
-  Metrics Explorer pages). Make sure to use this skill whenever the user says
-  "save this query as a view", "save this filter", "bookmark this search",
-  "list my saved views", "show me views for traces/logs/metrics", "rename the
-  X view", "update my saved view to also filter Y",
-  "delete the X view", or otherwise asks to manage Explorer saved views — even
-  if they don't say the word "view" explicitly. Also use it when someone wants
-  to share a recurring Explorer query with their team and asks how to "save"
-  or "bookmark" it.
+  Use when the user wants to create, list, get, update, rename, or delete a
+  SigNoz saved Explorer view. Trigger on phrases like "save this query as a
+  view", "save this filter", "bookmark this search", "list my saved views",
+  "show me views for traces/logs/metrics", "rename the X view", "update my
+  saved view to also filter Y", "delete the X view", or any request to manage
+  Explorer saved views — even if they don't say "view" explicitly. Also use
+  when someone wants to share a recurring Explorer query with their team and
+  asks how to "save" or "bookmark" it.
 argument-hint: <natural-language view request>
 ---
 
@@ -59,19 +57,27 @@ Do NOT use when the user wants to:
 
 ## Schema reference
 
-The authoritative SavedView schema lives on the MCP server. Read these
-**before** composing any create or update payload using `ReadMcpResourceTool`
-(not `signoz_fetch_doc` — these are MCP resources, not HTTP URLs):
+**Read both resources BEFORE composing any create or update payload.** Do not
+hand-compose a `compositeQuery` from memory — the correct schema is not the
+legacy `builder.queryData` format; it is the v5 spec described in these
+resources. Sending a legacy payload causes a silent HTTP 400.
+
+Call `ReadMcpResourceTool` with each URI to load them:
+
+```
+ReadMcpResourceTool(uri="signoz://view/instructions")
+ReadMcpResourceTool(uri="signoz://view/examples")
+```
 
 - `signoz://view/instructions` — SavedView field reference, `sourcePage`
   rules, the GET-then-PUT update flow, the minimal create body.
 - `signoz://view/examples` — three round-tripped payloads (traces list, logs
   list, metrics graph) you can adapt verbatim.
 
-Both `signoz:signoz_create_view` and `signoz:signoz_update_view` repeat this
-requirement in their tool descriptions for a reason: the server returns
-HTTP 400 on legacy v3/v4 fields (`builder`, `promql`, `unit`, top-level
-`id`, `queryFormulas`) and the failure mode is silent for the user.
+The server returns HTTP 400 on legacy v3/v4 fields (`builder`, `promql`,
+`unit`, top-level `id`, `queryFormulas`, `queryTraceOperator`) — the failure
+mode is silent for the user, so reading the resources first is mandatory, not
+optional.
 
 ## Operation flows
 
@@ -80,21 +86,22 @@ HTTP 400 on legacy v3/v4 fields (`builder`, `promql`, `unit`, top-level
 1. **Resolve `sourcePage`** — must be exactly one of `traces`, `logs`,
    `metrics`. If the user's intent is ambiguous ("save this query"), ask
    which Explorer they mean. It cannot be inferred from filter strings alone.
-2. **Build the query using `signoz-generating-queries`.** Invoke the
-   `signoz-generating-queries` skill to construct and validate the
-   `compositeQuery` before saving it as a view. This ensures the query
-   actually returns data and surfaces filter mistakes (e.g. wrong service
-   name, wrong attribute key) before they become a saved view that needs to
-   be deleted. Do not hand-compose a `compositeQuery` from the user's
-   description alone.
-3. **Enforce `signal == sourcePage`** in every `builder_query` spec. A
+2. **Read the schema resources.** Call `ReadMcpResourceTool` for both
+   `signoz://view/instructions` and `signoz://view/examples` before composing
+   any payload. Do not skip this step even if you think you know the schema —
+   the legacy `builder.queryData` format is rejected with HTTP 400.
+3. **Build the query using `signoz-generating-queries` — mandatory.** Invoke
+   the `signoz-generating-queries` skill to construct and validate the
+   `compositeQuery`. Do not hand-compose a `compositeQuery` from the user's
+   description alone. This surfaces filter mistakes before they become a
+   saved view that needs to be deleted.
+4. **Enforce `signal == sourcePage`** in every `builder_query` spec. A
    `sourcePage:"traces"` view with `signal:"logs"` is a server-side error.
-4. **Preview before writing — this step is not optional.** Before calling
-   `signoz_create_view`, show the user a summary of what will be created:
-   name, sourcePage, panelType, and the full filter expression. For a human
-   in the loop, wait for confirmation. For an autonomous agent, log the
-   preview in the reply and proceed.
-5. Call `signoz:signoz_create_view`. The server populates `id`,
+5. **Preview before writing — this step is not optional.** Before calling
+   `signoz_create_view`, show the user a summary: name, sourcePage,
+   panelType, and the full filter expression. For a human in the loop, wait
+   for confirmation. For an autonomous agent, log the preview and proceed.
+6. Call `signoz:signoz_create_view`. The server populates `id`,
    `createdAt/By`, `updatedAt/By` — never send those.
 
 ### List or find views
@@ -150,16 +157,20 @@ Deletion is permanent — there is no undo, and any team member who had the
 view bookmarked will see it disappear. Treat this like dropping a row from
 a shared table:
 
-1. Resolve the view by UUID (via list or by exact name → list result).
-   Never call `signoz:signoz_delete_view` on a UUID the user pasted
-   without a confirming `signoz:signoz_get_view` showing the matching
-   name and `sourcePage` — paste errors happen, and the wrong UUID deletes
-   the wrong view silently.
-2. Show the user the resolved view's name, `sourcePage`, and category,
-   and explicitly ask for confirmation. Do **not** auto-confirm
+1. **List to locate.** Call `signoz:signoz_list_views` to find the view
+   by name. If `sourcePage` is unknown, search all three signals.
+2. **Get to confirm — mandatory.** Call `signoz:signoz_get_view` with the
+   UUID from step 1. Do NOT skip this step even when you got the UUID from
+   a list result that looks correct. List results are paginated and a name
+   match is not a UUID guarantee — `signoz_get_view` is the confirmation
+   that the UUID maps to the view the user named.
+   Never call `signoz:signoz_delete_view` on a UUID without a prior
+   `signoz:signoz_get_view` confirming the matching name and `sourcePage`.
+3. **Show and ask.** Present the resolved view's name, `sourcePage`, and
+   category, and explicitly ask for confirmation. Do **not** auto-confirm
    based on the original prompt, even an emphatic one — destructive
    operations get a fresh confirmation against the resolved target.
-3. Call `signoz:signoz_delete_view`. Report success with the deleted
+4. Call `signoz:signoz_delete_view`. Report success with the deleted
    view's name (not just the UUID), so the user can recognize it.
 
 For autonomous agents without a human in the loop: refuse delete unless
@@ -167,27 +178,28 @@ the calling context has been explicitly authorized for destructive
 operations on saved views, and log the resolved view metadata before the
 call.
 
-## Common pitfalls
+## Quick reference
 
-- **Wrong sourcePage.** `traces` vs `logs` vs `metrics` — case-sensitive,
-  no plural. A typo here is a 400.
-- **`signal` ≠ `sourcePage` in a builder query.** Every `builder_query`
-  inside a view's `compositeQuery` must have `signal` equal to the view's
-  `sourcePage`. A `sourcePage:"traces"` view with `signal:"logs"` is a
-  server-side error. This applies to both create and update.
-- **Sending legacy fields.** `builder`, `promql`, `clickhouse_sql`,
-  top-level `id`, `unit`, `queryFormulas`, `queryTraceOperator` are all
-  rejected. Read `signoz://view/instructions` if unsure.
-- **PromQL / raw ClickHouse in a view.** Not supported for Explorer
-  saved views — only `queryType: "builder"` works. Tell the user and
-  offer a dashboard panel instead (see `signoz-creating-dashboards`).
-- **Partial update body.** Always go GET → modify → PUT. Do not hand-
-  compose an update body from the user's description.
-- **Skipping `pagination.hasMore`.** A "no such view" answer based on
-  page 1 alone is worth nothing on a busy tenant.
-- **`category` is a free-form string.** There is no server-enforced enum
-  for `category` — pass whatever label the user provides. Omit it (empty
-  string or absent) if the user does not specify one.
+| Operation | Tools called | Key guard |
+|-----------|-------------|-----------|
+| Create | `ReadMcpResourceTool` × 2 → `signoz-generating-queries` → preview → `signoz_create_view` | Preview before write; no legacy fields |
+| List | `signoz_list_views` (× 3 if no sourcePage given) | Check `pagination.hasMore` |
+| Get | `signoz_get_view(viewId)` | Returns canonical body for update |
+| Update | `signoz_get_view` → modify → preview → `signoz_update_view` | Full-body replace; diff preview required |
+| Delete | `signoz_list_views` → `signoz_get_view` → confirm → `signoz_delete_view` | Get-before-delete mandatory; fresh confirmation |
+
+## Common mistakes
+
+| Mistake | Fix |
+|---------|-----|
+| Hand-composing `compositeQuery` using legacy `builder.queryData` format | Read `signoz://view/instructions` first; use `signoz-generating-queries` to build the query |
+| Skipping `signoz_get_view` before delete (relying on list UUID alone) | Always call `signoz_get_view` to confirm name+sourcePage before `signoz_delete_view` |
+| Sending legacy fields: `builder`, `promql`, `unit`, top-level `id`, `queryFormulas` | Read schema resources; server returns HTTP 400 silently |
+| `signal` ≠ `sourcePage` in builder query | Every `builder_query.signal` must equal the view's `sourcePage` |
+| Partial update body (omitting unchanged fields) | GET full body first → modify only changed fields → PUT entire body |
+| Declaring "no such view" after only page 1 | Check `pagination.hasMore`; continue with `offset = pagination.nextOffset` |
+| Using PromQL or raw ClickHouse in a view | Only `queryType: "builder"` is supported; offer a dashboard panel instead |
+| Setting `category` to an enum value | `category` is free-form string; omit if user doesn't specify |
 
 ## Reporting back
 
