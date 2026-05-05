@@ -9,7 +9,7 @@ description: >
   Explorer saved views — even if they don't say "view" explicitly. Also use
   when someone wants to share a recurring Explorer query with their team and
   asks how to "save" or "bookmark" it.
-argument-hint: <natural-language view request>
+argument-hint: <view name, sourcePage (traces/logs/metrics), and filter intent>
 ---
 
 # Managing Saved Views
