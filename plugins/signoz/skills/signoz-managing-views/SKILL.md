@@ -1,12 +1,12 @@
 ---
 name: signoz-managing-views
 description: >
-  Create, list, get, update, rename, retag, or delete a SigNoz saved Explorer
+  Create, list, get, update, rename, or delete a SigNoz saved Explorer
   view (the reusable filter/panel snapshots that live on the Logs, Traces, and
   Metrics Explorer pages). Make sure to use this skill whenever the user says
   "save this query as a view", "save this filter", "bookmark this search",
   "list my saved views", "show me views for traces/logs/metrics", "rename the
-  X view", "add a tag to that view", "update my saved view to also filter Y",
+  X view", "update my saved view to also filter Y",
   "delete the X view", or otherwise asks to manage Explorer saved views — even
   if they don't say the word "view" explicitly. Also use it when someone wants
   to share a recurring Explorer query with their team and asks how to "save"
@@ -45,8 +45,8 @@ Use this skill when the user wants to:
 
 - **Create** a saved view from a current or described Explorer query.
 - **List / find** existing views (by `sourcePage`, name, or category).
-- **Inspect** a single view's filter, panel type, or tags.
-- **Update** a view — rename, retag, recategorize, or change its filter,
+- **Inspect** a single view's filter or panel type.
+- **Update** a view — rename, recategorize, or change its filter,
   panel type, or aggregations.
 - **Delete** a view that is no longer useful.
 
@@ -129,7 +129,7 @@ upstream). Sending a partial body wipes the unspecified fields. The flow:
    strips them for you, but omitting them up front makes the diff
    readable.
 3. Modify only the field(s) the user asked to change. For pure metadata
-   tweaks (rename, retag, recategorize), do not touch `compositeQuery` —
+   tweaks (rename, recategorize), do not touch `compositeQuery` —
    re-serializing it risks dropping a nested field.
 4. **Show a diff-style preview before writing.** One line per changed
    field: `name: "slow-checkout" → "slow-checkout-p99"`. Explicitly note
@@ -140,9 +140,11 @@ upstream). Sending a partial body wipes the unspecified fields. The flow:
 5. Call `signoz:signoz_update_view` with `{ "viewId": "<id>", "view": <modified data> }`.
 
 If the user asks for a structural change to the query (new filter,
-different panel type, different aggregation), re-read `signoz://view/instructions`
-before composing — the same `signal == sourcePage` rule applies, and
-`panelType` changes often imply a `stepInterval` change too.
+different panel type, different aggregation), invoke the
+`signoz-generating-queries` skill to build and validate the new
+`compositeQuery` before writing it back — the same `signal == sourcePage`
+rule applies, and `panelType` changes often imply a `stepInterval` change
+too.
 
 ### Delete a view
 
@@ -155,8 +157,8 @@ a shared table:
    without a confirming `signoz:signoz_get_view` showing the matching
    name and `sourcePage` — paste errors happen, and the wrong UUID deletes
    the wrong view silently.
-2. Show the user the resolved view's name, `sourcePage`, category, and
-   tags, and explicitly ask for confirmation. Do **not** auto-confirm
+2. Show the user the resolved view's name, `sourcePage`, and category,
+   and explicitly ask for confirmation. Do **not** auto-confirm
    based on the original prompt, even an emphatic one — destructive
    operations get a fresh confirmation against the resolved target.
 3. Call `signoz:signoz_delete_view`. Report success with the deleted
@@ -194,5 +196,5 @@ After any write (create / update / delete), include in your reply:
 - For deletes, an explicit "deleted" confirmation with the name.
 
 Read-only operations (list, get) should report concisely — name, id,
-sourcePage, filter expression, panel type, tags — and stop. Don't narrate
+sourcePage, filter expression, panel type — and stop. Don't narrate
 the schema back to the user.
