@@ -79,6 +79,88 @@
         "Agent calls signoz_get_field_values or signoz_list_dashboard_templates to discover candidates before prompting"
       ],
       "files": []
+    },
+    {
+      "id": 6,
+      "eval_name": "custom-build-scylladb-no-near-template-shortcut",
+      "prompt": "I need a dashboard for our ScyllaDB cluster — show me read/write latency, pending compactions, and storage load per node.",
+      "expected_output": "ScyllaDB has NO catalog template (the catalog ships templates for couchdb, mongodb, clickhouse, and a JMX/Cassandra template, but Scylla is a distinct product with its own Prometheus exporter and metric names). Agent paginates signoz_list_dashboards (no Scylla dashboard). Calls signoz_list_dashboard_templates with searchContext='scylladb' and finds no match. CRITICAL: agent must NOT shortcut by importing a near-neighbor template (jmx/cassandra.json, couchdb, mongodb) just because Scylla is Cassandra-compatible — must fall through to custom build. Calls signoz_list_metrics with searchText='scylla' as a no-data probe; if empty (likely on this instance), agent must surface the no-data warning from Step 3b-ii.2 and ask the user whether to proceed before building. If the user says proceed, agent uses signoz_get_field_keys with fieldContext=resource and signoz_get_field_values to surface per-node attributes (host.name, k8s.cluster.name where present). Reads signoz://dashboard/* MCP resources. Builds custom JSON with sections (Overview, Latency, Compaction, Storage), groupBy host.name on per-node panels, OTel attribute names. Emits JSON preview + summary BEFORE signoz_create_dashboard.",
+      "expectations": [
+        "Agent calls signoz_list_dashboard_templates with a scylla-related searchContext and finds no matching template",
+        "Agent does NOT call signoz_import_dashboard with a near-neighbor template (jmx/cassandra, couchdb, mongodb) as a shortcut",
+        "Agent calls signoz_list_metrics with a scylla-related searchText as part of the no-data probe",
+        "When the metric search returns empty, agent surfaces a no-data warning and waits for user confirmation before signoz_create_dashboard",
+        "Agent reads at least one signoz://dashboard/ MCP resource (instructions, widgets-instructions, or widgets-examples) before building JSON",
+        "Agent uses OTel resource attribute names (host.name, not 'host') in filters or groupBy",
+        "Agent emits a JSON preview or summary of the dashboard before calling signoz_create_dashboard"
+      ],
+      "files": []
+    },
+    {
+      "id": 7,
+      "eval_name": "custom-build-kafka-consumer-pressure",
+      "prompt": "Quick — just build me a Kafka consumer-health dashboard with fetch rate and commit latency, grouped by client. Don't ask a bunch of questions, I'm in the middle of an incident.",
+      "expected_output": "Kafka has NO catalog template (rabbitmq exists but is a different broker). The 'incident pressure + don't ask' phrasing tempts the agent to skip discovery and the no-data probe. Agent MUST still: paginate signoz_list_dashboards; call signoz_list_dashboard_templates (no Kafka match); fall through to custom build; call signoz_list_metrics with searchText='kafka' to discover real metric names (kafka.consumer.fetch_rate, kafka.consumer.commit_latency_avg, kafka.consumer.bytes_consumed_rate, etc.) before authoring; call signoz_get_field_keys with metricName scoped to a kafka.consumer metric to discover per-metric attributes (typically client-id and standard resource attrs like service.name, k8s.pod.name); run a per-panel data probe via signoz_query_metrics so a no-data dashboard isn't shipped. The skill's no-data-probe-before-save guardrail is non-negotiable even under incident pressure. Must emit JSON preview + summary before signoz_create_dashboard. GroupBy uses the actual attribute the metric carries — accept either 'client-id' (kafkametricsreceiver-style) or 'service.name' resource attribute. Reject shorthand keys like 'client' or 'consumer'.",
+      "expectations": [
+        "Agent calls signoz_list_dashboard_templates and finds no matching kafka template before custom build",
+        "Agent does NOT skip metric discovery — calls signoz_list_metrics with a kafka-related searchText before authoring panels",
+        "Agent calls signoz_get_field_keys (with signal=metrics and a kafka metric name) or signoz_get_field_values to discover the actual attribute keys carried by the kafka.consumer.* metrics before grouping",
+        "Agent does NOT skip the data probe — runs at least one signoz_query_metrics or aggregate probe before signoz_create_dashboard",
+        "Agent uses the actual attribute key carried by the metric (e.g. 'client-id') or a real resource attribute (e.g. 'service.name', 'k8s.pod.name') for groupBy — not invented shorthand like 'consumer_group' or 'topic'",
+        "Agent emits a JSON preview or summary before calling signoz_create_dashboard",
+        "Agent either calls signoz_create_dashboard with the custom-built payload or produces a complete, ready-to-send JSON payload that contains the discovered metric names, groupBy attribute, and formula panels (acceptable if harness is in simulation mode)",
+        "Agent does NOT bypass the duplicate check or skip signoz_list_dashboards under the incident-pressure framing"
+      ],
+      "files": []
+    },
+    {
+      "id": 8,
+      "eval_name": "custom-build-checkout-funnel-span-attributes",
+      "prompt": "Create a checkout funnel dashboard for our OpenTelemetry demo store. We instrument the cart, checkout, and payment services with span attributes — I want orders-placed count, total order revenue, and a card-type breakdown for charges. Discover the actual attribute names on the spans rather than guessing.",
+      "expected_output": "Business-KPI dashboard with NO catalog template — must custom build on traces signal, not metrics. Agent paginates signoz_list_dashboards (none). signoz_list_dashboard_templates returns no match. CRITICAL: agent must recognise the signal is TRACES with span-level attributes, not metrics — calls signoz_get_field_keys with signal='traces' to DISCOVER the actual attribute names rather than guessing. On this instance the attributes are app.order.id, app.order.amount, app.order.items.count, app.payment.amount, app.payment.card_type, app.payment.charged. Uses signoz_aggregate_traces with aggregation='count' for orders-placed (filtered to spans where app.order.id EXISTS, or operation = 'oteldemo.CheckoutService/PlaceOrder'); aggregation='sum' over app.order.amount for revenue; groupBy app.payment.card_type for the card-type breakdown. Reads signoz://traces/query-builder-guide and signoz://dashboard/* resources. groupBy uses the discovered span-attribute key with the correct attribute type (span attribute / tag, not resource). Emits JSON preview + summary before signoz_create_dashboard.",
+      "expectations": [
+        "Agent calls signoz_list_dashboard_templates and finds no matching template before custom build",
+        "Agent calls signoz_get_field_keys with signal=traces to discover the actual span-attribute names (does not invent attributes like 'order.value' or 'checkout.step' that may not exist on the instance)",
+        "Agent uses signoz_aggregate_traces (not signoz_query_metrics) for the headline panels since the data lives on spans",
+        "Agent uses span-attribute keys discovered via field_keys (e.g. app.order.amount, app.payment.card_type) in filters or groupBy with the correct attribute type (tag/attribute, not resource)",
+        "Agent uses a sum aggregation over a numeric order-amount attribute for the revenue panel (not just a count)",
+        "Agent emits a JSON preview or summary before calling signoz_create_dashboard",
+        "Agent calls signoz_create_dashboard with the custom-built payload"
+      ],
+      "files": []
+    },
+    {
+      "id": 9,
+      "eval_name": "custom-build-slo-error-budget-formula",
+      "prompt": "Build me an SLO dashboard for the checkout service — 99.9% availability target, 28-day rolling window, show error-budget burn rate and remaining budget.",
+      "expected_output": "SLO/error-budget dashboard has no catalog template. Agent paginates signoz_list_dashboards (none). signoz_list_dashboard_templates returns no match. Falls through to custom build. Discovers signoz_calls_total / signoz_latency_bucket span metrics via signoz_list_metrics. Calls signoz_get_field_values for service.name to confirm 'checkoutservice' (or whichever exists). Reads signoz://dashboard/* resources. Builds the dashboard in BUILDER MODE ONLY — never PromQL or ClickHouse-SQL. Panels: (a) availability using formula A*100/B or (1-A/B)*100 where A=signoz_calls_total filtered to status_code='STATUS_CODE_ERROR' and B=signoz_calls_total total; (b) error-budget-remaining as (availability - 99.9) / (1 - 0.999) * 100; (c) burn-rate panels with the MWMB pattern (1h and 6h windows; thresholds ≥14.4x / ≥6x). Time range default overridden to 28d (NOT the default 1h) since SLO windows are long. Filter and groupBy use 'service.name' (dotted, type=resource), NOT 'service_name' (underscore — that's PromQL syntax which this skill forbids). Emits JSON preview + summary before signoz_create_dashboard with the explicit time range, SLO target, error budget in minutes, and formula calls in the summary.",
+      "expectations": [
+        "Agent calls signoz_list_dashboard_templates and finds no matching SLO/error-budget template before custom build",
+        "Agent calls signoz_list_metrics to discover signoz_calls_total or signoz_latency_bucket span metrics (or equivalent) before authoring",
+        "Agent uses a formula combining good and total event counts (e.g. A*100/B, (B-A)/B, or a similar ratio) for the availability or error-budget panel",
+        "Agent overrides the default 1h time range to a longer SLO-appropriate window (28d, 30d, or similarly explicit long range) — acceptable either as a dashboard-level timeRange field or as a query-window (e.g. rate[28d]) override with the preview explicitly noting the non-default window",
+        "Agent uses service.name (dotted, OTel resource attribute) in builder-mode filters and variables — not the underscored span-metric label 'service_name' (this skill builds in builder mode only, never PromQL) and not the bare shorthand 'service'",
+        "Agent emits a JSON preview or summary before calling signoz_create_dashboard, surfacing the non-default time range and the formula(s)",
+        "Agent either calls signoz_create_dashboard with the custom-built payload or produces a complete, ready-to-send JSON payload that contains the formula panels, the non-default time range, and the service filter (acceptable if harness is in simulation mode)"
+      ],
+      "files": []
+    },
+    {
+      "id": 10,
+      "eval_name": "custom-build-multi-service-user-journey",
+      "prompt": "Create a user-journey dashboard for our OpenTelemetry demo checkout flow — I want per-hop latency and error rate across frontend, cartservice, checkoutservice, paymentservice, and shippingservice, so I can see where transactions slow down or fail. Discover the exact service names from the instance rather than hard-coding them.",
+      "expected_output": "Multi-service journey dashboard, no catalog template (apm covers single-service). Agent paginates signoz_list_dashboards (none). signoz_list_dashboard_templates with searchContext='user journey' / 'checkout' finds no match. Falls through to custom build. Calls signoz_get_field_keys with signal=traces fieldContext=resource to confirm service.name; signoz_get_field_values for service.name (or signoz_list_services) to verify the named services exist on the instance — the actual names are 'frontend', 'cartservice', 'checkoutservice', 'paymentservice', 'shippingservice' (plus others). Reads signoz://traces/query-builder-guide and signoz://dashboard/* resources. Builds JSON with: filter service.name IN (the discovered service names); per-service latency panels (p50/p95/p99) with groupBy=service.name (resource attr); per-service error-rate panels using A*100/B formula (errors / total); a request-rate panel grouped by service.name. Variables include service.name (multi-select pre-populated) and deployment.environment.name. groupBy uses 'service.name' with type='resource', not bare 'service'. Emits JSON preview + summary before signoz_create_dashboard. Performs shape check.",
+      "expectations": [
+        "Agent calls signoz_list_dashboard_templates and finds no matching user-journey template before custom build",
+        "Agent calls signoz_list_services or signoz_get_field_values for service.name (signal=traces) to verify which services actually exist on the instance before authoring",
+        "Agent uses an IN-list filter on service.name with the actual discovered service names (e.g. 'cartservice', 'checkoutservice', 'paymentservice', 'shippingservice') — not invented short names like 'cart' or 'payment'",
+        "Agent uses groupBy on service.name with type=resource (OTel attribute name) on per-hop panels so latency/error breakdown is per service",
+        "Agent includes a formula combining error count and total count (A*100/B or equivalent) for per-service error rate, not a single rate aggregation",
+        "Agent reads at least one signoz://dashboard/ or signoz://traces/ MCP resource before authoring JSON",
+        "Agent emits a JSON preview or summary before calling signoz_create_dashboard",
+        "Agent either calls signoz_create_dashboard with the custom-built payload or produces a complete, ready-to-send JSON payload that includes service.name groupBy, the error-rate formula, and all discovered service names (acceptable if harness is in simulation mode)"
+      ],
+      "files": []
     }
   ]
 }
