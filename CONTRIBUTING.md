@@ -28,6 +28,7 @@ npx skills add https://github.com/anthropics/skills --skill skill-creator
 - **Descriptions.** Imperative, pushy, and third-person. State both what the skill does and when to trigger it, with explicit user-phrase examples and an "even if they don't say X explicitly" clause. Aim well under the 1024-char limit.
 - **"Do NOT use" lists.** Only mention sibling skills that are genuinely similar or competing — i.e. ones a user could plausibly invoke instead. Don't enumerate every other skill in the plugin; rotting cross-references erode trust faster than any clarity they add.
 - **MCP tool references.** Use the fully qualified `signoz:<tool_name>` form (e.g. `` `signoz:signoz_get_alert` ``) in skill bodies. Bare names break when multiple MCP servers are loaded.
+- **MCP vs skill split.** MCP is the API; skills are the playbook. Tool definitions, input schemas, schema validation, searchable corpora, live tenant data, and release-sensitive reference data belong in MCP tools/resources. Workflows, conventions, decision rules, interpretation hints, pitfalls, and curated examples belong in skills.
 - **Schema reference.** The MCP server is the source of truth for tool input schemas, alert/dashboard JSON shape, and validation rules. Read the `signoz://*` resources rather than transcribing schema into a skill — duplicated schema rots out of sync.
 - **Reference files.** Move material >300 lines into `references/`, `scripts/`, or `assets/`. Any reference file longer than 100 lines must start with a `## Contents` table-of-contents.
 - **SKILL.md length.** Keep the body under 500 lines. Use progressive disclosure — link to specific reference files with a clear "read this when X" pointer rather than burying detail inline.
@@ -35,13 +36,14 @@ npx skills add https://github.com/anthropics/skills --skill skill-creator
 
 ### Further reading
 
-These external guides shape the conventions above. When in doubt, follow them:
+These guides and internal specs shape the conventions above. When in doubt, follow them:
 
 - Anthropic — [Skill authoring best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)
 - agentskills.io — [Best practices for skill creators](https://agentskills.io/skill-creation/best-practices)
 - agentskills.io — [Evaluating skill output quality](https://agentskills.io/skill-creation/evaluating-skills)
 - agentskills.io — [Optimizing skill descriptions](https://agentskills.io/skill-creation/optimizing-descriptions)
 - Agent Skills [specification](https://agentskills.io/specification)
+- SigNoz internal — [Skills & MCP Spec](https://www.notion.so/signoz/Skills-MCP-Spec-352fcc6bcd1980c89215deec882df42e#200b80ec35cb4012a246da1ccdc9d580)
 
 ## Plugin Versioning (CalVer)
 
