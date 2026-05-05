@@ -87,14 +87,13 @@ optional.
    you know the schema — the legacy `builder.queryData` format is rejected
    with HTTP 400.
 3. **Build the query using `signoz-generating-queries` — mandatory.** Use
-   the `Skill` tool to invoke `signoz-generating-queries`. This is the only
-   way to satisfy this step — reading `signoz://view/examples` and adapting
-   an example payload does NOT count, and calling `signoz_search_traces`
-   directly for validation does NOT count. The sub-skill runs field
-   discovery, builds the `compositeQuery` spec, and validates it against
-   the live data before you write anything. Skipping it means a malformed
-   filter becomes a permanent saved view that needs to be deleted and
-   recreated.
+   the `Skill` tool to invoke `signoz-generating-queries`. The sub-skill
+   handles field discovery, type checking, and live-data validation in one
+   pass — adapting an example payload from `signoz://view/examples` or
+   running a bare `signoz:signoz_search_traces` call skips the field-type
+   checks and service-name resolution that catch silent 400s before they
+   become permanent bad views. Skipping it means a malformed filter becomes
+   a saved view that must be deleted and recreated.
 4. **Enforce `signal == sourcePage`** in every `builder_query` spec. A
    `sourcePage:"traces"` view with `signal:"logs"` is a server-side error.
 5. **Preview before writing — this step is not optional.** Before calling
