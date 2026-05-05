@@ -1,0 +1,84 @@
+{
+  "skill_name": "signoz-managing-views",
+  "evals": [
+    {
+      "id": 0,
+      "name": "create-trace-view-for-service",
+      "prompt": "Save the current traces query as a view called 'checkout-errors' for the checkout service. I want to see only ERROR spans from service.name = checkout.",
+      "expected_output": "Agent resolves sourcePage=traces, builds a builder_query with filter service.name=checkout and status=error, sets panelType=list, shows a preview with name/sourcePage/filter, confirms, and calls signoz_create_view. Reports back the name, UUID, and sourcePage.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Agent calls signoz_create_view",
+          "description": "The primary write operation must be called"
+        },
+        {
+          "text": "sourcePage is set to 'traces' (not logs or metrics)",
+          "description": "sourcePage must match the user's intent; wrong value is a 400"
+        },
+        {
+          "text": "Filter includes service.name = checkout and status/error condition",
+          "description": "View must capture the user's stated filter criteria"
+        },
+        {
+          "text": "Agent shows a preview (name, sourcePage, filter) before calling create",
+          "description": "Skill requires a preview step; without it user cannot catch errors"
+        },
+        {
+          "text": "Final reply includes the UUID returned by the server",
+          "description": "User needs UUID for future get/update/delete operations"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "name": "list-views-no-sourcepage",
+      "prompt": "Show me all my saved views.",
+      "expected_output": "Agent recognizes no sourcePage was given, calls signoz_list_views three times (once for each of traces, logs, metrics), merges results, and presents them organized by sourcePage. Checks pagination.hasMore for each signal before concluding.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Agent calls signoz_list_views for all three signals: traces, logs, and metrics",
+          "description": "Without a sourcePage the agent must query all three"
+        },
+        {
+          "text": "Agent checks pagination.hasMore before concluding the list is complete",
+          "description": "A single page is not a complete list"
+        },
+        {
+          "text": "Results are organized/labeled by sourcePage in the reply",
+          "description": "Grouping by signal helps user find what they need"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "rename-existing-view",
+      "prompt": "Rename the 'slow-checkout' view to 'slow-checkout-p99'.",
+      "expected_output": "Agent calls signoz_list_views to find the view by name, then signoz_get_view to fetch full body, shows diff preview (rename only, compositeQuery untouched), waits for confirmation, then calls signoz_update_view with the modified name only. Reports UUID, old name, new name.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Agent calls signoz_list_views (or signoz_get_view) to resolve the view before updating",
+          "description": "Blind update without lookup risks wrong UUID"
+        },
+        {
+          "text": "Agent calls signoz_get_view to fetch the full body before composing update (GET-then-PUT)",
+          "description": "signoz_update_view is full-body replace; not fetching first risks wiping fields"
+        },
+        {
+          "text": "compositeQuery is not modified for a pure rename",
+          "description": "Touching compositeQuery for metadata-only change risks data loss"
+        },
+        {
+          "text": "Agent shows a diff-style preview before calling update",
+          "description": "Skill requires showing what will change"
+        },
+        {
+          "text": "Agent calls signoz_update_view with the modified name",
+          "description": "The rename must actually be written back"
+        }
+      ]
+    }
+  ]
+}

@@ -57,11 +57,11 @@ Do NOT use when the user wants to:
 - Run an ad-hoc Explorer query without saving it → `signoz-generating-queries`.
 - Create or change an alert rule → `signoz-creating-alerts`.
 
-## Schema is in the MCP resources, not here
+## Schema reference
 
 The authoritative SavedView schema lives on the MCP server. Read these
-**before** composing any create or update payload — do not transcribe schema
-from memory:
+**before** composing any create or update payload using `ReadMcpResourceTool`
+(not `signoz_fetch_doc` — these are MCP resources, not HTTP URLs):
 
 - `signoz://view/instructions` — SavedView field reference, `sourcePage`
   rules, the GET-then-PUT update flow, the minimal create body.
@@ -92,10 +92,13 @@ HTTP 400 on legacy v3/v4 fields (`builder`, `promql`, `unit`, top-level
    single number. List views set `stepInterval: 0`; graphs typically `60`.
 4. **Enforce `signal == sourcePage`** in every `builder_query` spec. A
    `sourcePage:"traces"` view with `signal:"logs"` is a server-side error.
-5. **Preview before writing.** Show the user the name, sourcePage, panel
-   type, filter expression, and any tags/category. For a human in the
-   loop, wait for confirmation. For an autonomous agent, proceed but log
-   the preview in your reply so it shows up in the transcript.
+5. **Preview before writing — this step is not optional.** Before calling
+   `signoz_create_view`, show the user a summary of what will be created:
+   name, sourcePage, panelType, and the full filter expression. Do this
+   even in autonomous mode — it surfaces filter mistakes (e.g. wrong
+   service name, wrong status value) before they become a saved view that
+   needs to be deleted. For a human in the loop, wait for confirmation.
+   For an autonomous agent, log the preview in the reply and proceed.
 6. Call `signoz:signoz_create_view`. The server populates `id`,
    `createdAt/By`, `updatedAt/By` — never send those.
 
@@ -133,10 +136,12 @@ upstream). Sending a partial body wipes the unspecified fields. The flow:
 3. Modify only the field(s) the user asked to change. For pure metadata
    tweaks (rename, retag, recategorize), do not touch `compositeQuery` —
    re-serializing it risks dropping a nested field.
-4. Show the user a diff-style preview ("rename `slow-checkout` →
-   `slow-checkout-p99`; tags unchanged"). Wait for confirmation on any
-   change to `compositeQuery`, since that changes what the view actually
-   shows.
+4. **Show a diff-style preview before writing.** One line per changed
+   field: `name: "slow-checkout" → "slow-checkout-p99"`. Explicitly note
+   any fields that are unchanged (e.g. "compositeQuery: unchanged"). This
+   prevents silent mistakes and gives the user a chance to catch a wrong
+   target view. Wait for confirmation on any change to `compositeQuery`,
+   since that changes what the view actually shows.
 5. Call `signoz:signoz_update_view` with `{ "viewId": "<id>", "view": <modified data> }`.
 
 If the user asks for a structural change to the query (new filter,
