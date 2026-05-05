@@ -146,18 +146,10 @@ Run the template lookup first. The user has already agreed to create
 new — the lookup decides *how* we build it.
 
 Call `signoz:signoz_list_dashboard_templates` with `searchContext` set
-to the user's raw request. The tool returns the catalog as a JSON array
-of `{id, title, path, description, category, keywords}` entries. Read
-the list and pick the entry whose `title` / `description` / `keywords`
-/ `category` best matches the user's intent — this is a model judgment,
-not a keyword score.
-
-**Narrowing by category.** When the user's request is broad (e.g. "give
-me an APM dashboard", "something for Kubernetes", "a database
-dashboard"), pass `category` to restrict the catalog (case-insensitive),
-e.g. `category="Apm"` or `category="K8S Infra Metrics"`. Present the
-narrowed list to the user and ask them to pick before importing — when
-multiple templates fit, the user is the right judge of which one.
+to the user's raw request. If the request is broad ("an APM dashboard",
+"something for Kubernetes"), also pass `category` to narrow the catalog.
+Read the returned entries and pick the best match for the user's intent.
+When several entries fit, present them and let the user choose.
 
 Branch on the result:
 - **Single clear template match** — proceed to Step 3b-i (template
