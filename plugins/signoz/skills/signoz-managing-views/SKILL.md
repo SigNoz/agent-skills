@@ -90,11 +90,15 @@ optional.
    `signoz://view/instructions` and `signoz://view/examples` before composing
    any payload. Do not skip this step even if you think you know the schema —
    the legacy `builder.queryData` format is rejected with HTTP 400.
-3. **Build the query using `signoz-generating-queries` — mandatory.** Invoke
-   the `signoz-generating-queries` skill to construct and validate the
-   `compositeQuery`. Do not hand-compose a `compositeQuery` from the user's
-   description alone. This surfaces filter mistakes before they become a
-   saved view that needs to be deleted.
+3. **Build the query using `signoz-generating-queries` — mandatory.** Use
+   the `Skill` tool to invoke `signoz-generating-queries`. This is the only
+   way to satisfy this step — reading `signoz://view/examples` and adapting
+   an example payload does NOT count, and calling `signoz_search_traces`
+   directly for validation does NOT count. The sub-skill runs field
+   discovery, builds the `compositeQuery` spec, and validates it against
+   the live data before you write anything. Skipping it means a malformed
+   filter becomes a permanent saved view that needs to be deleted and
+   recreated.
 4. **Enforce `signal == sourcePage`** in every `builder_query` spec. A
    `sourcePage:"traces"` view with `signal:"logs"` is a server-side error.
 5. **Preview before writing — this step is not optional.** Before calling
@@ -192,7 +196,7 @@ call.
 
 | Mistake | Fix |
 |---------|-----|
-| Hand-composing `compositeQuery` using legacy `builder.queryData` format | Read `signoz://view/instructions` first; use `signoz-generating-queries` to build the query |
+| Hand-composing `compositeQuery` from examples or memory (even after reading `signoz://view/examples`) | Use the `Skill` tool to invoke `signoz-generating-queries` — reading examples and validating with `signoz_search_traces` is not a substitute |
 | Skipping `signoz_get_view` before delete (relying on list UUID alone) | Always call `signoz_get_view` to confirm name+sourcePage before `signoz_delete_view` |
 | Sending legacy fields: `builder`, `promql`, `unit`, top-level `id`, `queryFormulas` | Read schema resources; server returns HTTP 400 silently |
 | `signal` ≠ `sourcePage` in builder query | Every `builder_query.signal` must equal the view's `sourcePage` |
