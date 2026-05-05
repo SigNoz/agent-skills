@@ -80,26 +80,21 @@ HTTP 400 on legacy v3/v4 fields (`builder`, `promql`, `unit`, top-level
 1. **Resolve `sourcePage`** — must be exactly one of `traces`, `logs`,
    `metrics`. If the user's intent is ambiguous ("save this query"), ask
    which Explorer they mean. It cannot be inferred from filter strings alone.
-2. **Compose the filter expression.** Prefer a **resource attribute** in the
-   filter (`service.name`, `k8s.namespace.name`, `host.name`) — the SigNoz
-   backend uses these as primary indices, and a view without one tends to
-   be slow and noisy when reopened. If the user did not name a resource
-   attribute, call `signoz:signoz_get_field_keys` (with
-   `fieldContext=resource` and the matching `signal`) to surface options,
-   then ask the user to pick one. Do not invent attribute names.
-3. **Pick `panelType`** to match intent: `list` for tabular spans/logs,
-   `graph` for time-series, `table` for grouped tables, `value` for a
-   single number. List views set `stepInterval: 0`; graphs typically `60`.
-4. **Enforce `signal == sourcePage`** in every `builder_query` spec. A
+2. **Build the query using `signoz-generating-queries`.** Invoke the
+   `signoz-generating-queries` skill to construct and validate the
+   `compositeQuery` before saving it as a view. This ensures the query
+   actually returns data and surfaces filter mistakes (e.g. wrong service
+   name, wrong attribute key) before they become a saved view that needs to
+   be deleted. Do not hand-compose a `compositeQuery` from the user's
+   description alone.
+3. **Enforce `signal == sourcePage`** in every `builder_query` spec. A
    `sourcePage:"traces"` view with `signal:"logs"` is a server-side error.
-5. **Preview before writing — this step is not optional.** Before calling
+4. **Preview before writing — this step is not optional.** Before calling
    `signoz_create_view`, show the user a summary of what will be created:
-   name, sourcePage, panelType, and the full filter expression. Do this
-   even in autonomous mode — it surfaces filter mistakes (e.g. wrong
-   service name, wrong status value) before they become a saved view that
-   needs to be deleted. For a human in the loop, wait for confirmation.
-   For an autonomous agent, log the preview in the reply and proceed.
-6. Call `signoz:signoz_create_view`. The server populates `id`,
+   name, sourcePage, panelType, and the full filter expression. For a human
+   in the loop, wait for confirmation. For an autonomous agent, log the
+   preview in the reply and proceed.
+5. Call `signoz:signoz_create_view`. The server populates `id`,
    `createdAt/By`, `updatedAt/By` — never send those.
 
 ### List or find views
