@@ -3,23 +3,81 @@
   "evals": [
     {
       "id": 0,
-      "name": "template-with-data-jvm",
+      "eval_name": "template-with-data-jvm",
       "prompt": "Create a JVM dashboard so I can monitor my Java service.",
-      "expected_output": "Agent calls signoz_list_dashboard_templates, picks the JVM template entry, runs the no-data pre-flight (signoz_list_metrics for jvm.*), finds data is flowing, and proceeds to call signoz_import_dashboard with no warning.",
+      "expected_output": "Agent paginates signoz_list_dashboards (no JVM dashboard found), confirms creation with the user, calls signoz_list_dashboard_templates with searchContext='jvm' and picks the JVM catalog entry. Runs the Step 3b-i.1 no-data probe via signoz_list_metrics with searchText='jvm' and timeRange=1h; finds JVM metrics flowing, proceeds silently to signoz_import_dashboard with the chosen template path. On success, reports the created dashboard's title, panel count, sections, and variables, and offers a customization or alerting follow-up.",
+      "expectations": [
+        "Agent calls signoz_list_dashboards before any write operation",
+        "Agent calls signoz_list_dashboard_templates to look for a JVM template",
+        "Agent runs a no-data probe (signoz_list_metrics with a jvm-related searchText) before importing",
+        "Agent calls signoz_import_dashboard with the JVM template path",
+        "Agent reports the created dashboard title, panel count, or section breakdown"
+      ],
       "files": []
     },
     {
       "id": 1,
-      "name": "template-no-data-postgres",
+      "eval_name": "template-no-data-postgres",
       "prompt": "Create a dashboard for my PostgreSQL database.",
-      "expected_output": "Agent calls signoz_list_dashboard_templates, picks the postgresql template entry, runs the no-data pre-flight (signoz_list_metrics for postgresql.*), finds no data, warns the user verbatim with the prompt from SKILL.md Step 3b-i.1, and waits for confirmation before calling signoz_import_dashboard.",
+      "expected_output": "Agent paginates signoz_list_dashboards (no Postgres dashboard), confirms creation, calls signoz_list_dashboard_templates and picks the postgresql/postgresql.json catalog entry. Runs the Step 3b-i.1 no-data probe via signoz_list_metrics searchText='postgresql' timeRange=1h; the probe returns empty. CRITICAL: agent MUST emit the verbatim warning from SKILL.md Step 3b-i.1 and wait for the user's choice. Must NOT silently call signoz_import_dashboard.",
+      "expectations": [
+        "Agent calls signoz_list_dashboard_templates and picks the postgresql template",
+        "Agent runs a no-data probe via signoz_list_metrics with a postgresql-related searchText",
+        "Agent emits a warning message noting data is not found before calling signoz_import_dashboard",
+        "Agent waits for user confirmation before calling signoz_import_dashboard (does not import silently)"
+      ],
       "files": []
     },
     {
       "id": 2,
-      "name": "broad-request-apm-category",
+      "eval_name": "broad-request-apm-category",
       "prompt": "I need an APM dashboard - what do you have?",
-      "expected_output": "Agent recognises the request is broad. Calls signoz_list_dashboard_templates with category='Apm' to enumerate APM templates, presents them to the user, and asks the user to pick before calling signoz_import_dashboard.",
+      "expected_output": "Agent recognises the request is broad and exploratory. Paginates signoz_list_dashboards (no existing APM dashboard). Calls signoz_list_dashboard_templates with category='Apm' to enumerate APM templates, presents the narrowed list to the user, and asks them to pick before calling signoz_import_dashboard. Must NOT pick a template silently when the request is ambiguous.",
+      "expectations": [
+        "Agent calls signoz_list_dashboard_templates with a category filter (e.g. category='Apm')",
+        "Agent presents multiple template options to the user and asks them to choose",
+        "Agent does NOT silently call signoz_import_dashboard without user selection"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "eval_name": "duplicate-redis-modify-or-create",
+      "prompt": "Set up a dashboard for monitoring my Redis cluster.",
+      "expected_output": "Agent paginates signoz_list_dashboards across all pages and detects an existing 'Redis - Overview' (or similarly-named) dashboard. Surfaces the duplicate with name, UUID, and createdAt and presents the three options: '(a) modify, (b) create new, (c) stop'. Must NOT call signoz_create_dashboard or signoz_import_dashboard before the user picks.",
+      "expectations": [
+        "Agent calls signoz_list_dashboards (paginated) and finds a similar existing Redis dashboard",
+        "Agent presents the existing dashboard name/UUID to the user with modify/create/stop options",
+        "Agent does NOT call signoz_import_dashboard or signoz_create_dashboard before the user responds to the duplicate prompt"
+      ],
+      "files": []
+    },
+    {
+      "id": 4,
+      "eval_name": "custom-build-payment-pipeline",
+      "prompt": "Create a dashboard to track our payment processing pipeline — I want to see request rate, p99 latency, and error rate per service across checkout, payments, and notifications.",
+      "expected_output": "Agent paginates signoz_list_dashboards (no payment dashboard). Confirms creation. Calls signoz_list_dashboard_templates — no match, falls through to custom build. Discovery via signoz_get_field_keys and signoz_get_field_values. Reads signoz://dashboard/* MCP resources. Builds JSON with OTel attribute names, error-rate formula F1=A*100/B, and variables. Runs data probes. Emits JSON preview + summary BEFORE calling signoz_create_dashboard. Performs shape check.",
+      "expectations": [
+        "Agent calls signoz_list_dashboard_templates and finds no matching template before proceeding to custom build",
+        "Agent calls signoz_get_field_keys or signoz_get_field_values to discover resource attributes",
+        "Agent reads signoz://dashboard/ MCP resources (instructions, widgets-instructions, or widgets-examples)",
+        "Agent emits a JSON preview or summary of the dashboard before calling signoz_create_dashboard",
+        "Agent uses OTel attribute names (service.name, not 'service') in filters or groupBy",
+        "Agent calls signoz_create_dashboard to create the dashboard",
+        "Agent includes an error rate formula or multiple queries combining error count and total count"
+      ],
+      "files": []
+    },
+    {
+      "id": 5,
+      "eval_name": "needs-input-missing-scope-custom-build",
+      "prompt": "Build me a dashboard for some k8s pods.",
+      "expected_output": "Request is too vague (no cluster, namespace, or pod set). Agent must NOT proceed to signoz_create_dashboard with a guessed scope. Either emits a structured needs_input block listing 'resource_scope' as missing with candidates discovered via signoz_get_field_values, or proposes the k8s catalog template and asks the user to confirm scope before importing. Must explicitly ask the user to clarify cluster/namespace before any write tool.",
+      "expectations": [
+        "Agent does NOT call signoz_create_dashboard or signoz_import_dashboard without first clarifying scope with the user",
+        "Agent either emits a needs_input block or asks a clarifying question about the cluster or namespace",
+        "Agent calls signoz_get_field_values or signoz_list_dashboard_templates to discover candidates before prompting"
+      ],
       "files": []
     }
   ]
