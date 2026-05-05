@@ -128,23 +128,21 @@ upstream). Sending a partial body wipes the unspecified fields. The flow:
    `createdAt`, `createdBy`, `updatedAt`, `updatedBy`) — the MCP server
    strips them for you, but omitting them up front makes the diff
    readable.
-3. Modify only the field(s) the user asked to change. For pure metadata
-   tweaks (rename, recategorize), do not touch `compositeQuery` —
-   re-serializing it risks dropping a nested field.
-4. **Show a diff-style preview before writing.** One line per changed
+3. **If the update changes `compositeQuery`** (new filter, different panel
+   type, different aggregation), invoke `signoz-generating-queries` to
+   build and validate the new query before proceeding. Do not hand-edit
+   `compositeQuery` from the user's description — the same
+   `signal == sourcePage` rule applies, and `panelType` changes often
+   imply a `stepInterval` change too. For pure metadata tweaks (rename,
+   recategorize), skip this step and do not touch `compositeQuery`.
+4. Modify only the field(s) the user asked to change.
+5. **Show a diff-style preview before writing.** One line per changed
    field: `name: "slow-checkout" → "slow-checkout-p99"`. Explicitly note
    any fields that are unchanged (e.g. "compositeQuery: unchanged"). This
    prevents silent mistakes and gives the user a chance to catch a wrong
    target view. Wait for confirmation on any change to `compositeQuery`,
    since that changes what the view actually shows.
-5. Call `signoz:signoz_update_view` with `{ "viewId": "<id>", "view": <modified data> }`.
-
-If the user asks for a structural change to the query (new filter,
-different panel type, different aggregation), invoke the
-`signoz-generating-queries` skill to build and validate the new
-`compositeQuery` before writing it back — the same `signal == sourcePage`
-rule applies, and `panelType` changes often imply a `stepInterval` change
-too.
+6. Call `signoz:signoz_update_view` with `{ "viewId": "<id>", "view": <modified data> }`.
 
 ### Delete a view
 
@@ -173,6 +171,10 @@ call.
 
 - **Wrong sourcePage.** `traces` vs `logs` vs `metrics` — case-sensitive,
   no plural. A typo here is a 400.
+- **`signal` ≠ `sourcePage` in a builder query.** Every `builder_query`
+  inside a view's `compositeQuery` must have `signal` equal to the view's
+  `sourcePage`. A `sourcePage:"traces"` view with `signal:"logs"` is a
+  server-side error. This applies to both create and update.
 - **Sending legacy fields.** `builder`, `promql`, `clickhouse_sql`,
   top-level `id`, `unit`, `queryFormulas`, `queryTraceOperator` are all
   rejected. Read `signoz://view/instructions` if unsure.
@@ -183,6 +185,9 @@ call.
   compose an update body from the user's description.
 - **Skipping `pagination.hasMore`.** A "no such view" answer based on
   page 1 alone is worth nothing on a busy tenant.
+- **`category` is a free-form string.** There is no server-enforced enum
+  for `category` — pass whatever label the user provides. Omit it (empty
+  string or absent) if the user does not specify one.
 
 ## Reporting back
 

@@ -79,6 +79,64 @@
           "description": "The rename must actually be written back"
         }
       ]
+    },
+    {
+      "id": 3,
+      "name": "delete-view-by-name",
+      "prompt": "Delete the 'checkout-errors' view.",
+      "expected_output": "Agent calls signoz_list_views to find the view by name, then calls signoz_get_view to confirm the UUID maps to a view named 'checkout-errors' with the expected sourcePage. Shows the resolved name, sourcePage, and category to the user and asks for explicit confirmation. Only after confirmation calls signoz_delete_view. Reports 'deleted' with the view name, not just the UUID.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Agent calls signoz_list_views to locate the view by name before acting",
+          "description": "Must resolve name to UUID via listing; do not call delete on a guessed or user-pasted UUID without lookup"
+        },
+        {
+          "text": "Agent calls signoz_get_view to confirm the resolved UUID before deleting",
+          "description": "Paste errors happen; the get-before-delete guard prevents deleting the wrong view"
+        },
+        {
+          "text": "Agent shows the resolved view's name, sourcePage, and category and asks for explicit confirmation",
+          "description": "Delete is permanent; skill requires fresh confirmation against the resolved target, not just the original prompt"
+        },
+        {
+          "text": "Agent calls signoz_delete_view only after confirmation",
+          "description": "Must not auto-confirm based on original prompt"
+        },
+        {
+          "text": "Final reply confirms deletion by view name, not just UUID",
+          "description": "User should recognize what was deleted"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "update-view-filter",
+      "prompt": "Update the 'checkout-errors' view to also show WARN spans, not just ERROR.",
+      "expected_output": "Agent calls signoz_list_views to find the view, then signoz_get_view to fetch full body. Recognizes this is a compositeQuery change and invokes signoz-generating-queries skill to build a new query with status IN (ERROR, WARN). Shows a diff preview with old vs new filter expression and notes compositeQuery is changing. Waits for confirmation, then calls signoz_update_view with the validated compositeQuery. Reports back UUID, name, and what changed.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "Agent calls signoz_get_view to fetch the full body before composing update (GET-then-PUT)",
+          "description": "Full-body replace; not fetching first risks wiping fields"
+        },
+        {
+          "text": "Agent invokes signoz-generating-queries skill to build the new compositeQuery",
+          "description": "Query changes must go through signoz-generating-queries for validation; hand-editing compositeQuery risks malformed payloads"
+        },
+        {
+          "text": "Agent shows a diff-style preview before writing, explicitly calling out the compositeQuery change",
+          "description": "Skill requires confirmation for compositeQuery changes; user must see what is changing"
+        },
+        {
+          "text": "Agent calls signoz_update_view with the validated compositeQuery",
+          "description": "The filter change must actually be written back"
+        },
+        {
+          "text": "signal in every builder_query matches the view's sourcePage",
+          "description": "signal != sourcePage is a server-side error"
+        }
+      ]
     }
   ]
 }
