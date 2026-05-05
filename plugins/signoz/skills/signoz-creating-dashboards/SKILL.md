@@ -102,19 +102,10 @@ Call `signoz:signoz_list_dashboards` and **paginate through every page**
 Stopping at page 1 misses near-duplicates and produces clutter the user
 will later regret.
 
-**Match aggressively.** For each existing dashboard, compare its
-lowercased `name`, `description`, and `tags` against the user's request.
-A match is any of:
-- lowercased name contains the technology / domain keyword (e.g.
-  `redis`, `postgres`, `k8s`/`kubernetes`, `docker`/`container`,
-  `host`, `jvm`, `llm`/`openai`/`anthropic`);
-- any tag matches the keyword;
-- existing name and the user's request share the root token (e.g.
-  "Redis - Overview" vs a request for a Redis dashboard);
-- description mentions the same technology or service the user named.
-
-Collect every match with its `name`, `uuid`, and `createdAt` for the
-next step.
+**Match aggressively.** Compare each existing dashboard's lowercased
+`name`, `description`, and `tags` against the user's technology/domain —
+fuzzy is fine, the goal is to surface every plausible duplicate. Collect
+every match with its `name`, `uuid`, and `createdAt` for the next step.
 
 ### Step 2: Ask the user — modify or create
 
@@ -184,12 +175,10 @@ catalog entry's `category`, `title`, and `keywords` plus the user's
 stated technology. Pick up to ~5 representative signals and check them
 — keep the total small:
 
-- **Metric-based templates** (most infra/runtime templates — e.g.
-  PostgreSQL, Redis, JVM, hostmetrics, k8s, MongoDB, Kafka): call
-  `signoz:signoz_list_metrics` with `searchText=<technology prefix>`
-  (e.g. `postgresql`, `redis`, `jvm`, `system.`, `k8s.`, `mongo`,
-  `kafka`) and `timeRange=1h`. Empty result → metric family is not
-  being ingested.
+- **Metric-based templates** (most infra/runtime templates): call
+  `signoz:signoz_list_metrics` with `searchText` set to the technology
+  prefix and `timeRange=1h`. Empty result → metric family is not being
+  ingested.
 - **Trace-based templates** (APM-style): call
   `signoz:signoz_aggregate_traces` with `aggregation=count`, an
   appropriate filter (e.g. `service.name EXISTS`), `timeRange=1h`.
@@ -277,9 +266,8 @@ data:
    names produce empty panels.
 2. **Resource attributes** — call `signoz:signoz_get_field_keys` with
    `fieldContext=resource` for the relevant signal to enumerate
-   available attributes; call `signoz:signoz_get_field_values` for the
-   most likely attributes (typically `service.name`, then `host.name`,
-   then `k8s.namespace.name`) to get concrete values for variables.
+   available attributes; call `signoz:signoz_get_field_values` on the
+   ones you'll use as variables to confirm concrete values exist.
 3. **Per-panel data probe** — for the headline panels, run a short
    `signoz:signoz_query_metrics` / `signoz:signoz_aggregate_traces` /
    `signoz:signoz_aggregate_logs` with the same filter the panel will
@@ -313,9 +301,7 @@ Add signal-specific resources as needed:
 
 Follow the v5 schema as documented in the resources above. Use OTel
 semantic attribute names (not shorthand) in filters, groupBy, and
-variables — `service.name` not `service`, `host.name` not `host`,
-`deployment.environment.name` not `env`. Apply the defaults below
-unless the user specified otherwise.
+variables. Apply the defaults below unless the user specified otherwise.
 
 **Defaults the skill applies (and surfaces in the preview):**
 
