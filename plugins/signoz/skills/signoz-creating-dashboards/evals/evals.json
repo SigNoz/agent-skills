@@ -5,7 +5,7 @@
       "id": 0,
       "eval_name": "template-with-data-jvm",
       "prompt": "Create a JVM dashboard so I can monitor my Java service.",
-      "expected_output": "Agent paginates signoz_list_dashboards (no JVM dashboard found), confirms creation with the user, calls signoz_list_dashboard_templates with searchContext='jvm' and picks the JVM catalog entry. Runs the Step 3b-i.1 no-data probe via signoz_list_metrics with searchText='jvm' and timeRange=1h; finds JVM metrics flowing, proceeds silently to signoz_import_dashboard with the chosen template path. On success, reports the created dashboard's title, panel count, sections, and variables, and offers a customization or alerting follow-up.",
+      "expected_output": "Agent calls signoz_list_dashboards (no JVM dashboard found), confirms creation with the user, calls signoz_list_dashboard_templates and picks the JVM catalog entry. Runs the Step 3b-i.1 no-data probe via signoz_list_metrics with searchText='jvm'; finds JVM metrics flowing, proceeds silently to signoz_import_dashboard with the chosen template path. On success, reports the created dashboard's title, panel count, sections, and variables, and offers a customization or alerting follow-up.",
       "expectations": [
         "Agent calls signoz_list_dashboards before any write operation",
         "Agent calls signoz_list_dashboard_templates to look for a JVM template",
@@ -19,7 +19,7 @@
       "id": 1,
       "eval_name": "template-no-data-postgres",
       "prompt": "Create a dashboard for my PostgreSQL database.",
-      "expected_output": "Agent paginates signoz_list_dashboards (no Postgres dashboard), confirms creation, calls signoz_list_dashboard_templates and picks the postgresql/postgresql.json catalog entry. Runs the Step 3b-i.1 no-data probe via signoz_list_metrics searchText='postgresql' timeRange=1h; the probe returns empty. CRITICAL: agent MUST emit the verbatim warning from SKILL.md Step 3b-i.1 and wait for the user's choice. Must NOT silently call signoz_import_dashboard.",
+      "expected_output": "Agent calls signoz_list_dashboards (no Postgres dashboard), confirms creation, calls signoz_list_dashboard_templates and picks the postgresql/postgresql.json catalog entry. Runs the Step 3b-i.1 no-data probe via signoz_list_metrics searchText='postgresql'; the probe returns empty. CRITICAL: agent MUST warn the user that no postgres data was found and offer create-anyway-or-stop, then wait for the user's choice. Must NOT silently call signoz_import_dashboard.",
       "expectations": [
         "Agent calls signoz_list_dashboard_templates and picks the postgresql template",
         "Agent runs a no-data probe via signoz_list_metrics with a postgresql-related searchText",
@@ -32,10 +32,10 @@
       "id": 2,
       "eval_name": "broad-request-apm-category",
       "prompt": "I need an APM dashboard - what do you have?",
-      "expected_output": "Agent recognises the request is broad and exploratory. Paginates signoz_list_dashboards (no existing APM dashboard). Calls signoz_list_dashboard_templates with category='Apm' to enumerate APM templates, presents the narrowed list to the user, and asks them to pick before calling signoz_import_dashboard. Must NOT pick a template silently when the request is ambiguous.",
+      "expected_output": "Agent recognises the request is broad and exploratory. Calls signoz_list_dashboards (no existing APM dashboard). Calls signoz_list_dashboard_templates (no arguments needed — full catalog returns in one call), reads the catalog in-context, filters to APM entries, presents the narrowed list to the user, and asks them to pick before calling signoz_import_dashboard. Must NOT pick a template silently when the request is ambiguous.",
       "expectations": [
-        "Agent calls signoz_list_dashboard_templates with a category filter (e.g. category='Apm')",
-        "Agent presents multiple template options to the user and asks them to choose",
+        "Agent calls signoz_list_dashboard_templates and reads the catalog",
+        "Agent presents multiple APM template options to the user and asks them to choose",
         "Agent does NOT silently call signoz_import_dashboard without user selection"
       ],
       "files": []
@@ -84,9 +84,9 @@
       "id": 6,
       "eval_name": "custom-build-scylladb-no-near-template-shortcut",
       "prompt": "I need a dashboard for our ScyllaDB cluster — show me read/write latency, pending compactions, and storage load per node.",
-      "expected_output": "ScyllaDB has NO catalog template (the catalog ships templates for couchdb, mongodb, clickhouse, and a JMX/Cassandra template, but Scylla is a distinct product with its own Prometheus exporter and metric names). Agent paginates signoz_list_dashboards (no Scylla dashboard). Calls signoz_list_dashboard_templates with searchContext='scylladb' and finds no match. CRITICAL: agent must NOT shortcut by importing a near-neighbor template (jmx/cassandra.json, couchdb, mongodb) just because Scylla is Cassandra-compatible — must fall through to custom build. Calls signoz_list_metrics with searchText='scylla' as a no-data probe; if empty (likely on this instance), agent must surface the no-data warning from Step 3b-ii.2 and ask the user whether to proceed before building. If the user says proceed, agent uses signoz_get_field_keys with fieldContext=resource and signoz_get_field_values to surface per-node attributes (host.name, k8s.cluster.name where present). Reads signoz://dashboard/* MCP resources. Builds custom JSON with sections (Overview, Latency, Compaction, Storage), groupBy host.name on per-node panels, OTel attribute names. Emits JSON preview + summary BEFORE signoz_create_dashboard.",
+      "expected_output": "ScyllaDB has NO catalog template (the catalog ships templates for couchdb, mongodb, clickhouse, and a JMX/Cassandra template, but Scylla is a distinct product with its own Prometheus exporter and metric names). Agent calls signoz_list_dashboards (no Scylla dashboard). Calls signoz_list_dashboard_templates, reads the catalog in-context, finds no scylla match. CRITICAL: agent must NOT shortcut by importing a near-neighbor template (jmx/cassandra.json, couchdb, mongodb) just because Scylla is Cassandra-compatible — must fall through to custom build. Calls signoz_list_metrics with searchText='scylla' as a no-data probe; if empty (likely on this instance), agent must surface the no-data warning from Step 3b-ii.2 and ask the user whether to proceed before building. If the user says proceed, agent uses signoz_get_field_keys with fieldContext=resource and signoz_get_field_values to surface per-node attributes (host.name, k8s.cluster.name where present). Reads signoz://dashboard/* MCP resources. Builds custom JSON with sections (Overview, Latency, Compaction, Storage), groupBy host.name on per-node panels, OTel attribute names. Emits JSON preview + summary BEFORE signoz_create_dashboard.",
       "expectations": [
-        "Agent calls signoz_list_dashboard_templates with a scylla-related searchContext and finds no matching template",
+        "Agent calls signoz_list_dashboard_templates, reads the catalog, and finds no matching scylla template",
         "Agent does NOT call signoz_import_dashboard with a near-neighbor template (jmx/cassandra, couchdb, mongodb) as a shortcut",
         "Agent calls signoz_list_metrics with a scylla-related searchText as part of the no-data probe",
         "When the metric search returns empty, agent surfaces a no-data warning and waits for user confirmation before signoz_create_dashboard",
@@ -146,10 +146,47 @@
       "files": []
     },
     {
+      "id": 11,
+      "eval_name": "duplicate-modify-hands-off",
+      "prompt": "I want to add a slow-query panel to my existing PostgreSQL dashboard.",
+      "expected_output": "Agent calls signoz_list_dashboards, finds the existing PostgreSQL dashboard, and presents the modify/create/stop options. When the user picks (a) modify, agent must hand off to signoz-modifying-dashboards with the dashboard's UUID and the user's intent — must NOT call signoz_get_dashboard or signoz_update_dashboard from this skill. The skill's scope-boundary guardrail forbids inline modification.",
+      "expectations": [
+        "Agent calls signoz_list_dashboards and surfaces the existing PostgreSQL dashboard",
+        "Agent presents modify / create new / stop options to the user",
+        "When the user picks modify, agent hands off to signoz-modifying-dashboards (does NOT call signoz_update_dashboard or signoz_get_dashboard from this skill)"
+      ],
+      "files": []
+    },
+    {
+      "id": 12,
+      "eval_name": "shape-check-no-stringify",
+      "prompt": "Create a dashboard with one timeseries panel showing service request rate for the checkout service. Walk me through the create call.",
+      "expected_output": "Agent walks the standard custom-build path: list_dashboards, list_dashboard_templates (no exact 'request rate one panel' template), discovery via list_metrics + get_field_keys, reads dashboard MCP resources. Builds the JSON. CRITICAL: when emitting the preview and calling signoz_create_dashboard, the payload's layout, widgets, and variables fields must be passed as native JSON arrays/objects — NOT as JSON.stringify'd strings. Required top-level fields are title, layout (array of {x,y,w,h,i}), widgets (array). Each widget must include id, panelTypes, title, query (with builder/promql/clickhouse_sql sub-keys), selectedLogFields, selectedTracesFields, thresholds, contextLinks. Agent must NOT wrap any of these in a JSON string.",
+      "expectations": [
+        "Agent emits a JSON preview where layout is an array of objects (not a string)",
+        "Agent emits a JSON preview where widgets is an array of objects (not a string)",
+        "Each widget in the preview includes id, panelTypes, title, query, selectedLogFields, selectedTracesFields, thresholds, and contextLinks",
+        "The widget's query object includes queryType, builder, promql, and clickhouse_sql sub-keys (with promql and clickhouse_sql passed as empty arrays for builder-mode widgets)"
+      ],
+      "files": []
+    },
+    {
+      "id": 13,
+      "eval_name": "import-failure-falls-back-to-custom",
+      "prompt": "Create a dashboard for our Redis cluster.",
+      "expected_output": "Agent runs duplicate check (no existing dashboard), confirms creation, calls signoz_list_dashboard_templates and picks the Redis catalog entry, runs the no-data probe (data flowing). Calls signoz_import_dashboard. Simulated failure: signoz_import_dashboard returns an error (e.g. catalog path not found, server-side validation failure). CRITICAL: agent must NOT silently retry or claim success — must surface the import error to the user and either (a) ask whether to fall through to a custom build using the same template's signals, or (b) stop. Must NOT skip directly to signoz_create_dashboard with a fabricated payload without telling the user the import failed.",
+      "expectations": [
+        "Agent calls signoz_import_dashboard with the Redis template path",
+        "On import failure, agent surfaces the error to the user and does NOT silently claim success",
+        "Agent either offers a custom-build fallback OR stops — does not silently call signoz_create_dashboard with a guessed payload"
+      ],
+      "files": []
+    },
+    {
       "id": 10,
       "eval_name": "custom-build-multi-service-user-journey",
       "prompt": "Create a user-journey dashboard for our OpenTelemetry demo checkout flow — I want per-hop latency and error rate across frontend, cartservice, checkoutservice, paymentservice, and shippingservice, so I can see where transactions slow down or fail. Discover the exact service names from the instance rather than hard-coding them.",
-      "expected_output": "Multi-service journey dashboard, no catalog template (apm covers single-service). Agent paginates signoz_list_dashboards (none). signoz_list_dashboard_templates with searchContext='user journey' / 'checkout' finds no match. Falls through to custom build. Calls signoz_get_field_keys with signal=traces fieldContext=resource to confirm service.name; signoz_get_field_values for service.name (or signoz_list_services) to verify the named services exist on the instance — the actual names are 'frontend', 'cartservice', 'checkoutservice', 'paymentservice', 'shippingservice' (plus others). Reads signoz://traces/query-builder-guide and signoz://dashboard/* resources. Builds JSON with: filter service.name IN (the discovered service names); per-service latency panels (p50/p95/p99) with groupBy=service.name (resource attr); per-service error-rate panels using A*100/B formula (errors / total); a request-rate panel grouped by service.name. Variables include service.name (multi-select pre-populated) and deployment.environment.name. groupBy uses 'service.name' with type='resource', not bare 'service'. Emits JSON preview + summary before signoz_create_dashboard. Performs shape check.",
+      "expected_output": "Multi-service journey dashboard, no catalog template (apm covers single-service). Agent calls signoz_list_dashboards (none). signoz_list_dashboard_templates returns the catalog; agent reads it in-context and finds no user-journey match. Falls through to custom build. Calls signoz_get_field_keys with signal=traces fieldContext=resource to confirm service.name; signoz_get_field_values for service.name (or signoz_list_services) to verify the named services exist on the instance — the actual names are 'frontend', 'cartservice', 'checkoutservice', 'paymentservice', 'shippingservice' (plus others). Reads signoz://traces/query-builder-guide and signoz://dashboard/* resources. Builds JSON with: filter service.name IN (the discovered service names); per-service latency panels (p50/p95/p99) with groupBy=service.name (resource attr); per-service error-rate panels using A*100/B formula (errors / total); a request-rate panel grouped by service.name. Variables include service.name (multi-select pre-populated) and deployment.environment.name. groupBy uses 'service.name' with type='resource', not bare 'service'. Emits JSON preview + summary before signoz_create_dashboard. Performs shape check.",
       "expectations": [
         "Agent calls signoz_list_dashboard_templates and finds no matching user-journey template before custom build",
         "Agent calls signoz_list_services or signoz_get_field_values for service.name (signal=traces) to verify which services actually exist on the instance before authoring",
