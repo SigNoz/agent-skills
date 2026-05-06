@@ -303,6 +303,19 @@ Follow the v5 schema as documented in the resources above. Use OTel
 semantic attribute names (not shorthand) in filters, groupBy, and
 variables. Apply the defaults below unless the user specified otherwise.
 
+**Prototype non-trivial panel queries first.** If a panel needs a
+non-obvious filter, aggregation, groupBy, or formula, delegate the
+query design to `signoz-generating-queries` before authoring the
+widget JSON. That skill picks the signal, discovers field names against
+live data, chooses the right filter operator, runs the query, and
+returns a shape you can lift directly into the panel's `queryData`. The
+reason: panel JSON is awkward to debug after save — every fix is a
+`get → mutate → update` round-trip, and a wrong builder query only
+surfaces as an empty panel after `signoz_create_dashboard`. Validating
+once ad-hoc is much cheaper than editing the dashboard afterwards. Skip
+the prototype only when the query is trivially obvious (e.g. a single
+gauge metric with no groupBy and no filter beyond the resource scope).
+
 **Defaults the skill applies (and surfaces in the preview):**
 
 | Field | Default | When to override |
