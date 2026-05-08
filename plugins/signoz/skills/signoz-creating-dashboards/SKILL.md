@@ -180,7 +180,7 @@ stated technology. Pick up to ~5 representative signals and check them
   prefix (e.g. `searchText="postgresql"`). Empty result → metric family
   is not being ingested. *Early out:* if this returns empty, declare
   "None present" and skip the rest of the metric probes — they will all
-  return zero. Note: `signoz_list_metrics` has no `timeRange` parameter;
+  return zero. Note: `signoz:signoz_list_metrics` has no `timeRange` parameter;
   pass `start`/`end` (unix-ms strings) only if you need a window other
   than the server default.
 - **Trace-based templates** (APM-style): call
@@ -266,7 +266,7 @@ data:
 1. **Metrics** — call `signoz:signoz_list_metrics` with `searchText`
    tied to the technology (e.g. `searchText="postgresql"`) to get the
    *exact* OTel metric names. Catalog presence ≠ data flowing — for
-   any metric you intend to use, follow up with `signoz_query_metrics`
+   any metric you intend to use, follow up with `signoz:signoz_query_metrics`
    on a representative window to confirm it actually has datapoints.
 2. **Resource attributes** — call `signoz:signoz_get_field_keys` with
    `fieldContext=resource` for the relevant signal to enumerate
@@ -331,7 +331,7 @@ query design to `signoz-generating-queries` before authoring the
 widget JSON, then lift the returned shape into `queryData`.
 Why: panel JSON is awkward to debug after save (every fix is a
 `get → mutate → update` round-trip), and a wrong builder query only
-surfaces as an empty panel after `signoz_create_dashboard`. Skip the
+surfaces as an empty panel after `signoz:signoz_create_dashboard`. Skip the
 prototype only when the query is trivially obvious (e.g. a single
 gauge metric with no groupBy and no filter beyond the resource scope).
 
@@ -345,7 +345,7 @@ gauge metric with no groupBy and no filter beyond the resource scope).
 | Section structure (infra/runtime) | Overview / Saturation / Errors / Latency | domain-specific |
 | Headline panels (services) | request rate, error rate, p50/p95/p99 latency, throughput | omit those that don't apply |
 | Headline panels (infra) | resource utilization (CPU, mem), saturation, error/restart counts, throughput | tailor to the technology |
-| Variables (services) | `service.name`, `deployment.environment` (or `deployment.environment.name` — verify which exists via `signoz_get_field_keys`) | add `k8s.cluster.name` / `k8s.namespace.name` when k8s-flavored |
+| Variables (services) | `service.name`, `deployment.environment` (or `deployment.environment.name` — verify which exists via `signoz:signoz_get_field_keys`) | add `k8s.cluster.name` / `k8s.namespace.name` when k8s-flavored |
 | Variables (k8s/infra) | `k8s.cluster.name`, `k8s.namespace.name` (or `host.name` for hostmetrics) | drop `service.name` — it is rarely populated on infra signals |
 | Layout | 2-column grid (`w: 6`), 12 columns wide | full-width (`w: 12`) for tables and time-series with many series |
 | GroupBy on per-service panels | `service.name` resource attribute | drop when filtering to a single service |
@@ -363,7 +363,7 @@ required fields, panel-type-specific shapes, the canonical
 errors. Re-skim it before serialising any custom widget JSON.
 
 One rule `widgets-examples` does not call out, but
-`signoz_create_dashboard` enforces: **no `JSON.stringify` on
+`signoz:signoz_create_dashboard` enforces: **no `JSON.stringify` on
 arrays/objects.** `layout`, `widgets`, `tags`, and `variables` are
 native JSON — stringifying them produces errors like
 `cannot unmarshal string into ... layout of type []LayoutItem`.
@@ -430,7 +430,7 @@ native JSON — stringifying them produces errors like
 - **OTel attribute names only.** `service.name` not `service`,
   `host.name` not `host`. Wrong names produce empty panels. Verify the
   exact key (`deployment.environment` vs `deployment.environment.name`,
-  for instance) against `signoz_get_field_keys` rather than guessing —
+  for instance) against `signoz:signoz_get_field_keys` rather than guessing —
   installs running classic OTel semconv emit the no-`.name` form.
 - **No metric guessing.** For custom builds, verify metric names with
   `signoz:signoz_list_metrics` before authoring. Wrong names produce
@@ -496,7 +496,7 @@ dashboard found)
 asks the user (a) modify / (b) create new / (c) stop. If user picks
 (b), follows the PostgreSQL flow above against the `redis/redis.json`
 template. If (a), hands off to `signoz-modifying-dashboards` with the
-dashboard's UUID and the user's intent (no `signoz_get_dashboard` call
+dashboard's UUID and the user's intent (no `signoz:signoz_get_dashboard` call
 from this skill).
 
 ---
