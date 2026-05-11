@@ -122,6 +122,17 @@ Merge the planned changes into the full dashboard JSON from Step 2.
      MCP resource for the v5 builder query format. Use the signal-specific
      resources as needed (`signoz://dashboard/promql-example`,
      `signoz://dashboard/clickhouse-*`, `signoz://traces/query-builder-guide`).
+  6. **Prototype the query first if it is non-trivial.** When the new
+     panel needs a non-obvious filter, aggregation, or groupBy, delegate
+     query design to `signoz-generating-queries` before authoring the
+     widget. That skill picks the signal, discovers field names, runs
+     the query against live data, and returns a shape you can lift
+     directly into the panel. The reason: a wrong builder query only
+     surfaces as an empty panel after `signoz_update_dashboard`, and
+     each fix is another `get → mutate → update` round-trip. Validating
+     once ad-hoc is cheaper than editing the dashboard repeatedly.
+     Skip when the query is trivially obvious (single metric, no
+     groupBy, no formula).
 
 - **Removing a panel:** Remove the widget from `widgets`, its entry from `layout`,
   and its entry from the parent row's `panelMap.widgets` (if it exists in panelMap).
@@ -131,7 +142,12 @@ Merge the planned changes into the full dashboard JSON from Step 2.
   unchanged.
 
 - **Editing a panel's query:** Replace the query object on the target widget. Keep
-  all other widget fields intact.
+  all other widget fields intact. If the user is changing *what* the panel
+  measures (not just renaming a label), prototype the new query via
+  `signoz-generating-queries` first and confirm it returns the expected
+  shape before lifting it into the widget — replacing a working query
+  with a broken one is a destructive change the user will only notice
+  after the panel goes empty.
 
 - **Changing panel type:** Update `panelTypes` and handle type-specific fields:
   - `graph` → `table`: add `columnUnits` ({}) and `columnWidths` ({}) if missing.
