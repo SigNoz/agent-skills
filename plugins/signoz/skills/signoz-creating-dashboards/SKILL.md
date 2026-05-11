@@ -525,33 +525,3 @@ from this skill).
    `signoz:signoz_create_dashboard`. Reports UUID, panels, sections,
    variables, probe summary. Offers to wire error-rate alerts via
    `signoz-creating-alerts`.
-
-## Additional resources
-
-MCP resources (canonical schema and examples — always preferred over
-any transcribed copy):
-
-- `signoz://dashboard/instructions` — dashboard structure, variables.
-- `signoz://dashboard/widgets-instructions` — 7 panel types, layout.
-- `signoz://dashboard/widgets-examples` — full widget examples with
-  every required field.
-- `signoz://dashboard/query-builder-example` — query builder syntax
-  and operators.
-- `signoz://promql/instructions` — PromQL widgets.
-- `signoz://metrics-aggregation-guide` — valid `timeAggregation` /
-  `spaceAggregation` per metric type.
-- `signoz://traces/query-builder-guide` — Query Builder for traces.
-- `signoz://dashboard/clickhouse-schema-for-{logs,metrics,traces}` and
-  `signoz://dashboard/clickhouse-{logs,metrics,traces}-example` —
-  required when authoring raw ClickHouse SQL panels.
-
-Sibling skills:
-
-- `signoz-generating-queries` — for authoring or testing queries
-  before wrapping them in dashboard panels.
-- `signoz-modifying-dashboards` — for any change to an existing
-  dashboard (including immediately after this skill creates one).
-- `signoz-writing-clickhouse-queries` — for raw ClickHouse SQL panels
-  the builder cannot express.
-- `signoz-creating-alerts` — for wiring alerts on the signals shown
-  in the dashboard.
