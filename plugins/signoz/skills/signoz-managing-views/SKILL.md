@@ -153,9 +153,13 @@ upstream). Sending a partial body wipes the unspecified fields. The flow:
 
 ### Delete a view
 
-Deletion is permanent — there is no undo, and any team member who had the
-view bookmarked will see it disappear. Treat this like dropping a row from
-a shared table:
+Deletion is destructive and immediately removes the view from the shared
+list — any team member who had the view bookmarked will see it disappear.
+Depending on the host application, the user may be offered a one-click
+restore action shortly after the delete (the SigNoz Assistant captures a
+snapshot and exposes a `restore` action), but treat that as a recovery
+affordance, not a substitute for getting the delete right. Treat this like
+dropping a row from a shared table:
 
 1. **List to locate.** Call `signoz:signoz_list_views` to find the view
    by name. If `sourcePage` is unknown, search all three signals.
