@@ -46,10 +46,10 @@
       "id": 5,
       "eval_name": "needs-input-missing-scope-custom-build",
       "prompt": "Build me a dashboard for some k8s pods.",
-      "expected_output": "Request is too vague (no cluster, namespace, or pod set). Agent must NOT proceed to signoz_create_dashboard with a guessed scope. Either emits a structured needs_input block listing 'resource_scope' as missing with candidates discovered via signoz_get_field_values, or proposes the k8s catalog template and asks the user to confirm scope before importing. Must explicitly ask the user to clarify cluster/namespace before any write tool.",
+      "expected_output": "Request is too vague (no cluster, namespace, or pod set). Agent must NOT proceed to signoz_create_dashboard with a guessed scope. Either asks the user to clarify scope (using the host's clarification mechanism) with concrete candidates discovered via signoz_get_field_values, or proposes the k8s catalog template and asks the user to confirm scope before importing. Must explicitly ask the user to clarify cluster/namespace before any write tool.",
       "expectations": [
         "Agent does NOT call signoz_create_dashboard or signoz_import_dashboard without first clarifying scope with the user",
-        "Agent either emits a needs_input block or asks a clarifying question about the cluster or namespace",
+        "Agent stops before any write and asks a clarifying question about the cluster or namespace",
         "Agent calls signoz_get_field_values or signoz_list_dashboard_templates to discover candidates before prompting"
       ],
       "files": []

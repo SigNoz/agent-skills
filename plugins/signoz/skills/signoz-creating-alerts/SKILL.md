@@ -58,21 +58,26 @@ The skill enforces a strict input contract:
 | Severity | inferred from intent | default `warning`; promote to `critical` only if user said "page", "wake up", "critical" |
 | Notification channel | yes | `signoz:signoz_list_notification_channels` + offer "create new" |
 
-If a required input is missing and cannot be discovered, emit a structured
-`needs_input` block and stop **before** calling any write tool:
+If a required input is missing and cannot be discovered, **stop before
+calling any write tool** and ask the user. The host application decides
+how the question is surfaced (a structured clarification tool, inline
+`<assistant_question>` tags, an interactive prompt, etc.) — follow the
+host's UI rendering rules.
 
-```text
-needs_input:
-  missing:
-    - resource_attribute_filter: "no service or host specified — pick one"
-  candidates:
-    service.name: ["frontend", "checkout", "payments", "inventory"]
-    host.name: ["prod-api-1", "prod-api-2", "prod-db-1"]
-```
+What to include in the question:
 
-In interactive mode, the human picks from candidates. In autonomous mode, the
-caller fills the gap from upstream context or escalates. Either way, do not
-proceed to `signoz:signoz_create_alert` with a guessed value.
+- **What is missing** — name the input concretely (e.g. "which
+  resource-attribute filter to use").
+- **Candidate lists** populated from your discovery calls — concrete
+  values per attribute the user can pick from. Example shape:
+  `service.name` → `frontend`, `checkout`, `payments`, `inventory`;
+  `host.name` → `prod-api-1`, `prod-api-2`, `prod-db-1`.
+- **Allow free-form input** so the user can name a value you didn't
+  surface.
+
+In autonomous mode (no human), escalate to the caller or fill the gap
+from upstream context. Either way, do not proceed to
+`signoz:signoz_create_alert` with a guessed value.
 
 ## Workflow
 
@@ -97,7 +102,7 @@ Map signal phrasing to alert type:
 | exception, stack trace, crash | EXCEPTIONS_BASED_ALERT | (clickhouse_sql) |
 
 If resource scope is missing, run discovery (Step 2). If still missing after
-discovery, emit `needs_input` and stop.
+discovery, stop and ask the user (see *Required inputs* above).
 
 ### Step 2: Discover resource attributes and metric names
 
@@ -114,7 +119,8 @@ candidates instead of guessing:
    search term to verify the exact OTel metric name. Wrong names create
    alerts that never fire.
 
-Surface the candidates in the `needs_input` block. Do not pick one.
+Surface the candidates in your clarification request (see *Required
+inputs* above). Do not pick one.
 
 ### Step 2.5: Probe data existence for the chosen filter (fail fast)
 
@@ -137,8 +143,9 @@ Inspect the result:
 
 - **Probe returns rows** → proceed to Step 3.
 - **Probe returns empty** → STOP. Do not build an alert config the user
-  will then be asked to throw away. Emit a `needs_input` block describing
-  what was missing and offer concrete recovery:
+  will then be asked to throw away. Stop and ask the user (see *Required
+  inputs* above), describing what was missing and offering concrete
+  recovery:
   - Service doesn't emit the metric → call
     `signoz:signoz_get_field_values signal=metrics name=service.name metricName=<metric>`
     to list the services that *do* emit it; let the user pick a different
@@ -335,8 +342,8 @@ most common silent failure after bad queries.
    - **Create new inline** — call `signoz:signoz_create_notification_channel` with
      channel parameters the user provides (name, type, type-specific config
      like Slack webhook URL or PagerDuty integration key).
-4. If neither path resolves a channel, emit
-   `needs_input: notification_channel` and stop.
+4. If neither path resolves a channel, stop and ask the user for a
+   notification channel (see *Required inputs* above).
 
 For multi-severity alerts, attach channels per threshold:
 `thresholds.spec[N].channels` is an array — typically warning → Slack only,
@@ -399,7 +406,8 @@ alert have fired a sensible number of times in the last hour?
 
 If Step 2.5 was somehow skipped (e.g. a downstream skill is invoking this
 flow mid-stream), the no-data stop rule applies here too: empty result →
-emit `needs_input` instead of saving an alert that will never fire.
+stop and ask the user (see *Required inputs* above) instead of saving an
+alert that will never fire.
 
 ### Step 7: Preview the prepared config
 
@@ -446,7 +454,7 @@ intervene before Step 8.
 ## Guardrails
 
 - **Strict inputs over guessing.** Resource attribute and channel are
-  required. If missing, emit `needs_input` and stop. Creating an alert on
+  required. If missing, stop and ask the user (see *Required inputs* above). Creating an alert on
   a guessed service is harder to undo than asking.
 - **Always paginate `signoz:signoz_list_alert_rules`.** Stopping at page 1 misses
   duplicates and produces noise.
