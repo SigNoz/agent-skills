@@ -22,7 +22,7 @@ the same flow — the human just gets a chance to intervene at the preview step.
 ## Prerequisites
 
 This skill calls SigNoz MCP server tools (`signoz:signoz_create_alert`,
-`signoz:signoz_list_alerts`, `signoz:signoz_get_field_keys`, etc.). Before running the
+`signoz:signoz_list_alert_rules`, `signoz:signoz_get_field_keys`, etc.). Before running the
 workflow, confirm the `signoz:signoz_*` tools are available. If they are not,
 the SigNoz MCP server is not installed or configured — stop and direct
 the user to set it up:
@@ -162,11 +162,14 @@ can never fire.
 
 ### Step 3: Check for duplicate alerts
 
-Call `signoz:signoz_list_alerts` and **paginate through every page** —
-`pagination.hasMore` is true until you have walked the full list. Check for
-existing alerts that match the user's intent (same signal + same scope +
-similar threshold). If a likely duplicate exists, surface it and ask whether
-to create a new one anyway, modify the existing one (out of scope here — use
+Call `signoz:signoz_list_alert_rules` and **paginate through every page** —
+`pagination.hasMore` is true until you have walked the full list. This lists
+*configured* alert rules (the durable state); do not use `signoz:signoz_list_alerts`,
+which returns currently triggered/active alert instances and will silently
+miss rules that are configured but not firing right now. Check for existing
+rules that match the user's intent (same signal + same scope + similar
+threshold). If a likely duplicate exists, surface it and ask whether to
+create a new one anyway, modify the existing one (out of scope here — use
 `signoz:signoz_update_alert`), or cancel.
 
 ### Step 4: Build the alert config
@@ -418,7 +421,7 @@ intervene before Step 8.
 - **Strict inputs over guessing.** Resource attribute and channel are
   required. If missing, emit `needs_input` and stop. Creating an alert on
   a guessed service is harder to undo than asking.
-- **Always paginate `signoz:signoz_list_alerts`.** Stopping at page 1 misses
+- **Always paginate `signoz:signoz_list_alert_rules`.** Stopping at page 1 misses
   duplicates and produces noise.
 - **Dry-run is mandatory.** Saving an alert whose query returns no data is
   a silent failure mode and must be prevented.
@@ -444,7 +447,7 @@ intervene before Step 8.
    thresholds 80% (warning) / 90% (critical), severity bumped to critical
    on the higher level because "page me" was used.
 2. `signoz:signoz_list_metrics searchText=cpu` → confirms `system.cpu.utilization`.
-3. `signoz:signoz_list_alerts` (paginated) → no existing CPU alert for checkout.
+3. `signoz:signoz_list_alert_rules` (paginated) → no existing CPU alert for checkout.
 4. `signoz:signoz_list_notification_channels` → presents existing channels;
    user picks `slack-infra` for warning and `pagerduty-oncall` for critical.
 5. Builds JSON: `METRIC_BASED_ALERT`, `threshold_rule`,
