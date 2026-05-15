@@ -54,7 +54,10 @@ Map the user's intent to the right signal:
 | Infrastructure metrics (CPU, memory, disk, network) | **metrics** | Always metrics for resource utilization. |
 | "How many X per Y" (count/rate grouped by dimension) | **traces** or **logs** (aggregate) | Use `signoz:signoz_aggregate_traces` or `signoz:signoz_aggregate_logs` for grouped counts. |
 
-If the signal is genuinely ambiguous, ask using `<assistant_question>`.
+If the signal is genuinely ambiguous, ask the user before proceeding. The
+host application decides how the question is surfaced (e.g. a structured
+clarification tool or an inline `<assistant_question>` tag) — follow the
+host's UI rendering rules.
 
 ### Step 2: Discover available data
 
