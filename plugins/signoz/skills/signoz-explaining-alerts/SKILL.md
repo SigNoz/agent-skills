@@ -246,14 +246,15 @@ actually in the config:
 
 ### Step 6: Offer next steps
 
-End with two or three actionable follow-ups:
-- "Want me to investigate the most recent fire?" (→ `signoz-investigating-alerts`)
-- "Want me to run the underlying query to see current values?" (→
-  `signoz-generating-queries`)
-- "Want me to adjust the threshold or add a severity level?" (→
-  `signoz:signoz_update_alert` directly — out of scope here)
-- "Want me to create a related alert for [gap noticed]?" (→
-  `signoz-creating-alerts`)
+Surface up to 3 follow-up intents based on what the explanation
+revealed — things like investigating a recent fire, running the
+underlying query to see current values, adjusting a threshold, or
+creating a related alert for a coverage gap. Use your judgment; do
+not pad to 3.
+
+Skip follow-ups entirely when the user is purely inspecting ("what
+does this alert do?") and signals no further intent. No chips beat
+wrong chips.
 
 ## Guardrails
 

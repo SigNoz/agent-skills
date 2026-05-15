@@ -120,10 +120,14 @@ adding panels for X to cover Y."
 
 ### Step 4: Offer next steps
 
-After the explanation, offer actionable follow-ups:
-- "Want me to run the queries from any specific panel to check if they're returning
-  data?"
-- "Want me to add any missing panels or thresholds?" (→ `signoz-modifying-dashboards`)
+Surface up to 3 follow-up intents based on what the explanation
+surfaced — things like running a specific panel's underlying query,
+filling a coverage gap, or wiring an alert for an actionable threshold
+the user has not yet alerted on. Use your judgment; do not pad to 3.
+
+Skip follow-ups when the user was clearly just onboarding to the
+dashboard ("what is this?") and showed no further intent. No chips
+beat wrong chips.
 
 ## Guardrails
 
