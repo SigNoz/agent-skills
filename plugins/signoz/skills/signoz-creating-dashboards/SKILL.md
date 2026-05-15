@@ -66,23 +66,27 @@ sensible defaults, but a few cannot be guessed:
 | Specific metrics / signals for custom builds | inferred | derive from technology + MCP `signoz://dashboard/*` resources; surface in preview |
 | Default time range, refresh, layout | inferred | apply defaults (see "Defaults" below) |
 
-If a required input is missing and cannot be discovered, emit a
-structured `needs_input` block and stop **before** calling any write
-tool:
+If a required input is missing and cannot be discovered, **stop before
+calling any write tool** and ask the user. The host application decides
+how the question is surfaced (a structured clarification tool, inline
+`<assistant_question>` tags, an interactive prompt, etc.) — follow the
+host's UI rendering rules.
 
-```text
-needs_input:
-  missing:
-    - resource_scope: "no service or cluster specified for the custom build"
-  candidates:
-    service.name: ["frontend", "checkout", "payments", "inventory"]
-    k8s.cluster.name: ["prod-us-east-1", "staging"]
-```
+What to include in the question:
 
-In interactive mode, the human picks. In autonomous mode, the caller
-fills the gap from upstream context or escalates. Either way, do not
-proceed to `signoz:signoz_create_dashboard` /
-`signoz:signoz_import_dashboard` with a guessed value.
+- **What is missing** — name the input concretely (e.g. "no service or
+  cluster specified for the custom build").
+- **Candidate lists** populated from your discovery calls — concrete
+  values per attribute the user can pick from. Example shape:
+  `service.name` → `frontend`, `checkout`, `payments`, `inventory`;
+  `k8s.cluster.name` → `prod-us-east-1`, `staging`.
+- **Allow free-form input** so the user can name a value you didn't
+  surface.
+
+In autonomous mode (no human), escalate to the caller or fill the gap
+from upstream context. Either way, do not proceed to
+`signoz:signoz_create_dashboard` / `signoz:signoz_import_dashboard` with
+a guessed value.
 
 ## Workflow
 
@@ -407,8 +411,9 @@ native JSON — stringifying them produces errors like
 ## Guardrails
 
 - **Strict inputs over guessing.** Resource scope is required for custom
-  builds. If missing, emit `needs_input` and stop. A guessed scope on a
-  shared dashboard is harder to clean up than asking.
+  builds. If missing, stop and ask the user (see *Required inputs*
+  above). A guessed scope on a shared dashboard is harder to clean up
+  than asking.
 - **Always paginate `signoz:signoz_list_dashboards`.** Stopping at page
   1 misses duplicates and produces clutter.
 - **Duplicate check first.** The user's only two upfront options are
