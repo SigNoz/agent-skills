@@ -253,10 +253,17 @@ Pick the most relevant candidates based on what just happened:
 
 **After list / get / find** —
 - *Drill-down*: "Open the view's underlying query" — if the user is
-  inspecting and may want to see live data.
-- *Action*: "Update this view" or "Delete this view" — only when the
-  user's question hints at a CRUD intent ("is this still useful?").
-  Skip when the user is purely inspecting.
+  inspecting and may want to see live data. This stays on the read
+  path: the chip is user-triggered and the underlying call is a query,
+  not a write.
+
+Read-only operations must stay read-only at the chip surface: do NOT
+offer Action-tagged chips ("Update this view", "Delete this view")
+after list/get/find. That contradicts the read-only stop rule in
+*Reporting back* below — light CRUD intent ("is this still useful?")
+should prompt the user to ask explicitly rather than be nudged toward
+a write by the assistant. If the user's next message names an update
+or delete, route to the corresponding flow from there.
 
 **When the user is exploring and clearly hasn't decided yet**
 ("just listing my views", "what's in here?"), skip follow-ups entirely
