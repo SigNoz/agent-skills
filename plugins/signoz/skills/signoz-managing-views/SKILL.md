@@ -217,6 +217,55 @@ After any write (create / update / delete), include in your reply:
 - For updates, what changed (one-line diff).
 - For deletes, an explicit "deleted" confirmation with the name.
 
+## Follow-up suggestions
+
+After completing a view operation, surface 1-3 follow-up intents at the
+end of your reply. The host application renders them (e.g. clickable
+chips in a sidebar UI, inline links in a CLI) — follow the host's UI
+rendering rules for the exact mechanism. Cap at 3 total to avoid
+choice-fatigue.
+
+Pick the most relevant candidates based on what just happened:
+
+**After create** —
+- *Action*: "Run the saved query now" (→ `signoz-generating-queries` with
+  the view's filter/scope).
+- *Action*: "Create an alert from this view" (→ `signoz-creating-alerts`,
+  reusing the view's query as the alert's source).
+- *Action*: "Add this query to a dashboard" (→
+  `signoz-creating-dashboards` or `signoz-modifying-dashboards`).
+- *Drill-down*: "Show the latest matching rows" (run the underlying
+  builder query once).
+
+**After update** —
+- *Action*: "Preview the updated query results" (run the new builder
+  query and show counts/sample rows).
+- *Drill-down*: "Show what changed in detail" — only if the user only
+  saw the one-line diff and may want the full before/after.
+
+**After delete** —
+- *Action*: "Recreate this view from a different filter" — if the user
+  expressed regret or asked about restore.
+- *Drill-down*: "Save a replacement view" — useful when the delete was
+  part of a "delete + recreate cleaner" workflow.
+- If the host offered a restore action (the SigNoz Assistant does), do
+  NOT duplicate it as a follow-up — it is backend-injected.
+
+**After list / get / find** —
+- *Drill-down*: "Open the view's underlying query" — if the user is
+  inspecting and may want to see live data.
+- *Action*: "Update this view" or "Delete this view" — only when the
+  user's question hints at a CRUD intent ("is this still useful?").
+  Skip when the user is purely inspecting.
+
+**When the user is exploring and clearly hasn't decided yet**
+("just listing my views", "what's in here?"), skip follow-ups entirely
+— no chips are better than wrong chips.
+
+Always describe the follow-up by *user intent*, not by tool or skill
+name. The label the user clicks should read like the user's next prompt,
+not a developer command.
+
 Read-only operations (list, get) should report concisely — name, id,
 sourcePage, filter expression, panel type — and stop. Don't narrate
 the schema back to the user.
