@@ -342,6 +342,33 @@ For multi-severity alerts, attach channels per threshold:
 `thresholds.spec[N].channels` is an array — typically warning → Slack only,
 critical → Slack + PagerDuty.
 
+#### Handling secret-bearing channel config
+
+Slack webhook URLs, PagerDuty integration keys, and similar webhook tokens
+are secrets. When the user supplies them inline, treat them as opaque
+inputs and follow these rules:
+
+- **Do not echo the secret back.** Never include the webhook URL,
+  integration key, or any password-like token in chat output, previews,
+  confirmation messages, summaries, or the `<navigation_suggestions>`
+  payload. Refer to the channel by its `name` only ("Slack channel
+  `slack-infra` created") and omit the value entirely.
+- **Do not stash secrets in clarification context.** If you need to ask the
+  user a follow-up question after they pasted a secret, do not include
+  the secret value in the clarification `message`, `discovered_context`,
+  or any other field that the host may persist for resume. Refer to it
+  symbolically (e.g. "the webhook you just provided").
+- **One-pass only.** Pass the secret directly to
+  `signoz:signoz_create_notification_channel` and do not retain it in any
+  intermediate prose. After the create call succeeds, refer to the
+  channel by name; after a failure, ask the user to re-paste rather than
+  echoing what they sent.
+- **If the user instead asks "how do I set up a Slack channel?"** — that
+  is a docs question, not a create-channel request. Answer with the docs
+  flow (the SigNoz UI's Notification Channels page) and do not solicit
+  the secret in chat at all. Prefer the UI path when the user seems
+  uncertain about exposing the token.
+
 ### Step 6: Validate the threshold (would-have-fired count)
 
 Step 2.5 already confirmed the underlying data exists. Step 6 is about
@@ -435,6 +462,13 @@ intervene before Step 8.
   is rejected.
 - **Channels must exist.** Use names from `signoz:signoz_list_notification_channels`
   exactly, or create the channel inline first.
+- **Never echo channel secrets.** Slack webhook URLs, PagerDuty integration
+  keys, and similar webhook tokens are secrets. Pass them to
+  `signoz:signoz_create_notification_channel` once and never repeat the
+  value in chat output, previews, confirmations, summaries, clarification
+  payloads, or navigation suggestions. Refer to the channel by name only
+  after creation; ask the user to re-paste on failure rather than
+  reproducing what they sent.
 - **Scope boundary.** This skill only creates new rules. Modifications use
   `signoz:signoz_update_alert` directly.
 
