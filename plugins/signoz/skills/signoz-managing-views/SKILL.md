@@ -219,59 +219,29 @@ After any write (create / update / delete), include in your reply:
 
 ## Follow-up suggestions
 
-After completing a view operation, surface 1-3 follow-up intents at the
-end of your reply. The host application renders them (e.g. clickable
-chips in a sidebar UI, inline links in a CLI) — follow the host's UI
-rendering rules for the exact mechanism. Cap at 3 total to avoid
-choice-fatigue.
+After a view operation, you may surface up to 3 follow-up intents that
+match what just happened. The host application renders them — follow
+the host's UI rendering rules for the exact mechanism. Use your
+judgment about what's natural for the user's context; do not pad to 3.
 
-Pick the most relevant candidates based on what just happened:
+Two anti-rules that override your judgment:
 
-**After create** —
-- *Action*: "Run the saved query now" (→ `signoz-generating-queries` with
-  the view's filter/scope).
-- *Action*: "Create an alert from this view" (→ `signoz-creating-alerts`,
-  reusing the view's query as the alert's source).
-- *Action*: "Add this query to a dashboard" (→
-  `signoz-creating-dashboards` or `signoz-modifying-dashboards`).
-- *Drill-down*: "Show the latest matching rows" (run the underlying
-  builder query once).
+- **Read-only stays read-only at the chip surface.** After list / get /
+  find, do not offer chips that propose a write (e.g. "Update this
+  view", "Delete this view"). That contradicts the read-only stop rule
+  in *Reporting back* below. Chips that re-run the view's underlying
+  query are fine — those stay on the read path. If the user's next
+  message names an update or delete, route from there.
+- **Do not duplicate host-injected actions.** If the host offers a
+  restore action after a delete (the SigNoz Assistant does), do not
+  also surface restore as a follow-up — it would render twice.
 
-**After update** —
-- *Action*: "Preview the updated query results" (run the new builder
-  query and show counts/sample rows).
-- *Drill-down*: "Show what changed in detail" — only if the user only
-  saw the one-line diff and may want the full before/after.
+When the user is purely exploring ("just listing my views", "what's
+in here?") and signals no further intent, skip follow-ups entirely.
+No chips beat wrong chips.
 
-**After delete** —
-- *Action*: "Recreate this view from a different filter" — if the user
-  expressed regret or asked about restore.
-- *Drill-down*: "Save a replacement view" — useful when the delete was
-  part of a "delete + recreate cleaner" workflow.
-- If the host offered a restore action (the SigNoz Assistant does), do
-  NOT duplicate it as a follow-up — it is backend-injected.
-
-**After list / get / find** —
-- *Drill-down*: "Open the view's underlying query" — if the user is
-  inspecting and may want to see live data. This stays on the read
-  path: the chip is user-triggered and the underlying call is a query,
-  not a write.
-
-Read-only operations must stay read-only at the chip surface: do NOT
-offer Action-tagged chips ("Update this view", "Delete this view")
-after list/get/find. That contradicts the read-only stop rule in
-*Reporting back* below — light CRUD intent ("is this still useful?")
-should prompt the user to ask explicitly rather than be nudged toward
-a write by the assistant. If the user's next message names an update
-or delete, route to the corresponding flow from there.
-
-**When the user is exploring and clearly hasn't decided yet**
-("just listing my views", "what's in here?"), skip follow-ups entirely
-— no chips are better than wrong chips.
-
-Always describe the follow-up by *user intent*, not by tool or skill
-name. The label the user clicks should read like the user's next prompt,
-not a developer command.
+Describe follow-ups by *user intent*, not by tool or skill name. The
+label the user clicks should read like the user's next prompt.
 
 Read-only operations (list, get) should report concisely — name, id,
 sourcePage, filter expression, panel type — and stop. Don't narrate
