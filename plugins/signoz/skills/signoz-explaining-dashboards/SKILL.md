@@ -120,23 +120,14 @@ adding panels for X to cover Y."
 
 ### Step 4: Offer next steps
 
-Surface up to 3 follow-up intents after the explanation. Pick the most
-relevant from this menu:
-
-- *Drill-down*: "Run the queries from a specific panel to check if they
-  are returning data" (→ `signoz-generating-queries` with the panel's
-  builder query). Pick when the explanation revealed a panel the user
-  is most likely to act on.
-- *Action*: "Add any missing panels or thresholds" (→
-  `signoz-modifying-dashboards`). Pick when the explanation flagged a
-  coverage gap.
-- *Action*: "Wire alerts for any of these signals" (→
-  `signoz-creating-alerts`). Pick when the dashboard surfaces an
-  actionable threshold the user has not yet alerted on.
+Surface up to 3 follow-up intents based on what the explanation
+surfaced — things like running a specific panel's underlying query,
+filling a coverage gap, or wiring an alert for an actionable threshold
+the user has not yet alerted on. Use your judgment; do not pad to 3.
 
 Skip follow-ups when the user was clearly just onboarding to the
-dashboard ("what is this?") and showed no further intent. No chips beat
-wrong chips.
+dashboard ("what is this?") and showed no further intent. No chips
+beat wrong chips.
 
 ## Guardrails
 

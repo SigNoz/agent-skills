@@ -246,25 +246,15 @@ actually in the config:
 
 ### Step 6: Offer next steps
 
-Surface up to 3 follow-up intents. Pick the most relevant from this menu
-based on what the explanation just revealed — do not include all four:
+Surface up to 3 follow-up intents based on what the explanation
+revealed — things like investigating a recent fire, running the
+underlying query to see current values, adjusting a threshold, or
+creating a related alert for a coverage gap. Use your judgment; do
+not pad to 3.
 
-- *Action*: "Investigate the most recent fire" (→
-  `signoz-investigating-alerts`). Pick when there is a recent fire and
-  the user did not already ask about it.
-- *Drill-down*: "Run the underlying query to see current values" (→
-  `signoz-generating-queries`). Pick when the user seems uncertain
-  whether the alert's threshold is well-calibrated.
-- *Action*: "Adjust the threshold or add a severity level" (→
-  `signoz:signoz_update_alert` directly — out of scope here). Pick when
-  the explanation surfaced a calibration concern (e.g. evaluation
-  window vs. business cycle mismatch).
-- *Action*: "Create a related alert for [gap noticed]" (→
-  `signoz-creating-alerts`). Pick when the explanation revealed a
-  missing-coverage gap, not just answered the user's question.
-
-Skip follow-ups entirely when the user is purely inspecting ("what does
-this alert do?") and signals no further intent. No chips beat wrong chips.
+Skip follow-ups entirely when the user is purely inspecting ("what
+does this alert do?") and signals no further intent. No chips beat
+wrong chips.
 
 ## Guardrails
 

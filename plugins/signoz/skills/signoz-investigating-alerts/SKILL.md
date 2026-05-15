@@ -255,12 +255,10 @@ handles so the user can act immediately:
 Do not pad with generic advice ("verify connectivity", "check
 dashboards") — that's noise during an active incident.
 
-**Mirroring as navigation chips.** Pick the top 1-3 of these "Suggested
-next steps" and mirror them as host follow-up intents — the most
-actionable, alert-scoped ones (e.g. "Open trace 7af3a09b…", "Tune the
-threshold", "Page the owning team"). Keep the rest in the report prose
-so the user has the full picture. Do not cap the prose list, only the
-chips.
+**Mirroring as navigation chips.** Mirror up to 3 of these "Suggested
+next steps" as host follow-up intents — the most actionable,
+alert-scoped ones. Keep the rest in the report prose so the user has
+the full picture. The chip surface is capped; the prose is not.
 
 ## Out of scope (v1)
 
