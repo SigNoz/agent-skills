@@ -217,6 +217,32 @@ After any write (create / update / delete), include in your reply:
 - For updates, what changed (one-line diff).
 - For deletes, an explicit "deleted" confirmation with the name.
 
+## Follow-up suggestions
+
+After a view operation, you may surface up to 3 follow-up intents that
+match what just happened. The host application renders them — follow
+the host's UI rendering rules for the exact mechanism. Use your
+judgment about what's natural for the user's context; do not pad to 3.
+
+Two anti-rules that override your judgment:
+
+- **Read-only stays read-only at the chip surface.** After list / get /
+  find, do not offer chips that propose a write (e.g. "Update this
+  view", "Delete this view"). That contradicts the read-only stop rule
+  in *Reporting back* below. Chips that re-run the view's underlying
+  query are fine — those stay on the read path. If the user's next
+  message names an update or delete, route from there.
+- **Do not duplicate host-injected actions.** If the host offers a
+  restore action after a delete (the SigNoz Assistant does), do not
+  also surface restore as a follow-up — it would render twice.
+
+When the user is purely exploring ("just listing my views", "what's
+in here?") and signals no further intent, skip follow-ups entirely.
+No chips beat wrong chips.
+
+Describe follow-ups by *user intent*, not by tool or skill name. The
+label the user clicks should read like the user's next prompt.
+
 Read-only operations (list, get) should report concisely — name, id,
 sourcePage, filter expression, panel type — and stop. Don't narrate
 the schema back to the user.
