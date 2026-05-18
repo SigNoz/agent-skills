@@ -1,12 +1,12 @@
 # SigNoz Agent Skills
 
-Official SigNoz skills and MCP configuration for Claude Code, Codex, Cursor, and the [skills.sh](https://skills.sh) ecosystem.
+Official SigNoz skills and MCP configuration for Claude Code, Codex, Cursor, and the [skills.sh](https://skills.sh) ecosystem. The MCP setup skill also includes client-specific recipes for VS Code/GitHub Copilot, Claude Desktop, Gemini CLI, Windsurf, Zed, Antigravity, OpenCode, and generic HTTP MCP clients.
 
 ## Skills
 
 | Skill | Description |
 |-------|-------------|
-| [signoz-mcp-setup](plugins/signoz/skills/signoz-mcp-setup/SKILL.md) | Initialize or repair the SigNoz MCP server configuration for Claude Code, Codex, or Cursor. |
+| [signoz-mcp-setup](plugins/signoz/skills/signoz-mcp-setup/SKILL.md) | Initialize or repair the SigNoz MCP server configuration for Claude Code, Codex, Cursor, VS Code/GitHub Copilot, Claude Desktop, Gemini CLI, Windsurf, Zed, Antigravity, OpenCode, or another MCP client. |
 | [signoz-creating-alerts](plugins/signoz/skills/signoz-creating-alerts/SKILL.md) | Create SigNoz alert rules for threshold breaches, error rates, latency, anomaly detection, and absent-data conditions across metrics, logs, and traces. |
 | [signoz-explaining-alerts](plugins/signoz/skills/signoz-explaining-alerts/SKILL.md) | Explain and interpret an existing SigNoz alert rule's configuration, evaluation behavior, notification routing, and recent fire frequency. |
 | [signoz-investigating-alerts](plugins/signoz/skills/signoz-investigating-alerts/SKILL.md) | Diagnose why a SigNoz alert fired by correlating its signal with neighbor metrics, traces, and logs around the fire window, and ranking likely causes. |
@@ -72,6 +72,18 @@ self-hosted HTTP MCP endpoint, run `/signoz-mcp-setup` in an agent chat
 window. If Cursor keeps using the install-time URL, clear the SigNoz MCP URL
 plugin setting and reload.
 
+### Other MCP Clients
+
+The setup skill includes native config recipes for VS Code/GitHub Copilot,
+Claude Desktop, Gemini CLI, Windsurf, Zed, Antigravity, OpenCode, and generic
+HTTP MCP clients. These clients do not all consume this plugin automatically;
+install or copy the skill where your client supports skills, or use the
+client-specific setup snippets in the skill as a reference.
+
+For SigNoz Cloud, prefer the hosted MCP URL and client OAuth flow. For
+self-hosted SigNoz, the skill supports HTTP `/mcp` endpoints and stdio
+local-binary recipes. It avoids writing API keys into tracked project files.
+
 ### skills.sh
 
 ```sh
@@ -96,6 +108,7 @@ npx skills add SigNoz/agent-skills --skill signoz-writing-clickhouse-queries    
 │   ├── hooks/                              # Auto-allow hooks
 │   └── skills/
 │       ├── signoz-mcp-setup/
+│       │   └── references/
 │       ├── signoz-creating-alerts/
 │       ├── signoz-explaining-alerts/
 │       ├── signoz-investigating-alerts/

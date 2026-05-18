@@ -4,6 +4,17 @@ Use this reference when checking the SigNoz MCP server state, locating plugin
 registration files, editing the endpoint default, or mapping user input to a
 hosted SigNoz Cloud MCP URL.
 
+For native client config shapes such as VS Code, Gemini CLI, Windsurf, Zed,
+Antigravity, or OpenCode, read
+[client-configs.md](client-configs.md) after resolving the endpoint.
+
+## Contents
+
+- [State Check](#state-check)
+- [Registration Files](#registration-files)
+- [Editing Rule](#editing-rule)
+- [Endpoint Mapping](#endpoint-mapping)
+
 ## State Check
 
 Silently determine `signoz-server-state`:
@@ -22,7 +33,7 @@ only the plain outcome: working, not set up, or configured but not connected.
 
 ## Registration Files
 
-The SigNoz plugin may ship both registration files in the plugin root:
+The SigNoz plugin may ship both bundled registration files in the plugin root:
 
 - `.mcp.json` for Claude Code and Codex
 - `mcp.json` for Cursor
@@ -57,10 +68,9 @@ If a file contains the legacy no-default form `${SIGNOZ_MCP_URL}`, replace it
 with `${SIGNOZ_MCP_URL:-<resolved-mcp-url>}`.
 
 If the user's client has an explicit plugin setting or environment override
-for the endpoint, that value can override this default. If the MCP
-MCP setup skill updates the default but the client still connects to the
-old endpoint, tell the user to clear the explicit plugin setting and reload
-the client.
+for the endpoint, that value can override this default. If the MCP setup skill
+updates the default but the client still connects to the old endpoint, tell
+the user to clear the explicit plugin setting and reload the client.
 
 ## Endpoint Mapping
 
@@ -97,7 +107,9 @@ Mapping rules:
   `https://mcp.<region>.signoz.cloud/mcp`. New SigNoz Cloud regions may exist
   before this skill is updated.
 
-Do not ask for API keys in this MCP setup skill. SigNoz Cloud authentication
-happens after endpoint setup through the MCP client's OAuth flow. Self-hosted
-HTTP mode expects the user to run the MCP server with its SigNoz URL and API
-key configured on that server process.
+Do not ask for API keys for SigNoz Cloud endpoint setup. SigNoz Cloud
+authentication happens after endpoint setup through the MCP client's OAuth
+flow. Self-hosted HTTP mode expects the user to run the MCP server with its
+SigNoz URL and API key configured on that server process. For self-hosted
+stdio/local-binary mode, read `client-configs.md` and collect secrets only when
+the user explicitly asks you to configure that mode.
