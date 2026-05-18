@@ -24,10 +24,9 @@ the same flow — the human just gets a chance to intervene at the preview step.
 This skill calls SigNoz MCP server tools (`signoz:signoz_create_alert`,
 `signoz:signoz_list_alert_rules`, `signoz:signoz_get_field_keys`, etc.). Before running the
 workflow, confirm the `signoz:signoz_*` tools are available. If they are not,
-the SigNoz MCP server is not installed or configured — stop and direct
-the user to set it up:
-<https://signoz.io/docs/ai/signoz-mcp-server/>. Do not try to fall back
-to raw HTTP calls or fabricate alert configs without the MCP tools.
+run `signoz-mcp-setup` first to initialize or repair the MCP connection. Do not
+try to fall back to raw HTTP calls or fabricate alert configs without the MCP
+tools.
 
 ## When to use
 

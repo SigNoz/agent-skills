@@ -28,10 +28,10 @@ This skill calls SigNoz MCP server tools heavily (`signoz:signoz_get_alert`,
 `signoz:signoz_query_metrics`, `signoz:signoz_search_traces`, `signoz:signoz_search_logs`,
 `signoz:signoz_get_trace_details`, etc.). Before running the workflow,
 confirm the `signoz:signoz_*` tools are available. If they are not, the
-SigNoz MCP server is not installed or configured — stop and direct
-the user to set it up: <https://signoz.io/docs/ai/signoz-mcp-server/>.
-The investigation depends on correlating multiple MCP queries; without
-the server there is no way to ground the analysis.
+SigNoz MCP server is not installed or configured — run `signoz-mcp-setup` first
+to initialize or repair the MCP connection. The investigation depends on
+correlating multiple MCP queries; without the server there is no way to ground
+the analysis.
 
 ## When to use
 

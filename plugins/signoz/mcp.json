@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "signoz": {
+      "url": "https://not-setup/mcp"
+    }
+  }
+}

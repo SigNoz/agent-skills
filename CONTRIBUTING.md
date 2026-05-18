@@ -24,7 +24,7 @@ npx skills add https://github.com/anthropics/skills --skill skill-creator
 
 ### Conventions
 
-- **Skill naming.** Gerund form (verb-ing + plural noun) prefixed with `signoz-`, lowercase with hyphens — e.g. `signoz-creating-alerts`, `signoz-modifying-dashboards`, `signoz-investigating-alerts`. Both Anthropic's best-practices doc and the SigNoz Skills/MCP spec recommend this form. The `name` in SKILL.md frontmatter must exactly match the directory name.
+- **Skill naming.** Domain action skills use gerund form prefixed with `signoz-`, lowercase with hyphens — e.g. `signoz-creating-alerts`, `signoz-modifying-dashboards`, `signoz-investigating-alerts`. Setup/maintenance skills may use precise object-action names such as `signoz-mcp-setup`; avoid broad command names like `signoz-setup`. Both Anthropic's best-practices doc and the SigNoz Skills/MCP spec recommend gerund form for action skills. The `name` in SKILL.md frontmatter must exactly match the directory name.
 - **Descriptions.** Imperative, pushy, and third-person. State both what the skill does and when to trigger it, with explicit user-phrase examples and an "even if they don't say X explicitly" clause. Aim well under the 1024-char limit.
 - **"Do NOT use" lists.** Only mention sibling skills that are genuinely similar or competing — i.e. ones a user could plausibly invoke instead. Don't enumerate every other skill in the plugin; rotting cross-references erode trust faster than any clarity they add.
 - **MCP tool references.** Use the fully qualified `signoz:<tool_name>` form (e.g. `` `signoz:signoz_get_alert` ``) in skill bodies. Bare names break when multiple MCP servers are loaded.
