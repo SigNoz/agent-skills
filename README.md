@@ -29,6 +29,8 @@ plus an MCP setup skill so users do not have to hand-edit MCP configuration.
 After installing, run `signoz-mcp-setup` once if the MCP server is not already
 connected. It accepts a SigNoz Cloud region such as `us`, `us2`, `eu`, `eu2`,
 `in`, or `in2`, any hosted MCP URL, or a self-hosted HTTP `/mcp` endpoint.
+Plugin updates can reset bundled MCP registration files to the placeholder; if
+that happens, rerun `signoz-mcp-setup`.
 
 See the full setup guide in the [SigNoz MCP Server docs](https://signoz.io/docs/ai/signoz-mcp-server/).
 

@@ -12,7 +12,7 @@ Antigravity, or OpenCode, read
 
 - [State Check](#state-check)
 - [Registration Files](#registration-files)
-- [Editing Rule](#editing-rule)
+- [Editing Rules](#editing-rules)
 - [Endpoint Mapping](#endpoint-mapping)
 
 ## State Check
@@ -44,9 +44,34 @@ so the plugin root is two directories up from `skills/signoz-mcp-setup/`.
 Update every registration file that exists. Do not create duplicate MCP server
 entries, and do not rename the `signoz` server.
 
-## Editing Rule
+## Editing Rules
 
-The URL should use this template shape:
+Use the client-specific shape for the registration file you are editing.
+
+### Claude Code and Codex `.mcp.json`
+
+The URL should use a concrete endpoint:
+
+```json
+"url": "https://mcp.us.signoz.cloud/mcp"
+```
+
+Replace the entire `url` value with the resolved MCP endpoint. Do not keep
+`${SIGNOZ_MCP_URL:-...}` in `.mcp.json`; Codex treats that as a literal URL.
+
+If `.mcp.json` contains any legacy `SIGNOZ_MCP_URL` wrapper, replace the full
+value with the concrete resolved URL.
+
+Examples:
+
+```text
+https://mcp.eu.signoz.cloud/mcp
+http://localhost:8000/mcp
+```
+
+### Cursor `mcp.json`
+
+Cursor plugin config should use the template shape:
 
 ```json
 "url": "${SIGNOZ_MCP_URL:-https://mcp.us.signoz.cloud/mcp}"
@@ -64,13 +89,22 @@ ${SIGNOZ_MCP_URL:-https://mcp.eu.signoz.cloud/mcp}
 ${SIGNOZ_MCP_URL:-http://localhost:8000/mcp}
 ```
 
-If a file contains the legacy no-default form `${SIGNOZ_MCP_URL}`, replace it
-with `${SIGNOZ_MCP_URL:-<resolved-mcp-url>}`.
+If `mcp.json` contains the legacy no-default form `${SIGNOZ_MCP_URL}`, replace
+it with `${SIGNOZ_MCP_URL:-<resolved-mcp-url>}`. If `mcp.json` contains a
+concrete placeholder URL from a prior edit, replace it with the concrete
+resolved URL.
 
-If the user's client has an explicit plugin setting or environment override
-for the endpoint, that value can override this default. If the MCP setup skill
-updates the default but the client still connects to the old endpoint, tell
-the user to clear the explicit plugin setting and reload the client.
+If the user's client has an explicit plugin setting or environment override for
+the endpoint, that value can override this default. If this setup skill updates
+the default but the client still connects to the old endpoint, tell the user to
+clear the explicit plugin setting and reload the client.
+
+### Update behavior
+
+These bundled files live inside the installed plugin. Plugin updates can reset
+them to the placeholder. If the `signoz` server returns to **not-setup** after
+an update, rerun `signoz-mcp-setup`. For durable native client configuration,
+use the client-specific recipes in `client-configs.md`.
 
 ## Endpoint Mapping
 

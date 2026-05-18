@@ -42,7 +42,7 @@ Silently determine the SigNoz MCP server state using the reference flow:
   run Step 2. Otherwise tell them the SigNoz MCP server is configured but not
   connected, then ask for the SigNoz Cloud region or MCP URL to repair it. If
   they believe the endpoint is already correct, tell them to complete the
-  client authentication step in Step 4.
+  client authentication step in Step 5.
 
 Do not fall back to raw HTTP calls for SigNoz data when MCP is unavailable.
 The MCP server is the supported API surface for this plugin's live SigNoz
@@ -89,15 +89,28 @@ cannot complete interactive OAuth, use the header-based fallback in
 
 ### Step 4: Apply the endpoint
 
-For Claude Code, Codex, and Cursor plugin installs, edit the bundled plugin MCP
-registration files using the reference editing rule:
+For bundled Claude Code, Codex, and Cursor plugin installs, edit the registration
+files using the reference editing rules:
 
-1. Replace only the default value inside the `SIGNOZ_MCP_URL` template.
-2. Preserve the variable wrapper so users can still override the endpoint from
-   client settings when they need to.
-3. Update every SigNoz plugin registration file that exists in the plugin root.
+1. In `.mcp.json` for Claude Code and Codex, replace the full `url` value with
+   the resolved MCP endpoint. Do not use shell-style environment defaults here.
+2. In `mcp.json` for Cursor, replace only the default value inside the
+   `SIGNOZ_MCP_URL` template when that wrapper exists.
+3. Preserve unrelated MCP servers and settings.
 
-Example target shape:
+Claude Code and Codex target shape:
+
+```json
+{
+  "mcpServers": {
+    "signoz": {
+      "url": "https://mcp.us.signoz.cloud/mcp"
+    }
+  }
+}
+```
+
+Cursor target shape:
 
 ```json
 {
@@ -109,9 +122,13 @@ Example target shape:
 }
 ```
 
-If a registration file still uses the legacy no-default form
-`${SIGNOZ_MCP_URL}`, convert it to the target shape with the resolved endpoint
-as the default.
+If `.mcp.json` still uses any `SIGNOZ_MCP_URL` wrapper from an older version,
+replace it with the concrete resolved URL. If `mcp.json` lacks a
+`SIGNOZ_MCP_URL` wrapper, replace the concrete `url` value instead.
+
+Bundled registration files live inside the installed plugin. Plugin updates can
+reset them to the placeholder; if that happens, rerun this setup skill. For a
+more durable native-client setup, use the relevant recipe in `client-configs.md`.
 
 For native client setup, use `client-configs.md`:
 
