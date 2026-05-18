@@ -21,10 +21,9 @@ This skill calls SigNoz MCP server tools heavily (`signoz:signoz_execute_builder
 `signoz:signoz_get_field_values`, `signoz:signoz_list_metrics`, `signoz:signoz_list_services`,
 `signoz:signoz_get_service_top_operations`, `signoz:signoz_get_trace_details`). Before
 running the workflow, confirm the `signoz:signoz_*` tools are available. If they
-are not, the SigNoz MCP server is not installed or configured — stop and
-direct the user to set it up: <https://signoz.io/docs/ai/signoz-mcp-server/>.
-Do not fall back to raw HTTP calls or fabricate query results without the
-MCP tools.
+are not, run `signoz-mcp-setup` first to initialize or repair the MCP connection.
+Do not fall back to raw HTTP calls or fabricate query results without the MCP
+tools.
 
 ## When to use
 

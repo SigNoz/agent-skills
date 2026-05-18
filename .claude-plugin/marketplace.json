@@ -2,7 +2,7 @@
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "signoz-skills",
   "metadata": {
-    "description": "Official SigNoz marketplace for Claude Code skills"
+    "description": "Official SigNoz marketplace for Claude Code skills and MCP"
   },
   "owner": {
     "name": "SigNoz"
@@ -10,7 +10,7 @@
   "plugins": [
     {
       "name": "signoz",
-      "description": "Official SigNoz plugin for docs guidance and ClickHouse dashboard queries",
+      "description": "Official SigNoz plugin for MCP, docs, queries, dashboards, and alerts",
       "author": {
         "name": "SigNoz"
       },

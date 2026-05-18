@@ -32,9 +32,9 @@ This skill calls SigNoz MCP server tools (`signoz:signoz_create_dashboard`,
 `signoz:signoz_aggregate_logs`, `signoz:signoz_aggregate_traces`, etc.).
 Before running the workflow, confirm the `signoz:signoz_*` tools are
 available. If they are not, the SigNoz MCP server is not installed or
-configured — stop and direct the user to set it up:
-<https://signoz.io/docs/ai/signoz-mcp-server/>. Do not fall back to raw
-HTTP calls or fabricate dashboard JSON without the MCP tools.
+configured — run `signoz-mcp-setup` first to initialize or repair the MCP
+connection. Do not fall back to raw HTTP calls or fabricate dashboard JSON
+without the MCP tools.
 
 ## When to use
 

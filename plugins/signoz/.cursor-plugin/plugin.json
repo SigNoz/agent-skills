@@ -2,7 +2,7 @@
   "name": "signoz",
   "displayName": "SigNoz",
   "version": "2026.05.15.6",
-  "description": "Official SigNoz plugin for docs, queries, dashboards, and alerts",
+  "description": "Official SigNoz plugin for MCP, docs, queries, dashboards, and alerts",
   "author": {
     "name": "SigNoz"
   },
@@ -12,9 +12,33 @@
     "signoz",
     "opentelemetry",
     "observability",
+    "mcp",
     "clickhouse",
     "tracing",
     "logging"
   ],
+  "variables": {
+    "type": "object",
+    "properties": {
+      "SIGNOZ_MCP_URL": {
+        "type": "string",
+        "title": "SigNoz MCP URL",
+        "description": "Enter https://mcp.<region>.signoz.cloud/mcp for SigNoz Cloud, using the region shown under Settings -> Ingestion. For self-hosted HTTP mode, enter your server's /mcp URL, for example http://localhost:8000/mcp.",
+        "examples": [
+          "https://mcp.us.signoz.cloud/mcp",
+          "https://mcp.us2.signoz.cloud/mcp",
+          "https://mcp.eu.signoz.cloud/mcp",
+          "https://mcp.eu2.signoz.cloud/mcp",
+          "https://mcp.in.signoz.cloud/mcp",
+          "https://mcp.in2.signoz.cloud/mcp",
+          "http://localhost:8000/mcp"
+        ],
+        "pattern": "^https?://.+/mcp/?$"
+      }
+    },
+    "required": [
+      "SIGNOZ_MCP_URL"
+    ]
+  },
   "skills": "./skills/"
 }

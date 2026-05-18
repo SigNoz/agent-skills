@@ -4,7 +4,7 @@
     "name": "SigNoz"
   },
   "metadata": {
-    "description": "Official SigNoz Cursor plugin repository",
+    "description": "Official SigNoz Cursor plugin repository for skills and MCP",
     "version": "1.0.0",
     "pluginRoot": "plugins"
   },
@@ -12,7 +12,7 @@
     {
       "name": "signoz",
       "source": "signoz",
-      "description": "Official SigNoz plugin for docs guidance and ClickHouse dashboard queries"
+      "description": "Official SigNoz plugin for MCP, docs, queries, dashboards, and alerts"
     }
   ]
 }

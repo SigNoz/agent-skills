@@ -1,11 +1,12 @@
 # SigNoz Agent Skills
 
-Official SigNoz skills for Claude Code, Codex, Cursor, and the [skills.sh](https://skills.sh) ecosystem.
+Official SigNoz skills and MCP configuration for Claude Code, Codex, Cursor, and the [skills.sh](https://skills.sh) ecosystem.
 
 ## Skills
 
 | Skill | Description |
 |-------|-------------|
+| [signoz-mcp-setup](plugins/signoz/skills/signoz-mcp-setup/SKILL.md) | Initialize or repair the SigNoz MCP server configuration for Claude Code, Codex, or Cursor. |
 | [signoz-creating-alerts](plugins/signoz/skills/signoz-creating-alerts/SKILL.md) | Create SigNoz alert rules for threshold breaches, error rates, latency, anomaly detection, and absent-data conditions across metrics, logs, and traces. |
 | [signoz-explaining-alerts](plugins/signoz/skills/signoz-explaining-alerts/SKILL.md) | Explain and interpret an existing SigNoz alert rule's configuration, evaluation behavior, notification routing, and recent fire frequency. |
 | [signoz-investigating-alerts](plugins/signoz/skills/signoz-investigating-alerts/SKILL.md) | Diagnose why a SigNoz alert fired by correlating its signal with neighbor metrics, traces, and logs around the fire window, and ranking likely causes. |
@@ -19,12 +20,23 @@ Official SigNoz skills for Claude Code, Codex, Cursor, and the [skills.sh](https
 
 ## Installation
 
+The plugin ships with an MCP setup skill so users do not have to hand-edit MCP
+configuration. After installing, run `signoz-mcp-setup`
+once if the MCP server is not already connected. It accepts a SigNoz Cloud
+region such as `us`, `us2`, `eu`, `eu2`, `in`, or `in2`, any hosted MCP URL,
+or a self-hosted HTTP `/mcp` endpoint.
+
+See the full setup guide in the [SigNoz MCP Server docs](https://signoz.io/docs/ai/signoz-mcp-server/).
+
 ### Claude Code
 
 ```sh
 /plugin marketplace add SigNoz/agent-skills
 /plugin install signoz@signoz-skills
 ```
+
+Then run `/mcp`, select the `signoz` server, and complete the authentication flow.
+If the server is not connected yet, ask Claude Code to run `signoz-mcp-setup` first.
 
 Update:
 
@@ -39,6 +51,8 @@ Update:
 
 1. Open the repository in Codex (restart if already running).
 2. Run `/plugins` and install `signoz` from the `SigNoz` marketplace.
+3. Ask Codex to run `signoz-mcp-setup` if the MCP server is not connected yet.
+4. Run `codex mcp login signoz`, then `/mcp` to verify the connection.
 
 To use in another repo, copy `plugins/signoz` into the target repo's `plugins/` directory and add a marketplace entry in `$REPO_ROOT/.agents/plugins/marketplace.json`.
 
@@ -48,6 +62,15 @@ Not yet on the public Cursor Marketplace. Install via a Team Marketplace:
 
 1. Add `https://github.com/SigNoz/agent-skills` as a team marketplace in `Settings -> Plugins`.
 2. Install the `signoz` plugin from the marketplace panel.
+3. Enter the MCP URL for your SigNoz Cloud region when prompted, such as
+   `https://mcp.us2.signoz.cloud/mcp`. For self-hosted HTTP mode, enter your
+   server's `/mcp` URL, such as `http://localhost:8000/mcp`.
+4. Open Cursor's MCP settings and complete authentication for the `signoz` server if prompted.
+
+If you skipped the prompt, picked the wrong region, or need to change a
+self-hosted HTTP MCP endpoint, run `/signoz-mcp-setup` in an agent chat
+window. If Cursor keeps using the install-time URL, clear the SigNoz MCP URL
+plugin setting and reload.
 
 ### skills.sh
 
@@ -68,8 +91,11 @@ npx skills add SigNoz/agent-skills --skill signoz-writing-clickhouse-queries    
 │   ├── .codex-plugin/plugin.json           # Codex plugin manifest
 │   ├── .claude-plugin/plugin.json          # Claude Code plugin manifest
 │   ├── .cursor-plugin/plugin.json          # Cursor plugin manifest
+│   ├── .mcp.json                           # Claude Code and Codex MCP config
+│   ├── mcp.json                            # Cursor MCP config
 │   ├── hooks/                              # Auto-allow hooks
 │   └── skills/
+│       ├── signoz-mcp-setup/
 │       ├── signoz-creating-alerts/
 │       ├── signoz-explaining-alerts/
 │       ├── signoz-investigating-alerts/

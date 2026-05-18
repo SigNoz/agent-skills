@@ -32,10 +32,9 @@ This skill calls SigNoz MCP server tools (`signoz:signoz_create_view`,
 `signoz:signoz_update_view`, `signoz:signoz_delete_view`,
 `signoz:signoz_get_field_keys`, `signoz:signoz_get_field_values`). Before
 running the workflow, confirm the `signoz:signoz_*` tools are available. If
-they are not, the SigNoz MCP server is not installed or configured — stop
-and direct the user to set it up:
-<https://signoz.io/docs/ai/signoz-mcp-server/>. Do not fall back to raw HTTP
-calls or fabricate view payloads without the MCP tools.
+they are not, run `signoz-mcp-setup` first to initialize or repair the MCP
+connection. Do not fall back to raw HTTP calls or fabricate view payloads
+without the MCP tools.
 
 ## When to use
 

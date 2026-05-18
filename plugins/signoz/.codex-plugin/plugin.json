@@ -1,7 +1,7 @@
 {
   "name": "signoz",
   "version": "2026.05.15.6",
-  "description": "Official SigNoz plugin for docs, queries, dashboards, and alerts",
+  "description": "Official SigNoz plugin for MCP, docs, queries, dashboards, and alerts",
   "author": {
     "name": "SigNoz",
     "url": "https://signoz.io"
@@ -13,15 +13,17 @@
     "signoz",
     "opentelemetry",
     "observability",
+    "mcp",
     "clickhouse",
     "tracing",
     "logging"
   ],
+  "mcpServers": "./.mcp.json",
   "skills": "./skills/",
   "interface": {
     "displayName": "SigNoz",
-    "shortDescription": "Official SigNoz skills for docs, queries, dashboards, and alerts",
-    "longDescription": "Installs the official SigNoz skills for using SigNoz docs, writing ClickHouse queries, generating observability queries, and creating, explaining, and modifying dashboards and alerts in Codex.",
+    "shortDescription": "Official SigNoz MCP and skills for docs, queries, dashboards, and alerts",
+    "longDescription": "Installs the official SigNoz MCP server configuration and skills for using SigNoz docs, writing ClickHouse queries, generating observability queries, and creating, explaining, and modifying dashboards and alerts in Codex.",
     "developerName": "SigNoz",
     "category": "Productivity",
     "capabilities": [
@@ -30,6 +32,7 @@
     ],
     "websiteURL": "https://signoz.io",
     "defaultPrompt": [
+      "Use signoz-mcp-setup to configure the SigNoz MCP server for my region.",
       "Use SigNoz to help me find the right docs page for OpenTelemetry instrumentation.",
       "Use SigNoz to write a ClickHouse query for a SigNoz dashboard panel over traces or logs.",
       "Use SigNoz to create a dashboard for monitoring my service.",
