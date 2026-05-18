@@ -93,9 +93,9 @@ For bundled Claude Code, Codex, and Cursor plugin installs, edit the registratio
 files using the reference editing rules:
 
 1. In `.mcp.json` for Claude Code and Codex, replace the full `url` value with
-   the resolved MCP endpoint. Do not use shell-style environment defaults here.
-2. In `mcp.json` for Cursor, replace only the default value inside the
-   `SIGNOZ_MCP_URL` template when that wrapper exists.
+   the resolved MCP endpoint.
+2. In `mcp.json` for Cursor, replace the full `url` value with the resolved MCP
+   endpoint.
 3. Preserve unrelated MCP servers and settings.
 
 Claude Code and Codex target shape:
@@ -116,15 +116,14 @@ Cursor target shape:
 {
   "mcpServers": {
     "signoz": {
-      "url": "${SIGNOZ_MCP_URL:-https://mcp.us.signoz.cloud/mcp}"
+      "url": "https://mcp.us.signoz.cloud/mcp"
     }
   }
 }
 ```
 
-If `.mcp.json` still uses any `SIGNOZ_MCP_URL` wrapper from an older version,
-replace it with the concrete resolved URL. If `mcp.json` lacks a
-`SIGNOZ_MCP_URL` wrapper, replace the concrete `url` value instead.
+If either bundled file still uses any `SIGNOZ_MCP_URL` wrapper from an older
+version, replace it with the concrete resolved URL.
 
 Bundled registration files live inside the installed plugin. Plugin updates can
 reset them to the placeholder; if that happens, rerun this setup skill. For a

@@ -1,7 +1,7 @@
 {
   "mcpServers": {
     "signoz": {
-      "url": "${SIGNOZ_MCP_URL:-https://not-setup/mcp}"
+      "url": "https://not-setup/mcp"
     }
   }
 }

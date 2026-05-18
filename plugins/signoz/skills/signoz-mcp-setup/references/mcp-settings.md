@@ -48,19 +48,24 @@ entries, and do not rename the `signoz` server.
 
 Use the client-specific shape for the registration file you are editing.
 
-### Claude Code and Codex `.mcp.json`
+### Bundled plugin MCP files
 
-The URL should use a concrete endpoint:
+The URL should use a concrete endpoint in both bundled registration files:
+
+- `.mcp.json` for Claude Code and Codex
+- `mcp.json` for Cursor
 
 ```json
 "url": "https://mcp.us.signoz.cloud/mcp"
 ```
 
 Replace the entire `url` value with the resolved MCP endpoint. Do not keep
-`${SIGNOZ_MCP_URL:-...}` in `.mcp.json`; Codex treats that as a literal URL.
+`${SIGNOZ_MCP_URL:-...}` in bundled plugin MCP files; Codex treats it as a
+literal URL, and Cursor documents interpolation syntax that does not include
+shell-style defaults.
 
-If `.mcp.json` contains any legacy `SIGNOZ_MCP_URL` wrapper, replace the full
-value with the concrete resolved URL.
+If either bundled file contains any legacy `SIGNOZ_MCP_URL` wrapper, replace
+the full value with the concrete resolved URL.
 
 Examples:
 
@@ -68,31 +73,6 @@ Examples:
 https://mcp.eu.signoz.cloud/mcp
 http://localhost:8000/mcp
 ```
-
-### Cursor `mcp.json`
-
-Cursor plugin config should use the template shape:
-
-```json
-"url": "${SIGNOZ_MCP_URL:-https://mcp.us.signoz.cloud/mcp}"
-```
-
-The variable has the form `${NAME:-default}`. Replace only the default value,
-which is the text between `:-` and the closing `}`. Keep `${`, the variable
-name, `:-`, and `}` intact.
-
-Examples:
-
-```text
-${SIGNOZ_MCP_URL:-https://not-setup/mcp}
-${SIGNOZ_MCP_URL:-https://mcp.eu.signoz.cloud/mcp}
-${SIGNOZ_MCP_URL:-http://localhost:8000/mcp}
-```
-
-If `mcp.json` contains the legacy no-default form `${SIGNOZ_MCP_URL}`, replace
-it with `${SIGNOZ_MCP_URL:-<resolved-mcp-url>}`. If `mcp.json` contains a
-concrete placeholder URL from a prior edit, replace it with the concrete
-resolved URL.
 
 If the user's client has an explicit plugin setting or environment override for
 the endpoint, that value can override this default. If this setup skill updates

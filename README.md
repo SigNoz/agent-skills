@@ -75,15 +75,15 @@ Not yet on the public Cursor Marketplace. Install via a Team Marketplace:
 
 1. Add `https://github.com/SigNoz/agent-skills` as a team marketplace in `Settings -> Plugins`.
 2. Install the `signoz` plugin from the marketplace panel.
-3. Enter the MCP URL for your SigNoz Cloud region when prompted, such as
-   `https://mcp.us2.signoz.cloud/mcp`. For self-hosted HTTP mode, enter your
-   server's `/mcp` URL, such as `http://localhost:8000/mcp`.
-4. Open Cursor's MCP settings and complete authentication for the `signoz` server if prompted.
+3. Run `/signoz-mcp-setup` in an agent chat with your SigNoz Cloud region or
+   self-hosted HTTP MCP URL. This updates the bundled `mcp.json` placeholder
+   used by the Cursor plugin.
+4. Reload Cursor, then open MCP settings and complete authentication for the
+   `signoz` server if prompted.
 
-If you skipped the prompt, picked the wrong region, or need to change a
-self-hosted HTTP MCP endpoint, run `/signoz-mcp-setup` in an agent chat
-window. If Cursor keeps using the install-time URL, clear the SigNoz MCP URL
-plugin setting and reload.
+If you picked the wrong region or need to change a self-hosted HTTP MCP
+endpoint, run `/signoz-mcp-setup` again with the correct region or URL and
+reload Cursor.
 
 ### Other MCP Clients
 
