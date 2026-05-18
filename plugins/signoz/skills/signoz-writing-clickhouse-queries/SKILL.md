@@ -54,6 +54,7 @@ syntax, dashboard templates, query examples, and a validation checklist.
 - Timeseries panel: return rows of `(ts, value)` for a chart over time.
 - Value panel: return a single `value` for a stat or counter widget.
 - Table panel: return labelled columns for a grouped breakdown.
+- Pie chart panel: return rows of `(label, __result_0)` — no timestamp column.
 
 ## Key Variables by Signal
 
@@ -75,6 +76,16 @@ syntax, dashboard templates, query examples, and a validation checklist.
 - Main table: `signoz_traces.distributed_signoz_index_v3`.
 - Resource table: `signoz_traces.distributed_traces_v3_resource`.
 
+## SigNoz Known Issues
+
+- **Pie chart panels require `__result_[n]` alias.** When using `clickhouse_sql`
+  query type with a pie chart panel, the aggregation column **must** be aliased
+  as `` `__result_0` `` (or `` `__result_1` ``, etc. for multi-query panels).
+  Using any other alias (e.g., `value`, `count`) causes the pie chart to render
+  "No data". Do **not** include a timestamp column — return only the label and
+  the `` `__result_0` `` value. Reference:
+  [signoz#8844](https://github.com/SigNoz/signoz/issues/8844).
+
 ## Top Anti-Patterns
 
 - Missing `ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp`.
@@ -84,6 +95,8 @@ syntax, dashboard templates, query examples, and a validation checklist.
 - Traces query with `$start_timestamp_nano` or `$end_timestamp_nano`.
 - Traces query with `resources_string['service.name']` instead of
   `resource_string_service$$name`.
+- Pie chart query with an alias other than `` `__result_0` `` for the value
+  column (see Known Issues above).
 
 ## Query Attribution
 
