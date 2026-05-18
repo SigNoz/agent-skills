@@ -32,11 +32,9 @@
     ],
     "websiteURL": "https://signoz.io",
     "defaultPrompt": [
-      "Use signoz-mcp-setup to configure the SigNoz MCP server for my region.",
-      "Use SigNoz to help me find the right docs page for OpenTelemetry instrumentation.",
-      "Use SigNoz to write a ClickHouse query for a SigNoz dashboard panel over traces or logs.",
-      "Use SigNoz to create a dashboard for monitoring my service.",
-      "Use SigNoz to set up an alert when error rate exceeds a threshold."
+      "Connect this workspace to SigNoz Cloud.",
+      "Investigate checkout errors across logs, traces, and metrics.",
+      "Create a checkout dashboard and 5xx alert."
     ]
   }
 }
