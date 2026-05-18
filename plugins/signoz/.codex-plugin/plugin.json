@@ -1,7 +1,7 @@
 {
   "name": "signoz",
   "version": "2026.05.15.6",
-  "description": "Official SigNoz plugin for MCP, docs, queries, dashboards, and alerts",
+  "description": "Official SigNoz plugin for MCP setup, docs, queries, dashboards, and alerts",
   "author": {
     "name": "SigNoz",
     "url": "https://signoz.io"
@@ -22,8 +22,8 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "SigNoz",
-    "shortDescription": "Official SigNoz MCP and skills for docs, queries, dashboards, and alerts",
-    "longDescription": "Installs the official SigNoz MCP server configuration and skills for using SigNoz docs, writing ClickHouse queries, generating observability queries, and creating, explaining, and modifying dashboards and alerts in Codex.",
+    "shortDescription": "Official SigNoz MCP setup and skills for docs, queries, dashboards, and alerts",
+    "longDescription": "Installs the official SigNoz skills and a bundled MCP server registration for Codex. Use signoz-mcp-setup to configure a SigNoz Cloud region, hosted MCP URL, or self-hosted HTTP endpoint before running docs, query, dashboard, alert, and view workflows.",
     "developerName": "SigNoz",
     "category": "Productivity",
     "capabilities": [
@@ -32,7 +32,7 @@
     ],
     "websiteURL": "https://signoz.io",
     "defaultPrompt": [
-      "Connect this workspace to SigNoz Cloud.",
+      "Set up SigNoz MCP for my SigNoz Cloud region.",
       "Investigate checkout errors across logs, traces, and metrics.",
       "Create a checkout dashboard and 5xx alert."
     ]

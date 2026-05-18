@@ -1,7 +1,7 @@
 {
   "name": "signoz",
   "version": "2026.05.15.6",
-  "description": "Official SigNoz plugin for MCP, docs, queries, dashboards, and alerts",
+  "description": "Official SigNoz plugin for MCP setup, docs, queries, dashboards, and alerts",
   "author": {
     "name": "SigNoz"
   },

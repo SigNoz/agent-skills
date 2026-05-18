@@ -12,7 +12,7 @@
     {
       "name": "signoz",
       "source": "signoz",
-      "description": "Official SigNoz plugin for MCP, docs, queries, dashboards, and alerts"
+      "description": "Official SigNoz plugin for MCP setup, docs, queries, dashboards, and alerts"
     }
   ]
 }

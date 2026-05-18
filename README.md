@@ -1,6 +1,10 @@
 # SigNoz Agent Skills
 
-Official SigNoz skills and MCP configuration for Claude Code, Codex, Cursor, and the [skills.sh](https://skills.sh) ecosystem. The MCP setup skill also includes client-specific recipes for VS Code/GitHub Copilot, Claude Desktop, Gemini CLI, Windsurf, Zed, Antigravity, OpenCode, and generic HTTP MCP clients.
+Official SigNoz skills and MCP configuration for Claude Code, Codex, Cursor,
+and the [skills.sh](https://skills.sh) ecosystem. The MCP setup skill also
+includes client-specific recipes for VS Code/GitHub Copilot, Claude Desktop,
+Gemini CLI, Windsurf, Zed, Antigravity, OpenCode, and generic HTTP MCP
+clients.
 
 ## Skills
 
@@ -20,11 +24,11 @@ Official SigNoz skills and MCP configuration for Claude Code, Codex, Cursor, and
 
 ## Installation
 
-The plugin ships with an MCP setup skill so users do not have to hand-edit MCP
-configuration. After installing, run `signoz-mcp-setup`
-once if the MCP server is not already connected. It accepts a SigNoz Cloud
-region such as `us`, `us2`, `eu`, `eu2`, `in`, or `in2`, any hosted MCP URL,
-or a self-hosted HTTP `/mcp` endpoint.
+The Claude Code, Codex, and Cursor plugins ship with MCP registration files
+plus an MCP setup skill so users do not have to hand-edit MCP configuration.
+After installing, run `signoz-mcp-setup` once if the MCP server is not already
+connected. It accepts a SigNoz Cloud region such as `us`, `us2`, `eu`, `eu2`,
+`in`, or `in2`, any hosted MCP URL, or a self-hosted HTTP `/mcp` endpoint.
 
 See the full setup guide in the [SigNoz MCP Server docs](https://signoz.io/docs/ai/signoz-mcp-server/).
 
@@ -51,10 +55,17 @@ Update:
 
 1. Open the repository in Codex (restart if already running).
 2. Run `/plugins` and install `signoz` from the `SigNoz` marketplace.
-3. Ask Codex to run `signoz-mcp-setup` if the MCP server is not connected yet.
-4. Run `codex mcp login signoz`, then `/mcp` to verify the connection.
+3. Ask Codex to run `signoz-mcp-setup` with your SigNoz Cloud region or
+   self-hosted HTTP MCP URL. This updates the bundled `.mcp.json` placeholder
+   used by the Codex plugin.
+4. Restart Codex if the `signoz` MCP server does not appear.
+5. Run `codex mcp login signoz`, then `/mcp` to verify the connection.
 
-To use in another repo, copy `plugins/signoz` into the target repo's `plugins/` directory and add a marketplace entry in `$REPO_ROOT/.agents/plugins/marketplace.json`.
+The Codex plugin already declares `mcpServers: "./.mcp.json"`, so normal plugin
+installs do not need a separate native Codex MCP entry. To use in another repo,
+copy `plugins/signoz` into the target repo's `plugins/` directory, add a
+marketplace entry in `$REPO_ROOT/.agents/plugins/marketplace.json`, and repeat
+the setup step for that workspace.
 
 ### Cursor
 
@@ -108,7 +119,7 @@ npx skills add SigNoz/agent-skills --skill signoz-writing-clickhouse-queries    
 │   ├── hooks/                              # Auto-allow hooks
 │   └── skills/
 │       ├── signoz-mcp-setup/
-│       │   └── references/
+│       │   └── references/                 # Endpoint mapping and client recipes
 │       ├── signoz-creating-alerts/
 │       ├── signoz-explaining-alerts/
 │       ├── signoz-investigating-alerts/
