@@ -269,11 +269,10 @@ dotted attribute name with underscores: `service.name` → `service_name`).
 
 #### Common query shapes — conventions
 
-Three patterns cover most non-trivial alerts. Read
-`signoz://alert/examples` for the authoritative JSON;
-[`references/query-shapes.md`](references/query-shapes.md) has the same
-illustrations in-skill for quick reference. The conventions that don't
-live in the schema:
+Read `signoz://alert/examples` for the authoritative JSON of all
+patterns (error rate, p99 latency, log volume, absent-data, anomaly,
+PromQL, ClickHouse SQL). The conventions that don't live in the
+schema:
 
 - **Error-rate formula:** set `disabled: true` on the component
   queries A and B so only the formula F1 renders in the alert chart
@@ -285,9 +284,6 @@ live in the schema:
 - **Log volume spike:** prefer `groupBy: service.name` over a hard
   filter when the user said "any service" — groupBy provides the
   scoping AND keeps the notification useful per-service.
-
-For absent-data, anomaly, PromQL, and ClickHouse SQL alerts, read the
-`signoz://alert/examples` MCP resource for current shapes.
 
 ### Step 5: Resolve notification channels
 
