@@ -291,6 +291,8 @@ schema:
 
 ### Step 6: Dry-run the full query and validate the threshold
 
+Step 4 confirmed data flows. Step 6 does two things:
+
 1. **Validate query shape.** Run the full builder spec (with
    `groupBy`, formulas, disabled component queries, and non-string
    filters) — Step 4's bare `count()` probe doesn't exercise these.
@@ -304,24 +306,20 @@ schema:
    alert have fired a sensible number of times in the last hour?
 
 Run the full primary query (or formula) over the last hour:
-- `signoz:signoz_execute_builder_query` for builder and formula
-  queries — set `compositeQuery.queries[].type` to `builder_query` /
-  `builder_formula` as appropriate.
+- `signoz:signoz_execute_builder_query` for **all** builder, formula,
+  and PromQL queries — set `compositeQuery.queries[].type` to
+  `builder_query` / `builder_formula` / `promql` as appropriate. For
+  PromQL put the query string in `spec.query` and read
+  `signoz://promql/instructions` for the UTF-8 quoted-selector form
+  SigNoz requires (`{"metric.name.with.dots"}` — not the underscored
+  or bare-dotted forms).
 - `signoz:signoz_aggregate_logs` / `signoz:signoz_aggregate_traces`
   when those fit better.
 - `signoz:signoz_query_metrics` when the alert query targets a single
   known metric by `metricName` — the tool auto-applies aggregation
   defaults and accepts `filter`, `groupBy`, and `formula` alongside.
-  PromQL is not supported here.
-
-**PromQL alerts cannot be dry-run via MCP today** — both
-`signoz_execute_builder_query` and `signoz_query_metrics` reject or
-silently drop PromQL (see signoz-mcp-server#179), so neither query
-validation (1) nor breach calibration (2) is reachable. Skip Step 6
-for PromQL alerts and surface in the preview: *"PromQL dry-run
-unavailable — validate the expression in the SigNoz UI Explorer
-before save."* Stop and ask the user to confirm before proceeding to
-Step 7.
+  PromQL is not supported here; use `signoz_execute_builder_query` for
+  that.
 
 Compute how many evaluation points breached the proposed threshold.
 Surface in the preview as **"would have fired N times in the last 1h"**.
@@ -453,10 +451,7 @@ intervene before Step 9.
 - **Dry-run is mandatory.** Step 4 (data probe) and Step 6 (full
   query + threshold calibration) are both required before
   `signoz:signoz_create_alert`. A never-firing alert is *worse* than no
-  alert: it provides a false sense of safety. *Exception:* PromQL
-  alerts skip Step 6 because no MCP tool can run a PromQL query today
-  (signoz-mcp-server#179) — surface the gap in the preview and ask
-  the user to confirm.
+  alert: it provides a false sense of safety.
 - **No duplicate updates.** Name collision → error and stop. Do not
   silently update an existing alert from a "create" skill.
 - **OTel attribute names only.** `service.name` not `service`.
