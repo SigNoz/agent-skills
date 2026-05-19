@@ -252,8 +252,7 @@ clearly-critical condition), default to `warning` and surface the choice
 in the preview so they can adjust.
 
 **OTel attribute names** — always use semantic conventions:
-`service.name`, `host.name`, `k8s.namespace.name`,
-`deployment.environment.name`. Never `service`, `host`, or `env`.
+`service.name`, `host.name`, `k8s.namespace.name`, `deployment.environment` or `deployment.environment.name`. Never `service`, `host`, or `env`.
 
 **Annotation templates** — the on-call engineer sees the notification, not
 the alert config. A notification that says "Pod crash detected" with no
@@ -290,58 +289,9 @@ schema:
   filter when the user said "any service" — groupBy provides the
   scoping AND keeps the notification useful per-service.
 
-### Step 6: Resolve notification channels
+### Step 6: Dry-run the full query and validate the threshold
 
-The skill **must** resolve at least one channel before save. An alert with no
-channels saves successfully and silently never notifies anyone — the second
-most common silent failure after bad queries.
-
-1. Call `signoz:signoz_list_notification_channels` to enumerate existing channels.
-2. If the user named a channel ("send to slack-infra"), use it if it exists;
-   if not, fall through.
-3. Otherwise present the user with two options:
-   - **Pick from existing** — list channels with their type (Slack, PagerDuty,
-     email, webhook) so the user can choose.
-   - **Create new inline** — call `signoz:signoz_create_notification_channel` with
-     channel parameters the user provides (name, type, type-specific config
-     like Slack webhook URL or PagerDuty integration key).
-4. If neither path resolves a channel, stop and ask the user for a
-   notification channel (see *Required inputs* above).
-
-For multi-severity alerts, attach channels per threshold:
-`thresholds.spec[N].channels` is an array — typically warning → Slack only,
-critical → Slack + PagerDuty.
-
-#### Handling secret-bearing channel config
-
-Slack webhook URLs, PagerDuty integration keys, and similar webhook tokens
-are secrets. When the user supplies them inline, treat them as opaque
-inputs and follow these rules:
-
-- **Do not echo the secret back.** Never include the webhook URL,
-  integration key, or any password-like token in chat output, previews,
-  confirmation messages, summaries, or the `<navigation_suggestions>`
-  payload. Refer to the channel by its `name` only ("Slack channel
-  `slack-infra` created") and omit the value entirely.
-- **Do not stash secrets in clarification context.** If you need to ask the
-  user a follow-up question after they pasted a secret, do not include
-  the secret value in the clarification `message`, `discovered_context`,
-  or any other field that the host may persist for resume. Refer to it
-  symbolically (e.g. "the webhook you just provided").
-- **One-pass only.** Pass the secret directly to
-  `signoz:signoz_create_notification_channel` and do not retain it in any
-  intermediate prose. After the create call succeeds, refer to the
-  channel by name; after a failure, ask the user to re-paste rather than
-  echoing what they sent.
-- **If the user instead asks "how do I set up a Slack channel?"** — that
-  is a docs question, not a create-channel request. Answer with the docs
-  flow (the SigNoz UI's Notification Channels page) and do not solicit
-  the secret in chat at all. Prefer the UI path when the user seems
-  uncertain about exposing the token.
-
-### Step 7: Dry-run the full query and validate the threshold
-
-Step 4 confirmed data flows. Step 7 does two things:
+Step 4 confirmed data flows. Step 6 does two things:
 
 1. **Validate query shape.** Run the full builder spec (with
    `groupBy`, formulas, disabled component queries, and non-string
@@ -392,6 +342,58 @@ flow mid-stream), the no-data stop rule applies here too: empty result →
 stop and ask the user (see *Required inputs* above) instead of saving an
 alert that will never fire.
 
+### Step 7: Resolve notification channels
+
+The skill **must** resolve at least one channel before save. An alert with no
+channels saves successfully and silently never notifies anyone — the second
+most common silent failure after bad queries. Channel resolution runs after
+the dry-run so any threshold-driven severity changes (warning → critical)
+are settled before the user is asked to pick routing, and so we never
+create a notification channel inline for an alert that fails validation.
+
+1. Call `signoz:signoz_list_notification_channels` to enumerate existing channels.
+2. If the user named a channel ("send to slack-infra"), use it if it exists;
+   if not, fall through.
+3. Otherwise present the user with two options:
+   - **Pick from existing** — list channels with their type (Slack, PagerDuty,
+     email, webhook) so the user can choose.
+   - **Create new inline** — call `signoz:signoz_create_notification_channel` with
+     channel parameters the user provides (name, type, type-specific config
+     like Slack webhook URL or PagerDuty integration key).
+4. If neither path resolves a channel, stop and ask the user for a
+   notification channel (see *Required inputs* above).
+
+For multi-severity alerts, attach channels per threshold:
+`thresholds.spec[N].channels` is an array — typically warning → Slack only,
+critical → Slack + PagerDuty.
+
+#### Handling secret-bearing channel config
+
+Slack webhook URLs, PagerDuty integration keys, and similar webhook tokens
+are secrets. When the user supplies them inline, treat them as opaque
+inputs and follow these rules:
+
+- **Do not echo the secret back.** Never include the webhook URL,
+  integration key, or any password-like token in chat output, previews,
+  confirmation messages, summaries, or the `<navigation_suggestions>`
+  payload. Refer to the channel by its `name` only ("Slack channel
+  `slack-infra` created") and omit the value entirely.
+- **Do not stash secrets in clarification context.** If you need to ask the
+  user a follow-up question after they pasted a secret, do not include
+  the secret value in the clarification `message`, `discovered_context`,
+  or any other field that the host may persist for resume. Refer to it
+  symbolically (e.g. "the webhook you just provided").
+- **One-pass only.** Pass the secret directly to
+  `signoz:signoz_create_notification_channel` and do not retain it in any
+  intermediate prose. After the create call succeeds, refer to the
+  channel by name; after a failure, ask the user to re-paste rather than
+  echoing what they sent.
+- **If the user instead asks "how do I set up a Slack channel?"** — that
+  is a docs question, not a create-channel request. Answer with the docs
+  flow (the SigNoz UI's Notification Channels page) and do not solicit
+  the secret in chat at all. Prefer the UI path when the user seems
+  uncertain about exposing the token.
+
 ### Step 8: Preview the prepared config
 
 Emit a fenced JSON code block containing the exact payload that will be sent
@@ -441,7 +443,7 @@ intervene before Step 9.
   a guessed service is harder to undo than asking.
 - **Always paginate `signoz:signoz_list_alert_rules`.** Stopping at page 1 misses
   duplicates and produces noise.
-- **Dry-run is mandatory.** Step 4 (data probe) and Step 7 (full
+- **Dry-run is mandatory.** Step 4 (data probe) and Step 6 (full
   query + threshold calibration) are both required before
   `signoz:signoz_create_alert`. A never-firing alert is *worse* than no
   alert: it provides a false sense of safety.
