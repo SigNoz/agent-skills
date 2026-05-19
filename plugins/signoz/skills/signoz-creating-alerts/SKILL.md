@@ -381,14 +381,17 @@ Step 2.5 already confirmed the underlying data exists. Step 6 serves
 **two** purposes:
 
 1. **Validate the query shape** — running the full builder spec
-   (including `groupBy`, formulas, disabled queries, and any non-string
-   filters) is the only way to catch a query that passes the
+   (including `groupBy`, formulas, disabled component queries, and any
+   non-string filters) is the only way to catch a query that passes the
    create-alert schema check but fails at evaluation time. The classic
    failures are a `groupBy` on a numeric attribute, an unquoted bool
-   filter (`is_error = true` instead of `'true'`), an aggregation
-   incompatible with the metric type, or a formula referencing a
-   disabled query. Step 2.5's `count()` probe with no `groupBy` does
-   **not** catch these — that's why this step uses the full query.
+   filter (`hasError = true` instead of `'true'`), or an aggregation
+   incompatible with the metric type. Step 2.5's `count()` probe with
+   no `groupBy` does **not** catch these — that's why this step uses
+   the full query. (Note: `disabled: true` on component queries A and
+   B in a formula alert is the **recommended** pattern — that's not a
+   failure mode, that's what makes only `F1` render in the alert
+   preview.)
 2. **Calibrate the threshold** — given the validated query and the
    proposed threshold, would this alert have fired a sensible number
    of times in the last hour?
@@ -483,12 +486,14 @@ intervene before Step 8.
 
   *Why two steps:* the create-alert API validates JSON shape, not
   semantic correctness. A query whose `groupBy` references a numeric
-  attribute, whose bool filter is unquoted, whose aggregation does not
-  match the metric type, or whose formula references a disabled query
-  all save cleanly and silently never fire — the alert reads "OK" in
-  the UI and the on-call engineer never gets paged for the condition
-  it was supposed to catch. A never-firing alert is observably *worse*
-  than no alert because it provides a false sense of safety.
+  attribute, whose bool filter is unquoted, or whose aggregation does
+  not match the metric type all save cleanly and silently never fire
+  — the alert reads "OK" in the UI and the on-call engineer never
+  gets paged for the condition it was supposed to catch. A
+  never-firing alert is observably *worse* than no alert because it
+  provides a false sense of safety. (Formula alerts with `disabled:
+  true` component queries are a *recommended* pattern, not a failure
+  mode — see Step 4.)
 
   *Known bool footgun:* a bool attribute filter must be string-quoted
   (`hasError = 'true'`), not unquoted (`hasError = true`). The

@@ -390,13 +390,20 @@ Treat a non-empty success response as a pass. Treat a server error,
 zero rows on a query you expected to populate, or a "filter type
 mismatch" message as a fail — fix the panel JSON before save.
 
-Skip only on trivially obvious panels: a single metric / span / log
-aggregation with no `groupBy`, no formula, and no non-string filter.
+**Coverage by dashboard size.** Trivial panels (single metric / span /
+log aggregation with no `groupBy`, no formula, no non-string filter)
+can fail silently too — a log-count panel with the wrong severity
+filter or a metric panel with a wrong resource scope ships empty just
+as quietly. Coverage:
 
-Keep the probe set bounded — dry-running every panel on a 30-panel
-dashboard is wasteful. For dashboards larger than ~10 panels, dry-run
-all panels that match the conditions above plus a representative
-sample of the trivial ones (≈5 max).
+- **Dashboards with ≤10 panels:** dry-run every panel, trivial or not.
+  The cost is small (one `count()`-style call per panel) and the
+  alternative is a dashboard that ships entirely unverified.
+- **Dashboards with >10 panels:** dry-run all panels that match the
+  conditions above, plus a representative sample of the trivial ones
+  (~5 max). Cap exists because dry-running every panel on a 30-panel
+  dashboard is wasteful — the non-trivial panels carry the highest
+  risk, and the trivial sample backstops the rest.
 
 ##### Step 3b-ii.7: Preview, save, report
 
@@ -417,8 +424,10 @@ sample of the trivial ones (≈5 max).
 
 
    > **Summary**: This dashboard tracks [signals] for [scope], with
-   > sections [list]. Variables: [list]. Time range default 1h. The
-   > no-data probe found data for [count]/[total] headline panels.
+   > sections [list]. Variables: [list]. Time range default 1h.
+   > Dry-run: [N]/[total] panels validated against live data (any
+   > panels that failed have been fixed; any panels deliberately
+   > sampled or skipped are listed).
 
    In autonomous mode the consumer proceeds; in interactive mode the
    human can intervene before save.
@@ -429,7 +438,9 @@ sample of the trivial ones (≈5 max).
    - The created dashboard's UUID and title.
    - Panel count and section breakdown.
    - Which variables are wired.
-   - The probe summary ("data found for N of M headline panels").
+   - The dry-run summary: how many panels were dry-run, how many
+     failed and were fixed pre-save, and any panels deliberately
+     sampled or skipped under the size rule above.
    - Two follow-up offers: "Want me to adjust panels, layout, or
      variables?" and "Want me to wire alerts for any of these signals?
      (`signoz-creating-alerts`)".
