@@ -95,16 +95,21 @@ optional.
    a saved view that must be deleted and recreated.
 4. **Enforce `signal == sourcePage`** in every `builder_query` spec. A
    `sourcePage:"traces"` view with `signal:"logs"` is a server-side error.
-5. **Mandatory pre-save sample fetch.** Run a 1-row probe using the
-   **exact** filter from `compositeQuery.queries[0].spec` against the
-   destination signal — `signoz:signoz_search_traces` /
-   `signoz:signoz_search_logs` (`limit=1`), or
-   `signoz:signoz_query_metrics` over the last 1h for
-   `sourcePage=metrics`. Required even if Step 3 ran cleanly: the
-   sub-skill validates the query *it* authored, not whatever you
-   persist after edits or lifts. Empty result → halt and offer save
-   anyway / revise / abort. Autonomous mode without authorization to
-   persist empty views: abort and escalate.
+5. **Mandatory pre-save sample fetch.** Probe with the **exact** filter
+   from `compositeQuery.queries[0].spec` against the destination
+   signal:
+   - `sourcePage=traces` → `signoz:signoz_search_traces` with `limit=1`
+   - `sourcePage=logs` → `signoz:signoz_search_logs` with `limit=1`
+   - `sourcePage=metrics` → `signoz:signoz_query_metrics` with the
+     `metricName` from `spec.aggregations[0].metricName` plus the same
+     filter, `timeRange=1h`, `requestType=scalar`. Repeat per metric
+     query if the view has multiple. The tool requires `metricName` —
+     a filter-only probe is not supported.
+
+   Required even if Step 3 ran cleanly: the sub-skill validates the
+   query *it* authored, not whatever you persist after edits or lifts.
+   Empty → save anyway / revise / abort. Autonomous mode without
+   authorization to persist empty views: abort and escalate.
 6. **Preview before writing — this step is not optional.** Before calling
    `signoz:signoz_create_view`, show the user a summary: name, sourcePage,
    panelType, the full filter expression, and the Step 5 probe result

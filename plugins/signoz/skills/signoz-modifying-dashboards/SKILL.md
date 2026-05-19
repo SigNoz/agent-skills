@@ -172,11 +172,16 @@ Merge the planned changes into the full dashboard JSON from Step 2.
 
 **Dry-run modified panels (mandatory).** Before
 `signoz:signoz_update_dashboard`, call
-`signoz:signoz_execute_builder_query` for each modified panel — see
-the "Mandatory dry-run before update" guardrail for conditions, the
-bool-filter footgun, and why this catches what the JSON diff cannot.
-Server error or unexpected empty result = fix the panel JSON before
-update.
+`signoz:signoz_execute_builder_query` for each modified panel.
+Translate the widget's `builder.queryData[]` / `queryFormulas[]` into
+the endpoint's `queries[].{type, spec}` envelope: each `queryData[i]`
+→ `{ type: "builder_query", spec: { signal, filter: {expression},
+groupBy, aggregations } }`; each `queryFormulas[i]` → `{ type:
+"builder_formula", spec: { name, expression } }`. The endpoint cannot
+consume widget JSON directly. See the "Mandatory dry-run before
+update" guardrail for the conditions, the bool-filter footgun, and
+why this catches what the JSON diff cannot. Server error or
+unexpected empty result = fix the panel JSON before update.
 
 Call `signoz:signoz_update_dashboard` with the dashboard UUID and the **complete** modified
 dashboard JSON.
@@ -202,17 +207,18 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
 - **Mandatory dry-run before update.** For every added or edited
   panel whose query uses `groupBy`, a formula, disabled queries,
   dynamic variables, or a non-string filter (bool / number), run
-  `signoz:signoz_execute_builder_query` with the exact filter +
-  groupBy + formula shape from `queryData` before
-  `signoz:signoz_update_dashboard`. Skipping is equivalent to
-  skipping the get-before-update step. The update-dashboard schema
-  accepts queries that 500 at evaluation time — a numeric `groupBy`,
-  an unquoted bool filter (`is_error = 'true'` is correct;
-  `is_error = true` 500s), an aggregation mismatched with the metric
-  type — and the result is a silently empty panel. Modifications are
-  especially prone to silent regression because the panel worked
-  before the edit. In autonomous mode there is no diff review — the
-  dry-run is the only safety net.
+  `signoz:signoz_execute_builder_query` before
+  `signoz:signoz_update_dashboard` — translate the panel's
+  `builder.queryData[]` / `queryFormulas[]` into the endpoint's
+  `queries[].{type, spec}` envelope (mapping in the Dry-run step
+  above). Skipping is equivalent to skipping the get-before-update
+  step. The update-dashboard schema accepts queries that 500 at
+  evaluation time — a numeric `groupBy`, an unquoted bool filter
+  (`is_error = 'true'` is correct; `is_error = true` 500s), an
+  aggregation mismatched with the metric type — and the result is a
+  silently empty panel. Modifications are especially prone to silent
+  regression because the panel worked before the edit. In autonomous
+  mode there is no diff review — the dry-run is the only safety net.
 - **Valid JSON only**: Follow the v5 schema documented in the
   `signoz://dashboard/*` MCP resources (`instructions`, `widgets-instructions`,
   `widgets-examples`, `query-builder-example`). Include all required widget

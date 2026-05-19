@@ -217,10 +217,10 @@ positive, so `"above_or_below"` is rejected and unnecessary.
 **Defaults the skill applies (and surfaces in the preview):**
 - `evalWindow: 5m0s`, `frequency: 1m0s` — change only if the intent implies
   a slower or faster cadence.
-- `matchType: "3"` (on_average) for CPU / memory / latency — smooths
+- `matchType: "on_average"` for CPU / memory / latency — smooths
   transient spikes.
-- `matchType: "1"` (at_least_once) for error counts / error rates — catches
-  any breach.
+- `matchType: "at_least_once"` for error counts / error rates —
+  catches any breach.
 
 **Severity defaults — derive from the intrinsic urgency of the alert, not
 just the user's words.** The user saying "alert me" doesn't force `warning`
@@ -392,9 +392,18 @@ Step 2.5 confirmed data flows. Step 6 does two things:
    alert have fired a sensible number of times in the last hour?
 
 Run the full primary query (or formula) over the last hour:
-- `signoz:signoz_execute_builder_query` for builder/formula queries.
-- `signoz:signoz_query_metrics` for PromQL queries.
-- `signoz:signoz_aggregate_logs` / `signoz:signoz_aggregate_traces` if those fit better.
+- `signoz:signoz_execute_builder_query` for **all** builder, formula,
+  and PromQL queries — set `compositeQuery.queries[].type` to
+  `builder_query` / `builder_formula` / `promql` as appropriate. For
+  PromQL put the query string in `spec.query` and read
+  `signoz://promql/instructions` for the UTF-8 quoted-selector form
+  SigNoz requires (`{"metric.name.with.dots"}` — not the underscored
+  or bare-dotted forms).
+- `signoz:signoz_aggregate_logs` / `signoz:signoz_aggregate_traces`
+  when those fit better.
+- `signoz:signoz_query_metrics` only when you have a concrete
+  `metricName` and want a quick scalar — it does not accept PromQL or
+  bare filter expressions.
 
 Compute how many evaluation points breached the proposed threshold.
 Surface in the preview as **"would have fired N times in the last 1h"**:
@@ -480,7 +489,10 @@ intervene before Step 8.
 - **No duplicate updates.** Name collision → error and stop. Do not
   silently update an existing alert from a "create" skill.
 - **OTel attribute names only.** `service.name` not `service`.
-- **Threshold codes are strings, not words.** `op: "1"` not `op: "above"`.
+- **Threshold operators use canonical words.** Prefer `op: "above"` /
+  `"below"` / `"equals"` / `"not_equals"`. Numeric codes (`"1"`–`"7"`)
+  are accepted but discouraged — same goes for `matchType`
+  (`"on_average"` / `"at_least_once"`, not `"3"` / `"1"`).
 - **Signal must match alertType.** `signal: "logs"` requires
   `LOGS_BASED_ALERT`. Mismatches fail validation.
 - **Anomaly rules are metrics-only.** `anomaly_rule` + non-metric alertType
@@ -510,8 +522,9 @@ intervene before Step 8.
 4. `signoz:signoz_list_notification_channels` → presents existing channels;
    user picks `slack-infra` for warning and `pagerduty-oncall` for critical.
 5. Builds JSON: `METRIC_BASED_ALERT`, `threshold_rule`,
-   `signal=metrics`, two thresholds (`op="1"`, `matchType="3"` on_average,
-   `targetUnit="percent"`), filter `service.name = 'checkout'`.
+   `signal=metrics`, two thresholds (`op="above"`,
+   `matchType="on_average"`, `targetUnit="percent"`), filter
+   `service.name = 'checkout'`.
 6. Dry-run via `signoz:signoz_execute_builder_query` over last 1h: returns data,
    would have fired 0 times (clean baseline).
 7. Emits JSON preview + summary.
@@ -531,8 +544,8 @@ intervene before Step 8.
 4. Builds formula alert: query A counts spans with `hasError = true` for
    `service.name = 'payments'`, query B counts all spans for the same
    service, formula F1 = `A * 100 / B`, `selectedQueryName: "F1"`,
-   threshold target 5, `targetUnit: "percent"`, `op: "1"`, `matchType: "1"`
-   (catch any breach).
+   threshold target 5, `targetUnit: "percent"`,
+   `op: "above"`, `matchType: "at_least_once"` (catch any breach).
 5. Channel: user picks `slack-payments`.
 6. Dry-run on last 1h: payments error rate hovered around 0.3%, would have
    fired 0 times. Clean — not too tight.
@@ -553,7 +566,7 @@ intervene before Step 8.
    `filter: {expression: "severity_text IN ('ERROR', 'FATAL')"}`,
    `groupBy: [{name: "service.name", fieldContext: "resource", fieldDataType: "string"}]`,
    threshold 1000, `targetUnit: ""`, `evalWindow: 1m0s`,
-   `matchType: "1"` (catch any minute that breaches).
+   `matchType: "at_least_once"` (catch any minute that breaches).
 4. Channels: user picks slack channel.
 5. Dry-run: returned per-service counts, max in last 1h was 87 — would
    have fired 0 times. Within reasonable headroom.
@@ -570,7 +583,8 @@ intervene before Step 8.
 2. `signoz:signoz_list_metrics searchText=duration` → finds
    `http.server.request.duration`.
 3. Builds: `anomaly_rule`, `algorithm=zscore`, `seasonality=daily`,
-   threshold target 3 (3 standard deviations), `op: "1"`, `matchType: "1"`.
+   threshold target 3 (3 standard deviations), `op: "above"`,
+   `matchType: "at_least_once"`.
 4. Channel: user picks slack-api.
 5. Dry-run validates query returns data. Skip breach-count for
    anomaly alerts.

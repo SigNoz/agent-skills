@@ -376,12 +376,21 @@ native JSON — stringifying them produces errors like
 
 ##### Step 3b-ii.6: Dry-run before save (mandatory)
 
-Call `signoz:signoz_execute_builder_query` with each panel's exact
-`queryData` shape (filter + groupBy + formula). The dry-run validates
-the query is well-formed *and* confirms data flows under that filter
-— the per-panel data probe folds in here. Non-empty response = pass;
-server error, "filter type mismatch", or unexpected zero rows = fail
-(fix the JSON before save).
+Call `signoz:signoz_execute_builder_query` per panel. The dry-run
+validates the query is well-formed *and* confirms data flows under
+that filter — the per-panel data probe folds in here.
+
+**Envelope translation.** Widget JSON wraps queries in
+`compositeQuery.builder.queryData[]` and `queryFormulas[]`, but
+`signoz_execute_builder_query` takes
+`compositeQuery.queries[].{type, spec}`. Translate per panel: each
+`queryData[i]` → `{ type: "builder_query", spec: { signal, filter:
+{expression}, groupBy, aggregations } }`; each `queryFormulas[i]` →
+`{ type: "builder_formula", spec: { name, expression } }`. The
+endpoint cannot consume widget JSON directly.
+
+Non-empty response = pass; server error, "filter type mismatch", or
+unexpected zero rows = fail (fix the panel JSON before save).
 
 Coverage:
 
@@ -454,15 +463,17 @@ Coverage:
   explicitly opted out for this request.
 - **Mandatory dry-run before save on custom builds.** Before
   `signoz:signoz_create_dashboard`, run
-  `signoz:signoz_execute_builder_query` per Step 3b-ii.6 against the
-  exact `queryData` shape. Skipping is equivalent to skipping the
-  duplicate check. The create-dashboard schema accepts queries that
-  500 at query time — a `groupBy` on a numeric attribute, an unquoted
-  bool filter (`is_error = 'true'` is correct; `is_error = true`
-  500s), an aggregation incompatible with the metric type — and the
-  result ships as a silently empty panel. The JSON preview a human
-  reads cannot catch these; autonomous mode has no preview at all,
-  so the dry-run is the only safety net.
+  `signoz:signoz_execute_builder_query` per Step 3b-ii.6 — translate
+  each panel's `builder.queryData[]` / `queryFormulas[]` into the
+  endpoint's `queries[].{type, spec}` envelope (mapping in Step
+  3b-ii.6). Skipping is equivalent to skipping the duplicate check.
+  The create-dashboard schema accepts queries that 500 at query time
+  — a `groupBy` on a numeric attribute, an unquoted bool filter
+  (`is_error = 'true'` is correct; `is_error = true` 500s), an
+  aggregation incompatible with the metric type — and the result
+  ships as a silently empty panel. The JSON preview a human reads
+  cannot catch these; autonomous mode has no preview at all, so the
+  dry-run is the only safety net.
 - **Preview before save on custom builds.** Emit the JSON + summary
   before `signoz:signoz_create_dashboard`. Preview is for human
   intervention on intent, not a substitute for the dry-run.
