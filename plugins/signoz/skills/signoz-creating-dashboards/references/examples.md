@@ -77,8 +77,11 @@ from this skill).
    Overview / Latency / Errors / Throughput, with headline panels
    (request rate, p99 latency, error rate `A*100/B`, throughput) and
    the two variables.
-6. Per-panel dry-run via `signoz:signoz_execute_builder_query` for the
-   headline queries (envelope translation per Step 3b-ii.6). Emits
-   JSON preview + summary, then calls `signoz:signoz_create_dashboard`.
-   Reports UUID, panels, sections, variables, dry-run summary. Offers
-   to wire error-rate alerts via `signoz-creating-alerts`.
+6. Per-panel dry-run via `signoz:signoz_execute_builder_query` for
+   **every** panel (envelope translation per Step 3b-ii.6, with
+   `name` preserved on each `builder_query.spec` so formulas
+   resolve). Emits a one-paragraph plain-language summary — no JSON
+   dump — then calls `signoz:signoz_create_dashboard`. Reports UUID,
+   panel count and section breakdown, and which variables are
+   wired. Offers to wire error-rate alerts via
+   `signoz-creating-alerts`.

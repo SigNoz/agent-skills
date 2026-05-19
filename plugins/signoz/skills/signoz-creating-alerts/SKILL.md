@@ -192,7 +192,7 @@ can never fire.
 The MCP server is the source of truth for the alert JSON schema, threshold
 codes, and validation rules. Read the `signoz://alert/instructions` and
 `signoz://alert/examples` MCP resources for the canonical, version-current
-shape. 
+shape.
 
 For most user intents, the config is one of a small number of patterns:
 

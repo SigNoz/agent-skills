@@ -21,7 +21,7 @@ log-volume groupBy, and anomaly detection.
    `service.name = 'checkout'`.
 6. Dry-run via `signoz:signoz_execute_builder_query` over last 1h: returns data,
    would have fired 0 times (clean baseline).
-7. Emits JSON preview + summary.
+7. Emits a one-paragraph plain-language summary — no JSON dump.
 8. Calls `signoz:signoz_create_alert`. Reports created alert with ID, threshold
    summary, channel routing, and dry-run result.
 
