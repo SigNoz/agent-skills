@@ -133,8 +133,11 @@ silently never fires.
 Run a single probe over the last 1 hour using the same filter the alert
 will use, but with the simplest aggregation that confirms data exists:
 
-- **Metrics**: `signoz:signoz_query_metrics` (PromQL) or `signoz:signoz_execute_builder_query`
-  with `count()` (or `count_distinct(service.name)` if scope-discovering).
+- **Metrics**: `signoz:signoz_execute_builder_query` with `count()`
+  (or `count_distinct(service.name)` if scope-discovering). Use
+  `signoz:signoz_query_metrics` when you already have a concrete
+  `metricName` — it auto-applies aggregation defaults but does not
+  accept PromQL or filter-only probes.
 - **Logs**: `signoz:signoz_aggregate_logs` with `count()` over the filter.
 - **Traces**: `signoz:signoz_aggregate_traces` with `count()` over the filter.
 
@@ -264,64 +267,24 @@ Use `{{$value}}` for the breaching value, `{{$threshold}}` for the target,
 and `{{$labels.<key>}}` for groupBy values (note SigNoz substitutes the
 dotted attribute name with underscores: `service.name` → `service_name`).
 
-#### Common query shapes
+#### Common query shapes — conventions
 
-Three patterns cover most non-trivial alerts. The MCP resources above carry
-the full schema; these are quick references for the query block only.
+Three patterns cover most non-trivial alerts. Read
+`signoz://alert/examples` for the authoritative JSON;
+[`references/query-shapes.md`](references/query-shapes.md) has the same
+illustrations in-skill for quick reference. The conventions that don't
+live in the schema:
 
-**Error rate** — two queries + formula `A * 100 / B`. **Set
-`disabled: true` on the component queries A and B** so only the formula
-F1 renders in the alert chart and notification — the raw counts are
-intermediate, not the alert signal. Forgetting this clutters the alert
-preview with three series and confuses the on-call engineer reading the
-notification.
-
-```json
-{
-  "queries": [
-    { "type": "builder_query", "spec": { "name": "A", "signal": "traces",
-        "disabled": true,
-        "aggregations": [{ "expression": "count()" }],
-        "filter": { "expression": "hasError = true" } } },
-    { "type": "builder_query", "spec": { "name": "B", "signal": "traces",
-        "disabled": true,
-        "aggregations": [{ "expression": "count()" }],
-        "filter": { "expression": "" } } },
-    { "type": "builder_formula",
-      "spec": { "name": "F1", "expression": "A * 100 / B" } }
-  ],
-  "selectedQueryName": "F1"
-}
-```
-
-**p99 latency** — single trace query with `groupBy` for per-service
-breakdown. Threshold target is in **nanoseconds** (2s → 2000000000),
-`targetUnit: "ns"`:
-
-```json
-{
-  "queries": [
-    { "type": "builder_query", "spec": { "name": "A", "signal": "traces",
-        "aggregations": [{ "expression": "p99(durationNano)" }],
-        "groupBy": [{ "name": "service.name", "fieldContext": "resource",
-                      "fieldDataType": "string" }] } }
-  ]
-}
-```
-
-**Log volume spike** — count of error/fatal logs grouped by service:
-
-```json
-{
-  "queries": [
-    { "type": "builder_query", "spec": { "name": "A", "signal": "logs",
-        "aggregations": [{ "expression": "count()" }],
-        "filter": { "expression": "severity_text IN ('ERROR', 'FATAL')" },
-        "groupBy": [{ "name": "service.name", "fieldContext": "resource",
-                      "fieldDataType": "string" }] } }
-  ]
-}
-```
+- **Error-rate formula:** set `disabled: true` on the component
+  queries A and B so only the formula F1 renders in the alert chart
+  and notification. The raw counts are intermediate, not the alert
+  signal — forgetting this clutters the preview with three series and
+  confuses the on-call engineer reading the notification.
+- **p99 latency:** threshold target is in **nanoseconds** (2s →
+  2000000000), `targetUnit: "ns"`.
+- **Log volume spike:** prefer `groupBy: service.name` over a hard
+  filter when the user said "any service" — groupBy provides the
+  scoping AND keeps the notification useful per-service.
 
 For absent-data, anomaly, PromQL, and ClickHouse SQL alerts, read the
 `signoz://alert/examples` MCP resource for current shapes.
@@ -513,85 +476,9 @@ intervene before Step 8.
 
 ## Examples
 
-**User:** "Alert me when CPU usage on the checkout service goes above 80%, page me at 90%"
-
-**Agent:**
-1. Intent parsed: metric, CPU, scope `service.name = checkout`,
-   thresholds 80% (warning) / 90% (critical), severity bumped to critical
-   on the higher level because "page me" was used.
-2. `signoz:signoz_list_metrics searchText=cpu` → confirms `system.cpu.utilization`.
-3. `signoz:signoz_list_alert_rules` (paginated) → no existing CPU alert for checkout.
-4. `signoz:signoz_list_notification_channels` → presents existing channels;
-   user picks `slack-infra` for warning and `pagerduty-oncall` for critical.
-5. Builds JSON: `METRIC_BASED_ALERT`, `threshold_rule`,
-   `signal=metrics`, two thresholds (`op="above"`,
-   `matchType="on_average"`, `targetUnit="percent"`), filter
-   `service.name = 'checkout'`.
-6. Dry-run via `signoz:signoz_execute_builder_query` over last 1h: returns data,
-   would have fired 0 times (clean baseline).
-7. Emits JSON preview + summary.
-8. Calls `signoz:signoz_create_alert`. Reports created alert with ID, threshold
-   summary, channel routing, and dry-run result.
-
----
-
-**User:** "Set up an alert when error rate goes above 5% on payments"
-
-**Agent:**
-1. Intent parsed: traces, error-rate formula, scope
-   `service.name = payments`, threshold 5%, severity default warning.
-2. `signoz:signoz_get_field_keys fieldContext=resource signal=traces` confirms
-   `service.name`. `signoz:signoz_get_field_values` confirms `payments` exists.
-3. No existing payments error-rate alert.
-4. Builds formula alert: query A counts spans with `hasError = true` for
-   `service.name = 'payments'`, query B counts all spans for the same
-   service, formula F1 = `A * 100 / B`, `selectedQueryName: "F1"`,
-   threshold target 5, `targetUnit: "percent"`,
-   `op: "above"`, `matchType: "at_least_once"` (catch any breach).
-5. Channel: user picks `slack-payments`.
-6. Dry-run on last 1h: payments error rate hovered around 0.3%, would have
-   fired 0 times. Clean — not too tight.
-7. Preview, save, report.
-
----
-
-**User:** "Notify me if log volume spikes more than 1000 error logs per minute on any service"
-
-**Agent:**
-1. Intent parsed: logs, volume threshold, scope = all services (groupBy
-   `service.name`), threshold 1000/min, severity warning.
-2. `signoz:signoz_get_field_keys signal=logs fieldContext=resource` confirms
-   `service.name` exists; **no service filter required** since the user
-   said "any service" → groupBy provides the scoping.
-3. Builds: `LOGS_BASED_ALERT`, `signal=logs`,
-   `aggregations: [{expression: "count()"}]`,
-   `filter: {expression: "severity_text IN ('ERROR', 'FATAL')"}`,
-   `groupBy: [{name: "service.name", fieldContext: "resource", fieldDataType: "string"}]`,
-   threshold 1000, `targetUnit: ""`, `evalWindow: 1m0s`,
-   `matchType: "at_least_once"` (catch any minute that breaches).
-4. Channels: user picks slack channel.
-5. Dry-run: returned per-service counts, max in last 1h was 87 — would
-   have fired 0 times. Within reasonable headroom.
-6. Preview, save, report.
-
----
-
-**User:** "Alert me on anomalous request latency for the api gateway"
-
-**Agent:**
-1. Intent parsed: metric, anomaly detection, scope
-   `service.name = api-gateway`. Anomaly detection requires
-   `METRIC_BASED_ALERT` + `anomaly_rule`.
-2. `signoz:signoz_list_metrics searchText=duration` → finds
-   `http.server.request.duration`.
-3. Builds: `anomaly_rule`, `algorithm=zscore`, `seasonality=daily`,
-   threshold target 3 (3 standard deviations), `op: "above"`,
-   `matchType: "at_least_once"`.
-4. Channel: user picks slack-api.
-5. Dry-run validates query returns data. Skip breach-count for
-   anomaly alerts.
-6. Preview emphasizes that the threshold is in standard deviations, not raw
-   latency. Save, report.
+Four canonical alert flows — multi-severity metric threshold,
+error-rate formula, log-volume groupBy, anomaly detection — live in
+[`references/examples.md`](references/examples.md).
 
 ## Additional resources
 
