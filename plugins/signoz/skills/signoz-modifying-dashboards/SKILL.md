@@ -121,17 +121,12 @@ Merge the planned changes into the full dashboard JSON from Step 2.
      MCP resource for the v5 builder query format. Use the signal-specific
      resources as needed (`signoz://dashboard/promql-example`,
      `signoz://dashboard/clickhouse-*`, `signoz://traces/query-builder-guide`).
-  6. **Prototype the query first if it is non-trivial.** When the new
-     panel needs a non-obvious filter, aggregation, or groupBy, delegate
-     query design to `signoz-generating-queries` before authoring the
-     widget. That skill picks the signal, discovers field names, runs
-     the query against live data, and returns a shape you can lift
-     directly into the panel. The reason: a wrong builder query only
-     surfaces as an empty panel after `signoz_update_dashboard`, and
-     each fix is another `get → mutate → update` round-trip. Validating
-     once ad-hoc is cheaper than editing the dashboard repeatedly.
-     Skip when the query is trivially obvious (single metric, no
-     groupBy, no formula).
+  6. Non-trivial panels (groupBy, formula, disabled queries, dynamic
+     variables, non-string attributes) are validated below as a hard
+     requirement — see the "Dry-run modified panels" step before
+     `signoz_update_dashboard` and the "Mandatory dry-run before
+     update" guardrail. Author the JSON here as you intend to save it
+     — the dry-run uses the exact shape from `queryData`.
 
 - **Removing a panel:** Remove the widget from `widgets`, its entry from `layout`,
   and its entry from the parent row's `panelMap.widgets` (if it exists in panelMap).
@@ -142,11 +137,10 @@ Merge the planned changes into the full dashboard JSON from Step 2.
 
 - **Editing a panel's query:** Replace the query object on the target widget. Keep
   all other widget fields intact. If the user is changing *what* the panel
-  measures (not just renaming a label), prototype the new query via
-  `signoz-generating-queries` first and confirm it returns the expected
-  shape before lifting it into the widget — replacing a working query
-  with a broken one is a destructive change the user will only notice
-  after the panel goes empty.
+  measures (not just renaming a label), the new query is validated by the
+  mandatory dry-run step below (and the "Mandatory dry-run before update"
+  guardrail) — replacing a working query with a broken one is a destructive
+  change the user will only notice after the panel goes empty.
 
 - **Changing panel type:** Update `panelTypes` and handle type-specific fields:
   - `graph` → `table`: add `columnUnits` ({}) and `columnWidths` ({}) if missing.
@@ -176,6 +170,19 @@ Merge the planned changes into the full dashboard JSON from Step 2.
     top-level `layout` array, apply the same change to the matching entry in
     `panelMap[rowId].widgets`. These are duplicated and must stay consistent.
 
+**Dry-run modified panels (mandatory).** For every panel whose builder
+query you added or edited, if that query uses `groupBy`, a formula
+expression, disabled queries, dynamic variables, or a non-string
+attribute (bool / number) in any filter, call
+`signoz:signoz_execute_builder_query` with the **exact** filter +
+groupBy + formula shape from the panel's `queryData` before calling
+`signoz:signoz_update_dashboard`. A non-empty success response is a
+pass; an error or unexpected empty result is a fail — fix the panel
+JSON before update. Skip only on trivially obvious panels (single
+metric / span / log aggregation with no `groupBy`, no formula, and no
+non-string filter). See the "Mandatory dry-run before update"
+guardrail for the full rationale and the bool-filter footgun.
+
 Call `signoz:signoz_update_dashboard` with the dashboard UUID and the **complete** modified
 dashboard JSON.
 
@@ -197,6 +204,34 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
   deleting variables, confirm with the user — even if they say "just do it" or
   express urgency. Additions, renames, type changes, and variable additions do not
   need confirmation.
+- **Mandatory dry-run before update.** For every panel whose builder
+  query you added or edited, if that query uses `groupBy`, a formula
+  expression, disabled queries, dynamic variables, or a non-string
+  attribute (bool / number) in any filter, run
+  `signoz:signoz_execute_builder_query` with the **exact** filter +
+  groupBy + formula shape from the panel's `queryData` before calling
+  `signoz:signoz_update_dashboard`. Skipping is a guardrail violation,
+  equivalent to skipping the get-before-update step. Skip only on
+  trivially obvious panels: a single metric / span / log aggregation
+  with no `groupBy`, no formula, and no non-string filter.
+
+  *Why:* every fix after update is another `get → mutate → update`
+  round-trip, and a wrong builder query only surfaces as an empty
+  panel *after* the update lands. Modifications are particularly
+  prone to this — the panel was working before the edit, so a silent
+  regression is harder to spot.
+
+  *Known bool footgun:* a bool attribute filter must be string-quoted
+  (`is_error = 'true'`), not unquoted (`is_error = true`). The
+  unquoted form is accepted by the update-dashboard schema and
+  returns HTTP 500 at query time — the panel ships silently empty.
+  The dry-run catches this; visual inspection of the JSON does not.
+
+  *Dual-mode reality:* an interactive-mode review of the diff is *not*
+  a substitute. A human reading the payload cannot tell that
+  `groupBy: ["http.status_code"]` will fail because that key is a
+  number, not a string. In autonomous mode there is no diff review at
+  all, so the dry-run is the *only* remaining safety net.
 - **Valid JSON only**: Follow the v5 schema documented in the
   `signoz://dashboard/*` MCP resources (`instructions`, `widgets-instructions`,
   `widgets-examples`, `query-builder-example`). Include all required widget

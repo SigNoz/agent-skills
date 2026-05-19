@@ -375,20 +375,36 @@ inputs and follow these rules:
   the secret in chat at all. Prefer the UI path when the user seems
   uncertain about exposing the token.
 
-### Step 6: Validate the threshold (would-have-fired count)
+### Step 6: Dry-run the full query and validate the threshold
 
-Step 2.5 already confirmed the underlying data exists. Step 6 is about
-the *threshold* — given the full proposed query (including formulas,
-groupBy, and unit conversions) and the proposed threshold, would this
-alert have fired a sensible number of times in the last hour?
+Step 2.5 already confirmed the underlying data exists. Step 6 serves
+**two** purposes:
 
-1. Run the alert's full primary query (or formula) over the last hour using:
-   - `signoz:signoz_execute_builder_query` for builder/formula queries.
-   - `signoz:signoz_query_metrics` for PromQL queries.
-   - `signoz:signoz_aggregate_logs` / `signoz:signoz_aggregate_traces` if those fit better.
-2. Compute how many evaluation points in the last hour breached the
-   proposed threshold. Surface this in the preview as
-   **"would have fired N times in the last 1h"**:
+1. **Validate the query shape** — running the full builder spec
+   (including `groupBy`, formulas, disabled queries, and any non-string
+   filters) is the only way to catch a query that passes the
+   create-alert schema check but fails at evaluation time. The classic
+   failures are a `groupBy` on a numeric attribute, an unquoted bool
+   filter (`is_error = true` instead of `'true'`), an aggregation
+   incompatible with the metric type, or a formula referencing a
+   disabled query. Step 2.5's `count()` probe with no `groupBy` does
+   **not** catch these — that's why this step uses the full query.
+2. **Calibrate the threshold** — given the validated query and the
+   proposed threshold, would this alert have fired a sensible number
+   of times in the last hour?
+
+Run the alert's full primary query (or formula) over the last hour:
+- `signoz:signoz_execute_builder_query` for builder/formula queries.
+- `signoz:signoz_query_metrics` for PromQL queries.
+- `signoz:signoz_aggregate_logs` / `signoz:signoz_aggregate_traces` if those fit better.
+
+**Treat any server error (HTTP 5xx, "filter type mismatch", etc.) as
+a query-shape failure — fix the alert config before save, do not
+proceed to threshold calibration.**
+
+Once the query returns cleanly, compute how many evaluation points in
+the last hour breached the proposed threshold. Surface this in the
+preview as **"would have fired N times in the last 1h"**:
    - **N = 0** → the threshold may be too loose or the gating too strict.
      Mention this so the user can adjust if intent was tighter.
    - **N is large (e.g. > 30)** → likely alert storm. Surface and
@@ -457,8 +473,35 @@ intervene before Step 8.
   a guessed service is harder to undo than asking.
 - **Always paginate `signoz:signoz_list_alert_rules`.** Stopping at page 1 misses
   duplicates and produces noise.
-- **Dry-run is mandatory.** Saving an alert whose query returns no data is
-  a silent failure mode and must be prevented.
+- **Dry-run is mandatory.** Step 2.5 (data probe) and Step 6 (full
+  query + threshold calibration) are both required before
+  `signoz:signoz_create_alert`. Skipping either is a guardrail
+  violation, equivalent to skipping the duplicate-rule check. Step 2.5
+  catches the "no data flowing" silent failure; Step 6 catches
+  query-shape failures the create-alert schema check accepts but the
+  evaluation engine rejects.
+
+  *Why two steps:* the create-alert API validates JSON shape, not
+  semantic correctness. A query whose `groupBy` references a numeric
+  attribute, whose bool filter is unquoted, whose aggregation does not
+  match the metric type, or whose formula references a disabled query
+  all save cleanly and silently never fire — the alert reads "OK" in
+  the UI and the on-call engineer never gets paged for the condition
+  it was supposed to catch. A never-firing alert is observably *worse*
+  than no alert because it provides a false sense of safety.
+
+  *Known bool footgun:* a bool attribute filter must be string-quoted
+  (`hasError = 'true'`), not unquoted (`hasError = true`). The
+  unquoted form is accepted by `signoz:signoz_create_alert` and
+  returns HTTP 500 at evaluation time. Step 6 catches this; the JSON
+  preview does not.
+
+  *Dual-mode reality:* the interactive-mode JSON preview is *not* a
+  substitute. A human reviewing the payload cannot tell that a
+  builder query with a numeric `groupBy` will error at evaluation. In
+  autonomous mode there is no preview at all, so Step 6 is the *only*
+  remaining safety net. The rule is therefore stricter in autonomous
+  mode, not lighter — there is nothing else watching.
 - **No duplicate updates.** Name collision → error and stop. Do not
   silently update an existing alert from a "create" skill.
 - **OTel attribute names only.** `service.name` not `service`.
