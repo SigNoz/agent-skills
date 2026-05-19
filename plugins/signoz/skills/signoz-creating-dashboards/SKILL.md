@@ -374,36 +374,22 @@ arrays/objects.** `layout`, `widgets`, `tags`, and `variables` are
 native JSON — stringifying them produces errors like
 `cannot unmarshal string into ... layout of type []LayoutItem`.
 
-##### Step 3b-ii.6: Dry-run non-trivial panels (mandatory)
+##### Step 3b-ii.6: Dry-run before save (mandatory)
 
-For every panel whose builder query uses `groupBy`, a formula
-expression, disabled queries, dynamic variables, or a non-string
-attribute (bool / number) in any filter, call
-`signoz:signoz_execute_builder_query` with the **exact** filter +
-groupBy + formula shape from the panel's `queryData`. The dry-run
-serves two ends at once: it proves the query is well-formed (the panel
-will not be empty due to a malformed builder request) *and* confirms
-data flows under the panel's actual filter — so the per-panel data
-probe folds in here.
+Call `signoz:signoz_execute_builder_query` with each panel's exact
+`queryData` shape (filter + groupBy + formula). The dry-run validates
+the query is well-formed *and* confirms data flows under that filter
+— the per-panel data probe folds in here. Non-empty response = pass;
+server error, "filter type mismatch", or unexpected zero rows = fail
+(fix the JSON before save).
 
-Treat a non-empty success response as a pass. Treat a server error,
-zero rows on a query you expected to populate, or a "filter type
-mismatch" message as a fail — fix the panel JSON before save.
+Coverage:
 
-**Coverage by dashboard size.** Trivial panels (single metric / span /
-log aggregation with no `groupBy`, no formula, no non-string filter)
-can fail silently too — a log-count panel with the wrong severity
-filter or a metric panel with a wrong resource scope ships empty just
-as quietly. Coverage:
-
-- **Dashboards with ≤10 panels:** dry-run every panel, trivial or not.
-  The cost is small (one `count()`-style call per panel) and the
-  alternative is a dashboard that ships entirely unverified.
-- **Dashboards with >10 panels:** dry-run all panels that match the
-  conditions above, plus a representative sample of the trivial ones
-  (~5 max). Cap exists because dry-running every panel on a 30-panel
-  dashboard is wasteful — the non-trivial panels carry the highest
-  risk, and the trivial sample backstops the rest.
+- **≤10 panels:** dry-run every panel, trivial or not. Trivial panels
+  fail silently too (wrong severity filter, wrong resource scope).
+- **>10 panels:** dry-run all panels with `groupBy`, formula,
+  disabled queries, dynamic variables, or non-string filters, plus a
+  ~5 sample of the trivial ones.
 
 ##### Step 3b-ii.7: Preview, save, report
 
@@ -466,43 +452,20 @@ as quietly. Coverage:
   / `signoz:signoz_create_dashboard`. A "No data" dashboard is a worse
   outcome than one extra confirmation prompt. Skip only if the user has
   explicitly opted out for this request.
-- **Mandatory dry-run before save on custom builds.** For every panel
-  whose builder query uses `groupBy`, a formula expression, disabled
-  queries, dynamic variables, or a non-string attribute (bool / number)
-  in any filter, run `signoz:signoz_execute_builder_query` with the
-  **exact** filter + groupBy + formula shape from the panel's
-  `queryData` before calling `signoz:signoz_create_dashboard`. Skipping
-  is a guardrail violation, equivalent to skipping the duplicate check.
-  Skip only on trivially obvious panels: a single metric / span / log
-  aggregation with no `groupBy`, no formula, and no non-string filter.
-
-  *Why:* panel JSON is awkward to debug after save — every fix is a
-  `get → mutate → update` round-trip — and a wrong builder query only
-  surfaces as an empty panel *after* the dashboard exists. The
-  observed failure mode is filters that look fine in text but fail at
-  query time (a `groupBy` on a numeric attribute, an aggregation
-  incompatible with the metric type, a formula referencing a disabled
-  query). Catching it before save is an order of magnitude cheaper.
-
-  *Known bool footgun:* a bool attribute filter must be string-quoted
-  (`is_error = 'true'`), not unquoted (`is_error = true`). The
-  unquoted form is accepted by the create-dashboard schema and returns
-  HTTP 500 at query time — the panel ships silently empty. The
-  dry-run catches this; the JSON preview does not.
-
-  *Dual-mode reality:* the interactive-mode JSON preview is *not* a
-  substitute. A human reading the payload cannot tell that
-  `groupBy: ["http.status_code"]` will fail because that key is a
-  number, not a string — the JSON compiles, then the panel is empty
-  after save. In autonomous mode there is no preview at all, so the
-  dry-run is the *only* remaining safety net. The rule is therefore
-  stricter in autonomous mode, not lighter — there is nothing else
-  watching.
+- **Mandatory dry-run before save on custom builds.** Before
+  `signoz:signoz_create_dashboard`, run
+  `signoz:signoz_execute_builder_query` per Step 3b-ii.6 against the
+  exact `queryData` shape. Skipping is equivalent to skipping the
+  duplicate check. The create-dashboard schema accepts queries that
+  500 at query time — a `groupBy` on a numeric attribute, an unquoted
+  bool filter (`is_error = 'true'` is correct; `is_error = true`
+  500s), an aggregation incompatible with the metric type — and the
+  result ships as a silently empty panel. The JSON preview a human
+  reads cannot catch these; autonomous mode has no preview at all,
+  so the dry-run is the only safety net.
 - **Preview before save on custom builds.** Emit the JSON + summary
-  before `signoz:signoz_create_dashboard` so the human (or the
-  autonomous consumer) has a chance to intervene. Preview comes
-  *after* the dry-run — never use the preview as a substitute for
-  dry-running the queries.
+  before `signoz:signoz_create_dashboard`. Preview is for human
+  intervention on intent, not a substitute for the dry-run.
 - **OTel attribute names only.** `service.name` not `service`,
   `host.name` not `host`. Wrong names produce empty panels. Verify the
   exact key (`deployment.environment` vs `deployment.environment.name`,

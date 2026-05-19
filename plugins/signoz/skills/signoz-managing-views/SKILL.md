@@ -95,29 +95,16 @@ optional.
    a saved view that must be deleted and recreated.
 4. **Enforce `signal == sourcePage`** in every `builder_query` spec. A
    `sourcePage:"traces"` view with `signal:"logs"` is a server-side error.
-5. **Mandatory pre-save sample fetch.** Before calling
-   `signoz:signoz_create_view`, run a 1-row probe using the **exact**
-   `filter.expression` (and `groupBy` / formula if any) from
-   `compositeQuery.queries[0].spec`, against the destination signal:
-   - `sourcePage=traces` → `signoz:signoz_search_traces` with `limit=1`
-   - `sourcePage=logs` → `signoz:signoz_search_logs` with `limit=1`
-   - `sourcePage=metrics` → `signoz:signoz_query_metrics` over a short
-     window (last 1h is fine) using the candidate filter
-
-   This is required even when Step 3's `signoz-generating-queries` ran
-   cleanly — the sub-skill validates the query *it* authored, but the
-   filter you persist may have been edited or lifted from a sibling
-   artifact (a dashboard panel, an alert rule, another view) since
-   then. The sample fetch validates the *exact* filter that will be
-   saved.
-
-   - **Non-empty result** → proceed to Step 6.
-   - **Empty result** → halt and surface to the user with three
-     choices: save anyway (accept that the view is empty), revise the
-     filter, or abort. In autonomous mode without authorization to
-     persist empty views, abort and escalate. Do not save a view that
-     returned zero rows against its own filter — see the guardrail
-     below for why.
+5. **Mandatory pre-save sample fetch.** Run a 1-row probe using the
+   **exact** filter from `compositeQuery.queries[0].spec` against the
+   destination signal — `signoz:signoz_search_traces` /
+   `signoz:signoz_search_logs` (`limit=1`), or
+   `signoz:signoz_query_metrics` over the last 1h for
+   `sourcePage=metrics`. Required even if Step 3 ran cleanly: the
+   sub-skill validates the query *it* authored, not whatever you
+   persist after edits or lifts. Empty result → halt and offer save
+   anyway / revise / abort. Autonomous mode without authorization to
+   persist empty views: abort and escalate.
 6. **Preview before writing — this step is not optional.** Before calling
    `signoz:signoz_create_view`, show the user a summary: name, sourcePage,
    panelType, the full filter expression, and the Step 5 probe result
@@ -167,13 +154,9 @@ upstream). Sending a partial body wipes the unspecified fields. The flow:
    recategorize), skip this step and do not touch `compositeQuery`.
 4. Modify only the field(s) the user asked to change.
 5. **Mandatory pre-save sample fetch — when `compositeQuery` changed.**
-   If your modification touched `compositeQuery` (filter, panelType,
-   aggregation), run the same 1-row probe described in Step 5 of the
-   Create flow against the destination signal, using the **exact** new
-   filter from the modified payload. Empty result → halt with the same
-   save-anyway / revise / abort choice. Skip this step only for pure
-   metadata tweaks (rename, recategorize) where `compositeQuery` is
-   unchanged.
+   Run the 1-row probe from the Create flow's Step 5 against the new
+   filter. Empty → save anyway / revise / abort. Skip only for pure
+   metadata tweaks (rename, recategorize).
 6. **Show a diff-style preview before writing.** One line per changed
    field: `name: "slow-checkout" → "slow-checkout-p99"`. Explicitly note
    any fields that are unchanged (e.g. "compositeQuery: unchanged") and
@@ -217,39 +200,27 @@ call.
 ## Guardrails
 
 - **Mandatory pre-save sample fetch on create and on `compositeQuery`
-  updates.** Step 5 of the Create flow (and Step 5 of the Update flow
-  when `compositeQuery` changed) must run a 1-row probe against the
-  destination signal using the **exact** filter from the about-to-save
-  payload. Skipping is a guardrail violation, equivalent to skipping
-  the get-before-delete step. The Step 3 `signoz-generating-queries`
-  delegation is **necessary but not sufficient** — it validates the
-  query *it* authored, not the filter you ultimately persist.
+  updates.** Step 5 of each flow runs a 1-row probe against the
+  destination signal using the exact filter from the about-to-save
+  payload. Skipping is equivalent to skipping get-before-delete. The
+  Step 3 `signoz-generating-queries` delegation is necessary but not
+  sufficient — it validates the query *it* authored, not the filter
+  you persist after edits.
 
-  *Why:* a saved view that returns zero rows under its own filter is
-  a permanent artifact in a shared workspace. Teammates clicking it
-  tomorrow see an empty Explorer and either delete-and-rebuild or
-  silently lose trust in the saved-views surface. The create API
-  validates JSON shape, not whether the filter actually matches data.
-
-  *Known cross-signal-lift footgun:* field keys are signal-scoped. An
+  *Cross-signal-lift footgun:* field keys are signal-scoped. An
   attribute observed on **metrics** (e.g. `oauth.error_code` on a
-  counter metric) may not exist on **traces** or **logs** for the
-  same tenant, even when the metric and the span are emitted by the
-  same service. Lifting an attribute name from a sibling dashboard
-  panel, alert rule, or view that targets a different signal is the
-  most common source of empty saved views. The field-key check
-  (`signoz:signoz_get_field_keys signal=<sourcePage>`) is necessary
-  but **not sufficient** — sparse emission can still produce a
-  zero-result view even when the key exists in the destination
-  signal's field set. The sample fetch is the only confirmation.
+  counter) may not exist on **traces** or **logs** for the same
+  tenant, even when emitted by the same service. Lifting an attribute
+  from a sibling dashboard panel, alert rule, or view that targets a
+  different signal is the most common source of empty saved views.
+  `signoz:signoz_get_field_keys signal=<sourcePage>` is necessary but
+  not sufficient — sparse emission still produces zero-result views.
+  Only the sample fetch confirms.
 
-  *Dual-mode reality:* the interactive-mode preview shows the filter
-  expression, not the result of the filter. A human reviewer cannot
-  tell from the JSON that `oauth.error_code` is missing on traces —
-  the filter parses fine, the view saves cleanly, and the failure
-  surfaces only when someone clicks it. In autonomous mode there is
-  no preview at all, so the sample fetch is the *only* remaining
-  safety net.
+  A saved view returning zero rows under its own filter is a
+  permanent artifact in a shared workspace; the human preview can't
+  tell from JSON that the filter won't match, and autonomous mode
+  has no preview, so the sample fetch is the only safety net.
 
 ## Quick reference
 
