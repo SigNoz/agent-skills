@@ -105,7 +105,7 @@ page (`limit=50`); only paginate when `pagination.hasMore=true`. Use
 string values for `limit` / `offset` (e.g. `"50"`, `"0"`) — the schema
 expects strings, not integers.
 
-**Match by relevance.** Compare each existing
+**Match by relevance** Compare each existing
 dashboard's lowercased `name`, `description`, and `tags` against the
 user's technology/domain. Surface only matches a human would recognize
 as the same thing — a "redis" dashboard does not match a "postgresql"
@@ -156,7 +156,7 @@ Branch on the result:
 
 #### Step 3b-i: Import the template
 
-> **Tool guardrail.** The only template tools are
+> **Tool guardrail** The only template tools are
 > `signoz:signoz_list_dashboard_templates` and
 > `signoz:signoz_import_dashboard`. Do not shell out, fetch raw GitHub
 > URLs, or invent other tool names.
@@ -216,22 +216,22 @@ template path.
 
 ##### Step 3b-i.2: Preview, import, report
 
-1. **Preview.** Tell the user what's about to happen in one short
+1. **Preview** Tell the user what's about to happen in one short
    paragraph: which template (`title`, `path`), what category, what the
    probe found. In autonomous mode the consumer proceeds; in interactive
    mode the human can intervene.
-2. **Import.** Call `signoz:signoz_import_dashboard` with the `path`
+2. **Import** Call `signoz:signoz_import_dashboard` with the `path`
    from the chosen catalog entry (e.g. `postgresql/postgresql.json`).
    The server fetches the JSON, validates it, and creates the dashboard
    in one call.
-3. **Report.** Read the response and tell the user the dashboard's
+3. **Report** Read the response and tell the user the dashboard's
    title, panel count, and section breakdown. Surface the dashboard's
    variables ("filter by `service.name`", "filter by
    `k8s.cluster.name`") so the user knows what knobs they have. Offer
    two follow-ups: "Want me to adjust panels, layout, or variables?"
    and "Want me to wire alerts for any of these signals?
    (`signoz-creating-alerts`)".
-4. **Customization handling.** If the user asks for any change to the
+4. **Customization handling** If the user asks for any change to the
    imported dashboard, hand off to `signoz-modifying-dashboards` with
    the new dashboard's UUID and the requested changes. Do not call
    `signoz:signoz_update_dashboard` from this skill.
@@ -295,7 +295,7 @@ builder shape, and layout rules — do not transcribe schema text into
 this skill, it will rot out of sync with the server. Read the four
 core resources before authoring widget JSON.
 
-> **Fallback when the MCP resource-reader is unavailable.** Some MCP
+> **Fallback when the MCP resource-reader is unavailable** Some MCP
 > client harnesses do not expose a resource-reading tool. If you
 > cannot read `signoz://...` URIs in this session, fall back to
 > `signoz:signoz_list_dashboards` + `signoz:signoz_get_dashboard` on
@@ -354,7 +354,7 @@ dry-run uses the exact shape from `queryData`.
 | Layout | 2-column grid (`w: 6`), 12 columns wide | full-width (`w: 12`) for tables and time-series with many series |
 | GroupBy on per-service panels | `service.name` resource attribute | drop when filtering to a single service |
 
-**Title and description.** The dashboard title should name the
+**Title and description** The dashboard title should name the
 technology and the scope clearly: "PostgreSQL — prod-us-east-1", not
 just "PostgreSQL". Description should answer "what is this for" in one
 sentence. Tags: technology + signal types + environment when known.
@@ -368,7 +368,7 @@ errors. Re-skim it before serialising any custom widget JSON.
 
 One rule `widgets-examples` does not call out, but
 `signoz:signoz_create_dashboard` enforces: **no `JSON.stringify` on
-arrays/objects.** `layout`, `widgets`, `tags`, and `variables` are
+arrays/objects** `layout`, `widgets`, `tags`, and `variables` are
 native JSON — stringifying them produces errors like
 `cannot unmarshal string into ... layout of type []LayoutItem`.
 
@@ -378,7 +378,7 @@ Call `signoz:signoz_execute_builder_query` per panel. The dry-run
 validates the query is well-formed *and* confirms data flows under
 that filter — the per-panel data probe folds in here.
 
-**Envelope translation.** Widget JSON wraps queries in
+**Envelope translation** Widget JSON wraps queries in
 `compositeQuery.builder.queryData[]` and `queryFormulas[]`, but
 `signoz_execute_builder_query` takes
 `compositeQuery.queries[].{type, spec}`. Translate per panel: each
@@ -397,91 +397,76 @@ scope, attribute name shorthand like `service` instead of
 
 ##### Step 3b-ii.7: Preview, save, report
 
-1. **Preview.** Emit a one-paragraph plain-language summary plus a
-   fenced JSON code block containing the exact payload that will be sent
-   to `signoz:signoz_create_dashboard`:
-
-   ```json
-   {
-     "title": "...",
-     "description": "...",
-     "tags": ["..."],
-     "variables": { ... },
-     "widgets": [ ... ],
-     "layout": [ ... ]
-   }
-   ```
+1. **Preview** Emit a one-paragraph plain-language summary of what
+   will be created — no JSON dump. A 20–30 widget payload is hundreds
+   of lines the user cannot meaningfully review in chat, and the
+   dry-run has already validated every panel against live data.
 
    > **Summary**: This dashboard tracks [signals] for [scope], with
    > sections [list]. Variables: [list]. Time range default 1h.
-   > Dry-run: [N]/[total] panels validated against live data (any
-   > panels that failed have been fixed; any panels deliberately
-   > sampled or skipped are listed).
+   > Dry-run: all [N] panels validated against live data (any
+   > failures have been fixed pre-save).
 
-2. **Save.** Call `signoz:signoz_create_dashboard` with the payload.
+2. **Save** Call `signoz:signoz_create_dashboard` with the payload.
 
-3. **Report.** Tell the user:
+3. **Report** Tell the user:
    - The created dashboard's UUID and title.
    - Panel count and section breakdown.
    - Which variables are wired.
-   - The dry-run summary: how many panels were dry-run, how many
-     failed and were fixed pre-save, and any panels deliberately
-     sampled or skipped under the size rule above.
    - Two follow-up offers: "Want me to adjust panels, layout, or
      variables?" and "Want me to wire alerts for any of these signals?
      (`signoz-creating-alerts`)".
 
 ## Guardrails
 
-- **Strict inputs over guessing.** Resource scope is required for custom
+- **Strict inputs over guessing** Resource scope is required for custom
   builds. If missing, stop and ask the user (see *Required inputs*
   above). A guessed scope on a shared dashboard is harder to clean up
   than asking.
-- **Always paginate `signoz:signoz_list_dashboards`.** Stopping at page
+- **Always paginate `signoz:signoz_list_dashboards`** Stopping at page
   1 misses duplicates and produces clutter.
-- **Duplicate check first.** The user's only two upfront options are
+- **Duplicate check first** The user's only two upfront options are
   "modify an existing one" or "create a new one" — never offer
   template-import as a separate top-level choice.
-- **Template-first on the create path.** Once the user has chosen to
+- **Template-first on the create path** Once the user has chosen to
   create, always run `signoz:signoz_list_dashboard_templates` before any
   `signoz:signoz_create_dashboard` call. If a matching template exists,
   import it via `signoz:signoz_import_dashboard` (just inform the user);
   only build from scratch when no template matches.
-- **No-data probe is mandatory before save.** Run the pre-flight probe
+- **No-data probe is mandatory before save** Run the pre-flight probe
   (Step 3b-i.1 / Step 3b-ii.2) before `signoz:signoz_import_dashboard`
   / `signoz:signoz_create_dashboard`. A "No data" dashboard is a worse
   outcome than one extra confirmation prompt. Skip only if the user has
   explicitly opted out for this request.
-- **Mandatory dry-run before save on custom builds.** Before
+- **Mandatory dry-run before save on custom builds** Before
   `signoz:signoz_create_dashboard`, run
   `signoz:signoz_execute_builder_query` per Step 3b-ii.6 — translate
   each panel's `builder.queryData[]` / `queryFormulas[]` into the
   endpoint's `queries[].{type, spec}` envelope (mapping in Step
   3b-ii.6). Skipping is equivalent to skipping the duplicate check.
   The create-dashboard schema accepts queries that 500 at query time
-  — a `groupBy` on a numeric attribute, an unquoted bool filter
-  (`is_error = 'true'` is correct; `is_error = true` 500s), an
+  — a `groupBy` on a numeric attribute, an
   aggregation incompatible with the metric type — and the result
-  ships as a silently empty panel. The JSON preview a human reads
-  cannot catch these; autonomous mode has no preview at all, so the
-  dry-run is the only safety net.
-- **Preview before save on custom builds.** Emit the JSON + summary
-  before `signoz:signoz_create_dashboard`. Preview is for human
-  intervention on intent, not a substitute for the dry-run.
-- **OTel attribute names only.** `service.name` not `service`,
+  ships as a silently empty panel.
+- **Preview before save on custom builds** Emit the plain-language
+  summary before `signoz:signoz_create_dashboard` so the human can
+  intervene on intent. Skip the raw JSON — for a 20–30 widget
+  dashboard it is hundreds of lines no one will review. The dry-run
+  (not the preview) is the safety net against bad queries.
+- **Prefer OTel attribute names** `service.name` not `service`,
   `host.name` not `host`. Wrong names produce empty panels. Verify the
   exact key (`deployment.environment` vs `deployment.environment.name`,
   for instance) against `signoz:signoz_get_field_keys` rather than guessing —
   installs running classic OTel semconv emit the no-`.name` form.
-- **No metric guessing.** For custom builds, verify metric names with
+- **No metric guessing** For custom builds, verify metric names with
   `signoz:signoz_list_metrics` before authoring. Wrong names produce
   empty panels and the user only finds out later.
-- **Valid JSON shapes only.** Follow the v5 schema documented in
+- **Valid JSON shapes only** Follow the v5 schema documented in
   `signoz://dashboard/*` MCP resources. Required widget and `queryData`
   fields are listed in `signoz://dashboard/widgets-instructions` and
   `signoz://dashboard/widgets-examples`. Never wrap arrays/objects in
   `JSON.stringify`.
-- **Scope boundary.** This skill creates dashboards. The moment the
+- **Scope boundary** This skill creates dashboards. The moment the
   user asks to modify, edit, rearrange, or extend an existing dashboard
   — including immediately after import — hand off to
   `signoz-modifying-dashboards`. Do not call
