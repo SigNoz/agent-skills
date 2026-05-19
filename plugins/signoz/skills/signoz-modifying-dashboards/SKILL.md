@@ -121,9 +121,8 @@ Merge the planned changes into the full dashboard JSON from Step 2.
      MCP resource for the v5 builder query format. Use the signal-specific
      resources as needed (`signoz://dashboard/promql-example`,
      `signoz://dashboard/clickhouse-*`, `signoz://traces/query-builder-guide`).
-  6. Non-trivial panels (groupBy, formula, disabled queries, dynamic
-     variables, non-string attributes) are validated below as a hard
-     requirement — see the "Dry-run modified panels" step before
+  6. All modified panels are validated below as a hard requirement —
+     see the "Dry-run modified panels" step before
      `signoz_update_dashboard` and the "Mandatory dry-run before
      update" guardrail. Author the JSON here as you intend to save it
      — the dry-run uses the exact shape from `queryData`.

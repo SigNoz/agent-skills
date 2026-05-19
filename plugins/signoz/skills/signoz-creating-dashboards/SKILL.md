@@ -19,8 +19,7 @@ argument-hint: <natural-language dashboard intent>
 Build a SigNoz dashboard from a user's natural-language intent. The skill
 targets two consumers: an autonomous AI SRE agent that runs without a
 human in the loop, and a human at a Claude Code / Codex / Cursor prompt.
-Both go through the same flow — the human just gets a chance to intervene
-at the preview step.
+Both go through the same flow.
 
 ## Prerequisites
 
@@ -336,10 +335,9 @@ Follow the v5 schema as documented in the resources above. Use OTel
 semantic attribute names (not shorthand) in filters, groupBy, and
 variables. Apply the defaults below unless the user specified otherwise.
 
-Non-trivial panels (groupBy, formula, disabled queries, dynamic
-variables, non-string attributes) are validated in Step 3b-ii.6 via the
-mandatory dry-run before save. Author the JSON here as you intend to
-save it — the dry-run uses the exact shape from `queryData`.
+All panels are validated in Step 3b-ii.6 via the mandatory dry-run
+before save. Author the JSON here as you intend to save it — the
+dry-run uses the exact shape from `queryData`.
 
 **Defaults the skill applies (and surfaces in the preview):**
 
@@ -392,13 +390,10 @@ endpoint cannot consume widget JSON directly.
 Non-empty response = pass; server error, "filter type mismatch", or
 unexpected zero rows = fail (fix the panel JSON before save).
 
-Coverage:
-
-- **≤10 panels:** dry-run every panel, trivial or not. Trivial panels
-  fail silently too (wrong severity filter, wrong resource scope).
-- **>10 panels:** dry-run all panels with `groupBy`, formula,
-  disabled queries, dynamic variables, or non-string filters, plus a
-  ~5 sample of the trivial ones.
+Coverage: dry-run **every panel**, regardless of count or shape.
+Trivial panels fail silently too (wrong severity filter, wrong resource
+scope, attribute name shorthand like `service` instead of
+`service.name`) — the same footguns that bite non-trivial panels.
 
 ##### Step 3b-ii.7: Preview, save, report
 
@@ -417,15 +412,11 @@ Coverage:
    }
    ```
 
-
    > **Summary**: This dashboard tracks [signals] for [scope], with
    > sections [list]. Variables: [list]. Time range default 1h.
    > Dry-run: [N]/[total] panels validated against live data (any
    > panels that failed have been fixed; any panels deliberately
    > sampled or skipped are listed).
-
-   In autonomous mode the consumer proceeds; in interactive mode the
-   human can intervene before save.
 
 2. **Save.** Call `signoz:signoz_create_dashboard` with the payload.
 
