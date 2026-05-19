@@ -318,8 +318,8 @@ Run the full primary query (or formula) over the last hour:
 - `signoz:signoz_query_metrics` when the alert query targets a single
   known metric by `metricName` — the tool auto-applies aggregation
   defaults and accepts `filter`, `groupBy`, and `formula` alongside.
-  PromQL is not supported here; use `signoz_execute_builder_query` for
-  that.
+  PromQL is not supported here; use `signoz:signoz_execute_builder_query`
+  for that.
 
 Compute how many evaluation points breached the proposed threshold.
 Surface in the preview as **"would have fired N times in the last 1h"**.

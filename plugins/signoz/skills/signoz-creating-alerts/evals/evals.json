@@ -19,7 +19,7 @@
       "id": 2,
       "eval_name": "logs-pod-crash-keywords",
       "prompt": "create a log-based alert for pod crashes — fire if we see OOMKilled, CrashLoopBackOff, panic, or FATAL anywhere in log bodies. group by service so I know which one. notify #staging-alerts.",
-      "expected_output": "LOGS_BASED_ALERT, signal=logs, count() aggregation, body filter using LIKE/CONTAINS for the four keywords (OR'd), groupBy service.name with fieldContext=resource and fieldDataType=string. Threshold > 0, matchType='at_least_once' (canonical word form preferred over numeric codes). Performs the mandatory dry-run via signoz_execute_builder_query (with signal=logs in the builder_query.spec) to verify query returns data and to compute would-have-fired count.",
+      "expected_output": "LOGS_BASED_ALERT, signal=logs, count() aggregation, body filter using LIKE/CONTAINS for the four keywords (OR'd), groupBy service.name with fieldContext=resource and fieldDataType=string. Threshold > 0, matchType='at_least_once' (canonical word form preferred over numeric codes). Runs the mandatory dry-run via signoz_execute_builder_query (with signal=logs in the builder_query.spec). CRITICAL: crash-pattern alerts (OOMKilled / CrashLoopBackOff / panic / FATAL) intentionally have zero matches in a healthy system — agent must surface the zero-match result, ask the user to confirm before saving an alert that returns nothing now, and skip the would-have-fired breach-count computation per the skill's healthy-zero exception. Must NOT treat zero matches as a failure or nudge the user to loosen the filter.",
       "files": []
     },
     {

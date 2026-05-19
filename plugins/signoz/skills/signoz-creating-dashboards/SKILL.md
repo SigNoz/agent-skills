@@ -91,12 +91,17 @@ a guessed value.
 
 The flow runs in order: **duplicate check → user picks modify-or-create
 → on create, template lookup decides template-import vs custom-build →
-no-data probe → preview → save**. Duplicate check comes first so we
-never silently create a second copy of something that already exists.
-Once the user has chosen to create, the template lookup is an internal
-implementation detail — if a curated template fits we use it, otherwise
-we build from scratch. The user is offered exactly two upfront choices:
-modify an existing dashboard, or create a new one.
+no-data probe → per-panel dry-run → preview → save**. Duplicate check
+comes first so we never silently create a second copy of something that
+already exists. Once the user has chosen to create, the template lookup
+is an internal implementation detail — if a curated template fits we
+use it, otherwise we build from scratch. The per-panel dry-run
+(`signoz:signoz_execute_builder_query` against every query-bearing
+panel) is mandatory before save — a saved empty panel from a typo'd
+attribute or wrong severity filter is the worst failure mode for this
+skill, and dry-run is the only step that catches it. The user is
+offered exactly two upfront choices: modify an existing dashboard, or
+create a new one.
 
 ### Step 1: Check for duplicates
 
@@ -380,7 +385,7 @@ that filter — the per-panel data probe folds in here.
 
 **Envelope translation** Widget JSON wraps queries in
 `compositeQuery.builder.queryData[]` and `queryFormulas[]`, but
-`signoz_execute_builder_query` takes
+`signoz:signoz_execute_builder_query` takes
 `compositeQuery.queries[].{type, spec}`. Translate per panel: each
 `queryData[i]` → `{ type: "builder_query", spec: { name, signal,
 filter: {expression}, groupBy, aggregations } }`; each
@@ -395,22 +400,26 @@ directly.
 Non-empty response = pass; server error, "filter type mismatch", or
 unexpected zero rows = fail (fix the panel JSON before save).
 
-Coverage: dry-run **every panel**, regardless of count or shape.
-Trivial panels fail silently too (wrong severity filter, wrong resource
-scope, attribute name shorthand like `service` instead of
-`service.name`) — the same footguns that bite non-trivial panels.
+Coverage: dry-run **every query-bearing panel**, regardless of count
+or shape. Trivial panels fail silently too (wrong severity filter,
+wrong resource scope, attribute name shorthand like `service` instead
+of `service.name`) — the same footguns that bite non-trivial panels.
+Row / header panels (`panelTypes: "row"`) have no query to execute —
+validate their shape against `signoz://dashboard/widgets-examples`
+instead and skip them here.
 
 ##### Step 3b-ii.7: Preview, save, report
 
 1. **Preview** Emit a one-paragraph plain-language summary of what
    will be created — no JSON dump. A 20–30 widget payload is hundreds
    of lines the user cannot meaningfully review in chat, and the
-   dry-run has already validated every panel against live data.
+   dry-run has already validated every query-bearing panel against
+   live data.
 
    > **Summary**: This dashboard tracks [signals] for [scope], with
    > sections [list]. Variables: [list]. Time range default 1h.
-   > Dry-run: all [N] panels validated against live data (any
-   > failures have been fixed pre-save).
+   > Dry-run: all [N] query-bearing panels validated against live
+   > data (any failures have been fixed pre-save).
 
 2. **Save** Call `signoz:signoz_create_dashboard` with the payload.
 

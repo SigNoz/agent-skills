@@ -123,9 +123,9 @@ Merge the planned changes into the full dashboard JSON from Step 2.
      `signoz://dashboard/clickhouse-*`, `signoz://traces/query-builder-guide`).
   6. All modified panels are validated below as a hard requirement —
      see the "Dry-run modified panels" step before
-     `signoz_update_dashboard` and the "Mandatory dry-run before
-     update" guardrail. Author the JSON here as you intend to save it
-     — the dry-run uses the exact shape from `queryData`.
+     `signoz:signoz_update_dashboard` and the "Mandatory dry-run
+     before update" guardrail. Author the JSON here as you intend to
+     save it — the dry-run uses the exact shape from `queryData`.
 
 - **Removing a panel:** Remove the widget from `widgets`, its entry from `layout`,
   and its entry from the parent row's `panelMap.widgets` (if it exists in panelMap).
@@ -207,12 +207,14 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
   express urgency. Additions, renames, type changes, and variable additions do not
   need confirmation.
 - **Mandatory dry-run before update.** For every added or edited
-  panel, run `signoz:signoz_execute_builder_query` before
-  `signoz:signoz_update_dashboard` (envelope translation in the
-  Dry-run step above). Modifications are especially prone to silent
-  regression because the panel worked before the edit — a saved
-  empty panel from a typo'd rename or attribute swap is the worst
-  failure mode for this skill.
+  query-bearing panel, run `signoz:signoz_execute_builder_query`
+  before `signoz:signoz_update_dashboard` (envelope translation in
+  the Dry-run step above). Row / header panels (`panelTypes:
+  "row"`) have no query — validate their shape against
+  `signoz://dashboard/widgets-examples` instead. Modifications are
+  especially prone to silent regression because the panel worked
+  before the edit — a saved empty panel from a typo'd rename or
+  attribute swap is the worst failure mode for this skill.
 - **Valid JSON only**: Follow the v5 schema documented in the
   `signoz://dashboard/*` MCP resources (`instructions`, `widgets-instructions`,
   `widgets-examples`, `query-builder-example`). Include all required widget
