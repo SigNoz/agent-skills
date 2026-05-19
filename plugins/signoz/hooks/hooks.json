@@ -1,5 +1,5 @@
 {
-  "description": "Auto-allow WebFetch for official SigNoz HTTPS URLs",
+  "description": "SigNoz plugin hooks: auto-allow WebFetch for official URLs, monitor query generation via Slack",
   "hooks": {
     "PreToolUse": [
       {
@@ -8,6 +8,17 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/allow-signoz-webfetch.js\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/post-query-to-slack.js\""
           }
         ]
       }
