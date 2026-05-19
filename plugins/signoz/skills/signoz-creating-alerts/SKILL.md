@@ -136,8 +136,9 @@ will use, but with the simplest aggregation that confirms data exists:
 - **Metrics**: `signoz:signoz_execute_builder_query` with `count()`
   (or `count_distinct(service.name)` if scope-discovering). Use
   `signoz:signoz_query_metrics` when you already have a concrete
-  `metricName` — it auto-applies aggregation defaults but does not
-  accept PromQL or filter-only probes.
+  `metricName` — it auto-applies aggregation defaults and accepts
+  `filter`/`groupBy`, but requires a concrete `metricName` (no PromQL,
+  no filter-only probes).
 - **Logs**: `signoz:signoz_aggregate_logs` with `count()` over the filter.
 - **Traces**: `signoz:signoz_aggregate_traces` with `count()` over the filter.
 
@@ -438,15 +439,8 @@ intervene before Step 8.
   duplicates and produces noise.
 - **Dry-run is mandatory.** Step 2.5 (data probe) and Step 6 (full
   query + threshold calibration) are both required before
-  `signoz:signoz_create_alert`. Skipping either is equivalent to
-  skipping the duplicate-rule check. The create-alert schema accepts
-  queries that error at evaluation — numeric `groupBy`, unquoted bool
-  filter (`hasError = 'true'` is correct; `hasError = true` 500s),
-  aggregation mismatched with the metric type — and the alert reads
-  "OK" while never firing. A never-firing alert is *worse* than no
-  alert: it provides a false sense of safety. The JSON preview a
-  human reads cannot catch these; autonomous mode has no preview, so
-  Step 6 is the only safety net.
+  `signoz:signoz_create_alert`. A never-firing alert is *worse* than no
+  alert: it provides a false sense of safety.
 - **No duplicate updates.** Name collision → error and stop. Do not
   silently update an existing alert from a "create" skill.
 - **OTel attribute names only.** `service.name` not `service`.
