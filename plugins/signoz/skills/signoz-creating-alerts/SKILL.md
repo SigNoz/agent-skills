@@ -401,21 +401,11 @@ inputs and follow these rules:
 
 ### Step 8: Preview the prepared config
 
-Emit a fenced JSON code block containing the exact payload that will be sent
-to `signoz:signoz_create_alert`, plus a one-paragraph plain-language summary:
-
-```json
-{
-  "alert": "<name>",
-  "alertType": "...",
-  "ruleType": "...",
-  "condition": { ... },
-  "labels": { "severity": "..." },
-  "annotations": { "description": "...", "summary": "..." },
-  "evaluation": { ... },
-  "preferredChannels": ["..."]
-}
-```
+Emit a one-paragraph plain-language summary of what will be created —
+no raw JSON dump. The user-facing facts (what fires, on what scope, at
+what threshold, where it routes) are captured by the summary; clicking
+through the JSON does not catch query-shape errors (Step 6's dry-run
+does).
 
 > **Summary**: This alert fires when [condition] for [resource scope],
 > evaluated every [frequency] over the last [window]. Thresholds:
@@ -424,7 +414,7 @@ to `signoz:signoz_create_alert`, plus a one-paragraph plain-language summary:
 
 ### Step 9: Save and report
 
-1. Call `signoz:signoz_create_alert` with the JSON payload from Step 8.
+1. Call `signoz:signoz_create_alert` with the config from Step 8.
 2. **Name collision** — if `signoz:signoz_create_alert` returns a duplicate-name
    error, **do not** suffix-append or call `signoz:signoz_update_alert`. Stop and
    tell the user the existing alert blocked creation; offer to use a
