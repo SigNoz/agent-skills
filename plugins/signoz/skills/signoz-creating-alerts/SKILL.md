@@ -324,12 +324,17 @@ before save."* Stop and ask the user to confirm before proceeding to
 Step 7.
 
 Compute how many evaluation points breached the proposed threshold.
-Surface in the preview as **"would have fired N times in the last 1h"**:
-   - **N = 0** → the threshold may be too loose or the gating too strict.
-     Mention this so the user can adjust if intent was tighter.
+Surface in the preview as **"would have fired N times in the last 1h"**.
+A 1h window is too short to grade most alerts — only the upper extreme
+is actionable:
    - **N is large (e.g. > 30)** → likely alert storm. Surface and
      recommend tightening or adding hysteresis (`recoveryTarget`).
-   - **N is small and non-zero** → calibrated; proceed.
+   - **N = 0** → expected for a healthy system; do not nudge the user
+     to loosen. Only flag if the user said they'd expect the alert
+     firing right now (e.g. during an active incident).
+   - **N is small and non-zero** → report the count; the user decides
+     whether the threshold is right. One hour can't distinguish "tuned
+     well" from "barely caught a transient".
 3. **Exceptions:**
    - **Anomaly alerts** — skip the breach count entirely (Z-scores aren't
      directly comparable to raw values). Step 4 already verified the
