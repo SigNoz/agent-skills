@@ -422,9 +422,6 @@ to `signoz:signoz_create_alert`, plus a one-paragraph plain-language summary:
 > warning at X, critical at Y. Notifications go to [channels]. Dry-run on
 > the last hour: would have fired N times.
 
-In autonomous mode the consumer proceeds. In interactive mode the human can
-intervene before Step 9.
-
 ### Step 9: Save and report
 
 1. Call `signoz:signoz_create_alert` with the JSON payload from Step 8.
@@ -438,8 +435,6 @@ intervene before Step 9.
    - What it watches and at what threshold.
    - Which channels are wired up.
    - The dry-run summary ("would have fired N times in last 1h").
-   - Two follow-up offers: "Want to test the query live with `signoz-generating-queries`?"
-     and "Want me to add a runbook URL to the annotations?"
 
 ## Guardrails
 
@@ -472,8 +467,6 @@ intervene before Step 9.
   payloads, or navigation suggestions. Refer to the channel by name only
   after creation; ask the user to re-paste on failure rather than
   reproducing what they sent.
-- **Scope boundary.** This skill only creates new rules. Modifications use
-  `signoz:signoz_update_alert` directly.
 
 ## Examples
 
