@@ -438,25 +438,22 @@ to `signoz:signoz_create_alert`, plus a one-paragraph plain-language summary:
 
 ## Guardrails
 
-- **Strict inputs over guessing.** Resource attribute and channel are
+- **Strict inputs over guessing** Resource attribute and channel are
   required. If missing, stop and ask the user (see *Required inputs* above). Creating an alert on
   a guessed service is harder to undo than asking.
-- **Always paginate `signoz:signoz_list_alert_rules`.** Stopping at page 1 misses
+- **Always paginate `signoz:signoz_list_alert_rules`** Stopping at page 1 misses
   duplicates and produces noise.
-- **Dry-run is mandatory.** Step 4 (data probe) and Step 6 (full
+- **Dry-run is mandatory** Step 4 (data probe) and Step 6 (full
   query + threshold calibration) are both required before
   `signoz:signoz_create_alert`. A never-firing alert is *worse* than no
   alert: it provides a false sense of safety.
-- **No duplicate updates.** Name collision → error and stop. Do not
-  silently update an existing alert from a "create" skill.
-- **OTel attribute names only.** `service.name` not `service`.
-- **Threshold operators use canonical words.** Prefer `op: "above"` /
+- **Threshold operators use canonical words** Prefer `op: "above"` /
   `"below"` / `"equals"` / `"not_equals"`. Numeric codes (`"1"`–`"7"`)
   are accepted but discouraged — same goes for `matchType`
   (`"on_average"` / `"at_least_once"`, not `"3"` / `"1"`).
-- **Signal must match alertType.** `signal: "logs"` requires
+- **Signal must match alertType** `signal: "logs"` requires
   `LOGS_BASED_ALERT`. Mismatches fail validation.
-- **Anomaly rules are metrics-only.** `anomaly_rule` + non-metric alertType
+- **Anomaly rules are metrics-only** `anomaly_rule` + non-metric alertType
   is rejected.
 - **Channels must exist.** Use names from `signoz:signoz_list_notification_channels`
   exactly, or create the channel inline first.
