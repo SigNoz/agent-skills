@@ -196,16 +196,16 @@ shape.
 
 For most user intents, the config is one of a small number of patterns:
 
-| Pattern | Where to author | Example intents |
-|---|---|---|
-| Single-metric threshold | inline | "alert when CPU > 80%", "p99 latency > 2s" |
-| Log volume threshold | inline | "more than N error logs/min" |
-| Trace-based count or p-tile | inline | "p99 span duration > 2s on checkout" |
-| Error-rate formula (A/B*100) | inline (see "Common query shapes" below) | "error rate > 5%" |
-| Anomaly detection (Z-score) | inline, but only with `METRIC_BASED_ALERT` | "alert me on anomalous traffic" |
-| Absent-data alert | inline | "alert if data stops arriving" |
-| ClickHouse SQL alert | inline — author the SQL directly using the schema in `signoz://alert/examples` | non-trivial joins, custom aggregations the builder cannot express |
-| PromQL alert | delegate to `signoz-generating-queries` for the PromQL, then return here | when user already has PromQL |
+| Pattern | Example intents |
+|---|---|
+| Single-metric threshold | "alert when CPU > 80%", "p99 latency > 2s" |
+| Log volume threshold | "more than N error logs/min" |
+| Trace-based count or p-tile | "p99 span duration > 2s on checkout" |
+| Error-rate formula (A/B*100) — see "Common query shapes" below | "error rate > 5%" |
+| Anomaly detection (Z-score) | "alert me on anomalous traffic" |
+| Absent-data alert | "alert if data stops arriving" |
+| ClickHouse SQL alert — author SQL using the schema in `signoz://alert/examples` | non-trivial joins, custom aggregations the builder cannot express |
+| PromQL alert — delegate to `signoz-generating-queries` for the query, then return here | when user already has PromQL |
 
 **Threshold `op` and `matchType` values.** v2alpha1 accepts the
 human-readable strings (`"above"`, `"on_average"`); the legacy numeric
