@@ -382,10 +382,15 @@ that filter — the per-panel data probe folds in here.
 `compositeQuery.builder.queryData[]` and `queryFormulas[]`, but
 `signoz_execute_builder_query` takes
 `compositeQuery.queries[].{type, spec}`. Translate per panel: each
-`queryData[i]` → `{ type: "builder_query", spec: { signal, filter:
-{expression}, groupBy, aggregations } }`; each `queryFormulas[i]` →
-`{ type: "builder_formula", spec: { name, expression } }`. The
-endpoint cannot consume widget JSON directly.
+`queryData[i]` → `{ type: "builder_query", spec: { name, signal,
+filter: {expression}, groupBy, aggregations } }`; each
+`queryFormulas[i]` → `{ type: "builder_formula", spec: { name,
+expression } }`. **Preserve the original `name`** (`A`, `B`, …) on
+every `builder_query.spec` — formula expressions reference inputs
+by that name (e.g., `A * 100 / B`), and dropping it makes the
+dry-run shape diverge from the saved panel so formulas can't
+resolve their inputs. The endpoint cannot consume widget JSON
+directly.
 
 Non-empty response = pass; server error, "filter type mismatch", or
 unexpected zero rows = fail (fix the panel JSON before save).

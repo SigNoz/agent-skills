@@ -174,13 +174,16 @@ Merge the planned changes into the full dashboard JSON from Step 2.
 `signoz:signoz_execute_builder_query` for each modified panel.
 Translate the widget's `builder.queryData[]` / `queryFormulas[]` into
 the endpoint's `queries[].{type, spec}` envelope: each `queryData[i]`
-→ `{ type: "builder_query", spec: { signal, filter: {expression},
-groupBy, aggregations } }`; each `queryFormulas[i]` → `{ type:
-"builder_formula", spec: { name, expression } }`. The endpoint cannot
-consume widget JSON directly. See the "Mandatory dry-run before
-update" guardrail for the conditions, the bool-filter footgun, and
-why this catches what the JSON diff cannot. Server error or
-unexpected empty result = fix the panel JSON before update.
+→ `{ type: "builder_query", spec: { name, signal, filter:
+{expression}, groupBy, aggregations } }`; each `queryFormulas[i]` →
+`{ type: "builder_formula", spec: { name, expression } }`. **Preserve
+the original `name`** (`A`, `B`, …) on every `builder_query.spec` —
+formula expressions reference inputs by that name (e.g., `A * 100 /
+B`), and dropping it makes the dry-run diverge from the saved panel.
+The endpoint cannot consume widget JSON directly. See the "Mandatory
+dry-run before update" guardrail for the conditions, the bool-filter
+footgun, and why this catches what the JSON diff cannot. Server
+error or unexpected empty result = fix the panel JSON before update.
 
 Call `signoz:signoz_update_dashboard` with the dashboard UUID and the **complete** modified
 dashboard JSON.
