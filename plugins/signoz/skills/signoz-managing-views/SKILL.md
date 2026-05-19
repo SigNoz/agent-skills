@@ -95,11 +95,27 @@ optional.
    a saved view that must be deleted and recreated.
 4. **Enforce `signal == sourcePage`** in every `builder_query` spec. A
    `sourcePage:"traces"` view with `signal:"logs"` is a server-side error.
-5. **Preview before writing — this step is not optional.** Before calling
+5. **Mandatory pre-save sample fetch.** Probe with the **exact** filter
+   from `compositeQuery.queries[0].spec` against the destination
+   signal:
+   - `sourcePage=traces` → `signoz:signoz_search_traces` with `limit=1`
+   - `sourcePage=logs` → `signoz:signoz_search_logs` with `limit=1`
+   - `sourcePage=metrics` → `signoz:signoz_query_metrics` with the
+     `metricName` from `spec.aggregations[0].metricName` plus the same
+     filter, `timeRange=1h`, `requestType=scalar`. Repeat per metric
+     query if the view has multiple. The tool requires `metricName` —
+     a filter-only probe is not supported.
+
+   Required even if Step 3 ran cleanly: the sub-skill validates the
+   query *it* authored, not whatever you persist after edits or lifts.
+   Empty → save anyway / revise / abort. Autonomous mode without
+   authorization to persist empty views: abort and escalate.
+6. **Preview before writing — this step is not optional.** Before calling
    `signoz:signoz_create_view`, show the user a summary: name, sourcePage,
-   panelType, and the full filter expression. For a human in the loop, wait
+   panelType, the full filter expression, and the Step 5 probe result
+   ("sample fetch: N rows in last 1h"). For a human in the loop, wait
    for confirmation. For an autonomous agent, log the preview and proceed.
-6. Call `signoz:signoz_create_view`. The server populates `id`,
+7. Call `signoz:signoz_create_view`. The server populates `id`,
    `createdAt/By`, `updatedAt/By` — never send those.
 
 ### List or find views
@@ -142,13 +158,18 @@ upstream). Sending a partial body wipes the unspecified fields. The flow:
    imply a `stepInterval` change too. For pure metadata tweaks (rename,
    recategorize), skip this step and do not touch `compositeQuery`.
 4. Modify only the field(s) the user asked to change.
-5. **Show a diff-style preview before writing.** One line per changed
+5. **Mandatory pre-save sample fetch — when `compositeQuery` changed.**
+   Run the 1-row probe from the Create flow's Step 5 against the new
+   filter. Empty → save anyway / revise / abort. Skip only for pure
+   metadata tweaks (rename, recategorize).
+6. **Show a diff-style preview before writing.** One line per changed
    field: `name: "slow-checkout" → "slow-checkout-p99"`. Explicitly note
-   any fields that are unchanged (e.g. "compositeQuery: unchanged"). This
+   any fields that are unchanged (e.g. "compositeQuery: unchanged") and
+   include the Step 5 probe result when `compositeQuery` changed. This
    prevents silent mistakes and gives the user a chance to catch a wrong
    target view. Wait for confirmation on any change to `compositeQuery`,
    since that changes what the view actually shows.
-6. Call `signoz:signoz_update_view` with `{ "viewId": "<id>", "view": <modified data> }`.
+7. Call `signoz:signoz_update_view` with `{ "viewId": "<id>", "view": <modified data> }`.
 
 ### Delete a view
 
@@ -181,14 +202,39 @@ the calling context has been explicitly authorized for destructive
 operations on saved views, and log the resolved view metadata before the
 call.
 
+## Guardrails
+
+- **Mandatory pre-save sample fetch on create and on `compositeQuery`
+  updates.** Step 5 of each flow runs a 1-row probe against the
+  destination signal using the exact filter from the about-to-save
+  payload. Skipping is equivalent to skipping get-before-delete. The
+  Step 3 `signoz-generating-queries` delegation is necessary but not
+  sufficient — it validates the query *it* authored, not the filter
+  you persist after edits.
+
+  *Cross-signal-lift footgun:* field keys are signal-scoped. An
+  attribute observed on **metrics** (e.g. `oauth.error_code` on a
+  counter) may not exist on **traces** or **logs** for the same
+  tenant, even when emitted by the same service. Lifting an attribute
+  from a sibling dashboard panel, alert rule, or view that targets a
+  different signal is the most common source of empty saved views.
+  `signoz:signoz_get_field_keys signal=<sourcePage>` is necessary but
+  not sufficient — sparse emission still produces zero-result views.
+  Only the sample fetch confirms.
+
+  A saved view returning zero rows under its own filter is a
+  permanent artifact in a shared workspace; the human preview can't
+  tell from JSON that the filter won't match, and autonomous mode
+  has no preview, so the sample fetch is the only safety net.
+
 ## Quick reference
 
 | Operation | Tools called | Key guard |
 |-----------|-------------|-----------|
-| Create | read `signoz://view/instructions` + `signoz://view/examples` → `signoz-generating-queries` → preview → `signoz:signoz_create_view` | Preview before write; no legacy fields |
+| Create | read `signoz://view/instructions` + `signoz://view/examples` → `signoz-generating-queries` → **sample fetch on exact filter** → preview → `signoz:signoz_create_view` | Mandatory pre-save sample fetch; preview before write; no legacy fields |
 | List | `signoz:signoz_list_views` (× 3 if no sourcePage given) | Check `pagination.hasMore` |
 | Get | `signoz:signoz_get_view(viewId)` | Returns canonical body for update |
-| Update | `signoz:signoz_get_view` → modify → preview → `signoz:signoz_update_view` | Full-body replace; diff preview required |
+| Update | `signoz:signoz_get_view` → modify → **sample fetch if `compositeQuery` changed** → diff preview → `signoz:signoz_update_view` | Full-body replace; sample fetch when compositeQuery changes; diff preview required |
 | Delete | `signoz:signoz_list_views` → `signoz:signoz_get_view` → confirm → `signoz:signoz_delete_view` | Get-before-delete mandatory; fresh confirmation |
 
 ## Common mistakes
@@ -196,6 +242,8 @@ call.
 | Mistake | Fix |
 |---------|-----|
 | Hand-composing `compositeQuery` from examples or memory (even after reading `signoz://view/examples`) | Use the `Skill` tool to invoke `signoz-generating-queries` — reading examples and validating with `signoz:signoz_search_traces` is not a substitute |
+| Lifting an attribute name from a metric, alert rule, or sibling view and using it in a `sourcePage=traces` / `=logs` view filter without re-verifying on the destination signal | Field keys are signal-scoped; an attribute on metrics may not exist on traces or logs. Always re-check via `signoz:signoz_get_field_keys signal=<sourcePage>` **and** run the mandatory pre-save sample fetch — the key check is necessary but not sufficient |
+| Skipping the pre-save sample fetch because `signoz-generating-queries` already validated the query | The sub-skill validates the query *it* authored; the filter you persist may have been edited or lifted since then. The Step 5 sample fetch is mandatory regardless |
 | Skipping `signoz:signoz_get_view` before delete (relying on list UUID alone) | Always call `signoz:signoz_get_view` to confirm name+sourcePage before `signoz:signoz_delete_view` |
 | Sending legacy fields: `builder`, `promql`, `unit`, top-level `id`, `queryFormulas` | Read schema resources; server returns HTTP 400 silently |
 | `signal` ≠ `sourcePage` in builder query | Every `builder_query.signal` must equal the view's `sourcePage` |

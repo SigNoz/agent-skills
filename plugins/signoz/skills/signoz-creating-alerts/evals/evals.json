@@ -5,7 +5,7 @@
       "id": 0,
       "eval_name": "metric-cpu-multi-severity",
       "prompt": "set up an alert for cartservice CPU usage. warning at 80%, page on-call at 90%. send warnings to #staging-alerts slack and criticals to 'test pager send resolved' pagerduty.",
-      "expected_output": "Multi-severity METRIC_BASED_ALERT with two thresholds (warning 80, critical 90), per-severity channels (slack on warning, pagerduty on critical), service.name='cartservice' filter on a CPU metric (e.g. system.cpu.utilization or k8s.pod.cpu.utilization), targetUnit percent, op='1', matchType='3' (on_average). Should run discovery for the right CPU metric and emit a JSON preview before any save.",
+      "expected_output": "Multi-severity METRIC_BASED_ALERT with two thresholds (warning 80, critical 90), per-severity channels (slack on warning, pagerduty on critical), service.name='cartservice' filter on a CPU metric (e.g. system.cpu.utilization or k8s.pod.cpu.utilization), targetUnit percent, op='above', matchType='on_average' (canonical word form preferred over numeric codes). Should run discovery for the right CPU metric and run the mandatory signoz_execute_builder_query dry-run before emitting a plain-language summary and saving.",
       "files": []
     },
     {
@@ -19,21 +19,21 @@
       "id": 2,
       "eval_name": "logs-pod-crash-keywords",
       "prompt": "create a log-based alert for pod crashes — fire if we see OOMKilled, CrashLoopBackOff, panic, or FATAL anywhere in log bodies. group by service so I know which one. notify #staging-alerts.",
-      "expected_output": "LOGS_BASED_ALERT, signal=logs, count() aggregation, body filter using LIKE/CONTAINS for the four keywords (OR'd), groupBy service.name with fieldContext=resource and fieldDataType=string. Threshold > 0, matchType='1' (at_least_once). Performs dry-run via signoz_search_logs or signoz_aggregate_logs to verify query returns data and to compute would-have-fired count.",
+      "expected_output": "LOGS_BASED_ALERT, signal=logs, count() aggregation, body filter using LIKE/CONTAINS for the four keywords (OR'd), groupBy service.name with fieldContext=resource and fieldDataType=string. Threshold > 0, matchType='at_least_once' (canonical word form preferred over numeric codes). Runs the mandatory dry-run via signoz_execute_builder_query (with signal=logs in the builder_query.spec). CRITICAL: crash-pattern alerts (OOMKilled / CrashLoopBackOff / panic / FATAL) intentionally have zero matches in a healthy system — agent must surface the zero-match result, ask the user to confirm before saving an alert that returns nothing now, and skip the would-have-fired breach-count computation per the skill's healthy-zero exception. Must NOT treat zero matches as a failure or nudge the user to loosen the filter.",
       "files": []
     },
     {
       "id": 3,
       "eval_name": "anomaly-frontend-request-rate",
       "prompt": "set up anomaly detection for frontend service request rate — alert me if traffic suddenly drops or spikes versus normal patterns. slack #staging-alerts is fine.",
-      "expected_output": "METRIC_BASED_ALERT with anomaly_rule, algorithm=zscore, seasonality=daily or hourly. Uses signoz_calls_total or http.server.request.count metric filtered by service.name='frontend'. Threshold target ~3 (standard deviations), op='1'. Skips the 'would have fired N times' breach count for anomaly alerts (Z-scores aren't comparable to raw breach counts) but still verifies the underlying query returns data.",
+      "expected_output": "METRIC_BASED_ALERT with anomaly_rule, algorithm=zscore, seasonality=daily or hourly. Uses signoz_calls_total or http.server.request.count metric filtered by service.name='frontend'. Threshold target ~3 (standard deviations), op='above' (anomaly_rule only accepts 'above'; canonical word form preferred over numeric codes). Skips the 'would have fired N times' breach count for anomaly alerts (Z-scores aren't comparable to raw breach counts) but still runs the mandatory signoz_execute_builder_query dry-run to verify the underlying query returns data.",
       "files": []
     },
     {
       "id": 4,
       "eval_name": "formula-gated-p99-with-count-guard",
       "prompt": "alert me when paymentservice p99 latency exceeds 1 second, but ONLY when request count is above 50 per minute — don't want to be paged on low-traffic noise. critical severity, send to both #staging-alerts slack AND 'test pager send resolved' pagerduty.",
-      "expected_output": "TRACES_BASED_ALERT with three queries: A = p99(durationNano) on service.name='paymentservice', B = count() on same filter, F1 = numeric formula that gates p99 by traffic (e.g. F1 = A * (B >= 50) or similar gating expression — exact form depends on alert engine, but skill must explain the gating choice). selectedQueryName='F1'. Threshold target 1000000000 (ns) or appropriate unit, op='1', critical severity, both channels attached. Surfaces the gating logic clearly in the preview.",
+      "expected_output": "TRACES_BASED_ALERT with three queries: A = p99(durationNano) on service.name='paymentservice', B = count() on same filter, F1 = numeric formula that gates p99 by traffic (e.g. F1 = A * (B >= 50) or similar gating expression — exact form depends on alert engine, but skill must explain the gating choice). selectedQueryName='F1'. Threshold target 1000000000 (ns) or appropriate unit, op='above' (canonical word form preferred over numeric codes), critical severity, both channels attached. Runs the mandatory signoz_execute_builder_query dry-run (envelope passes the three queries with names A, B, F1 — name preserved so the formula resolves) before save. Surfaces the gating logic clearly in the plain-language summary.",
       "files": []
     }
   ]

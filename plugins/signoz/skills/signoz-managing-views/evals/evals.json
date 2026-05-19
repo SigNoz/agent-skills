@@ -5,7 +5,7 @@
       "id": 0,
       "name": "create-trace-view-for-service",
       "prompt": "Save the current traces query as a view called 'checkout-errors' for the checkout service. I want to see only ERROR spans from service.name = checkout.",
-      "expected_output": "Agent resolves sourcePage=traces, builds a builder_query with filter service.name=checkout and status=error, sets panelType=list, shows a preview with name/sourcePage/filter, confirms, and calls signoz:signoz_create_view. Reports back the name, UUID, and sourcePage.",
+      "expected_output": "Agent resolves sourcePage=traces, builds a builder_query with filter service.name=checkout and status=error, sets panelType=list, runs the mandatory pre-save sample fetch (signoz:signoz_search_traces with limit=1 using the exact filter from compositeQuery.queries[0].spec), shows a preview with name/sourcePage/filter plus the sample-fetch result, confirms, and calls signoz:signoz_create_view. Reports back the name, UUID, and sourcePage.",
       "files": [],
       "assertions": [
         {
@@ -19,6 +19,10 @@
         {
           "text": "Filter includes service.name = checkout and status/error condition",
           "description": "View must capture the user's stated filter criteria"
+        },
+        {
+          "text": "Agent runs the mandatory pre-save sample fetch via signoz:signoz_search_traces with limit=1 using the exact filter from the about-to-save payload before signoz:signoz_create_view",
+          "description": "Step 5 of the create flow: a saved view returning zero rows is a permanent artifact; the sample fetch is the only confirmation that the filter matches data"
         },
         {
           "text": "Agent shows a preview (name, sourcePage, filter) before calling create",
@@ -113,7 +117,7 @@
       "id": 4,
       "name": "update-view-filter",
       "prompt": "Update the 'checkout-errors' view to also show WARN spans, not just ERROR.",
-      "expected_output": "Agent calls signoz:signoz_list_views to find the view, then signoz:signoz_get_view to fetch full body. Recognizes this is a compositeQuery change and invokes signoz-generating-queries skill to build a new query with status IN (ERROR, WARN). Shows a diff preview with old vs new filter expression and notes compositeQuery is changing. Waits for confirmation, then calls signoz:signoz_update_view with the validated compositeQuery. Reports back UUID, name, and what changed.",
+      "expected_output": "Agent calls signoz:signoz_list_views to find the view, then signoz:signoz_get_view to fetch full body. Recognizes this is a compositeQuery change and invokes signoz-generating-queries skill to build a new query with status IN (ERROR, WARN). Runs the mandatory pre-save sample fetch against the new filter (signoz:signoz_search_traces with limit=1 since sourcePage=traces) — required because compositeQuery changed. Shows a diff preview with old vs new filter expression, notes compositeQuery is changing, and includes the sample-fetch result. Waits for confirmation, then calls signoz:signoz_update_view with the validated compositeQuery. Reports back UUID, name, and what changed.",
       "files": [],
       "assertions": [
         {
@@ -123,6 +127,10 @@
         {
           "text": "Agent invokes signoz-generating-queries skill to build the new compositeQuery",
           "description": "Query changes must go through signoz-generating-queries for validation; hand-editing compositeQuery risks malformed payloads"
+        },
+        {
+          "text": "Agent runs the mandatory pre-save sample fetch via signoz:signoz_search_traces with limit=1 using the new filter before signoz:signoz_update_view",
+          "description": "Step 5 of the update flow: compositeQuery changed, so the 1-row probe against the new filter is required (skip only for pure metadata tweaks)"
         },
         {
           "text": "Agent shows a diff-style preview before writing, explicitly calling out the compositeQuery change",
