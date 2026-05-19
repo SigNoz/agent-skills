@@ -450,9 +450,7 @@ scope, attribute name shorthand like `service` instead of
   ships as a silently empty panel.
 - **Preview before save on custom builds** Emit the plain-language
   summary before `signoz:signoz_create_dashboard` so the human can
-  intervene on intent. Skip the raw JSON — for a 20–30 widget
-  dashboard it is hundreds of lines no one will review. The dry-run
-  (not the preview) is the safety net against bad queries.
+  intervene on intent.
 - **Prefer OTel attribute names** `service.name` not `service`,
   `host.name` not `host`. Wrong names produce empty panels. Verify the
   exact key (`deployment.environment` vs `deployment.environment.name`,
