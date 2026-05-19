@@ -17,7 +17,7 @@ argument-hint: <natural-language alert intent>
 Build a SigNoz alert from a user's natural-language intent. The skill targets
 two consumers: an autonomous AI SRE agent that runs without a human in the
 loop, and a human at a Claude Code / Codex / Cursor prompt. Both go through
-the same flow — the human just gets a chance to intervene at the preview step.
+the same flow.
 
 ## Prerequisites
 
@@ -69,8 +69,8 @@ What to include in the question:
   resource-attribute filter to use").
 - **Candidate lists** populated from your discovery calls — concrete
   values per attribute the user can pick from. Example shape:
-  `service.name` → `frontend`, `checkout`, `payments`, `inventory`;
-  `host.name` → `prod-api-1`, `prod-api-2`, `prod-db-1`.
+  `service.name` → `frontend`, `checkout`, `payments`;
+  `host.name` → `prod-api-1`, `prod-db-1`.
 - **Allow free-form input** so the user can name a value you didn't
   surface.
 
@@ -121,7 +121,24 @@ candidates instead of guessing:
 Surface the candidates in your clarification request (see *Required
 inputs* above). Do not pick one.
 
-### Step 2.5: Probe data existence for the chosen filter (fail fast)
+### Step 3: Check for duplicate alerts
+
+Once the scope is resolved (either provided by the user or discovered in
+Step 2), check for existing alerts before probing data or authoring a
+new config — both are wasted work if the user wants to update an
+existing rule instead.
+
+Call `signoz:signoz_list_alert_rules` and **paginate through every page** —
+`pagination.hasMore` is true until you have walked the full list. This lists
+*configured* alert rules (the durable state); do not use `signoz:signoz_list_alerts`,
+which returns currently triggered/active alert instances and will silently
+miss rules that are configured but not firing right now. Check for existing
+rules that match the user's intent (same signal + same scope + similar
+threshold). If a likely duplicate exists, surface it and ask whether to
+create a new one anyway, modify the existing one (out of scope here — use
+`signoz:signoz_update_alert`), or cancel.
+
+### Step 4: Probe data existence for the chosen filter (fail fast)
 
 Before authoring any alert config, confirm the **specific combination** the
 alert will watch (metric × service × any other filter) actually emits data.
@@ -144,7 +161,7 @@ will use, but with the simplest aggregation that confirms data exists:
 
 Inspect the result:
 
-- **Probe returns rows** → proceed to Step 3.
+- **Probe returns rows** → proceed to Step 5.
 - **Probe returns empty** → STOP. Do not build an alert config the user
   will then be asked to throw away. Stop and ask the user (see *Required
   inputs* above), describing what was missing and offering concrete
@@ -170,37 +187,24 @@ early avoids the worst UX failure mode of this skill — the user reading
 through a fully-authored JSON payload and only then learning the alert
 can never fire.
 
-### Step 3: Check for duplicate alerts
-
-Call `signoz:signoz_list_alert_rules` and **paginate through every page** —
-`pagination.hasMore` is true until you have walked the full list. This lists
-*configured* alert rules (the durable state); do not use `signoz:signoz_list_alerts`,
-which returns currently triggered/active alert instances and will silently
-miss rules that are configured but not firing right now. Check for existing
-rules that match the user's intent (same signal + same scope + similar
-threshold). If a likely duplicate exists, surface it and ask whether to
-create a new one anyway, modify the existing one (out of scope here — use
-`signoz:signoz_update_alert`), or cancel.
-
-### Step 4: Build the alert config
+### Step 5: Build the alert config
 
 The MCP server is the source of truth for the alert JSON schema, threshold
 codes, and validation rules. Read the `signoz://alert/instructions` and
 `signoz://alert/examples` MCP resources for the canonical, version-current
-shape. Do not transcribe schema text into this skill — it will rot out of
-sync with the server.
+shape. 
 
 For most user intents, the config is one of a small number of patterns:
 
 | Pattern | Where to author | Example intents |
 |---|---|---|
-| Single-metric threshold | inline (this skill) | "alert when CPU > 80%", "p99 latency > 2s" |
+| Single-metric threshold | inline | "alert when CPU > 80%", "p99 latency > 2s" |
 | Log volume threshold | inline | "more than N error logs/min" |
 | Trace-based count or p-tile | inline | "p99 span duration > 2s on checkout" |
 | Error-rate formula (A/B*100) | inline (see "Common query shapes" below) | "error rate > 5%" |
 | Anomaly detection (Z-score) | inline, but only with `METRIC_BASED_ALERT` | "alert me on anomalous traffic" |
 | Absent-data alert | inline | "alert if data stops arriving" |
-| ClickHouse SQL alert | inline (this skill) — author the SQL directly using the schema in `signoz://alert/examples` | non-trivial joins, custom aggregations the builder cannot express |
+| ClickHouse SQL alert | inline — author the SQL directly using the schema in `signoz://alert/examples` | non-trivial joins, custom aggregations the builder cannot express |
 | PromQL alert | delegate to `signoz-generating-queries` for the PromQL, then return here | when user already has PromQL |
 
 **Threshold `op` and `matchType` values.** v2alpha1 accepts the
@@ -286,7 +290,7 @@ schema:
   filter when the user said "any service" — groupBy provides the
   scoping AND keeps the notification useful per-service.
 
-### Step 5: Resolve notification channels
+### Step 6: Resolve notification channels
 
 The skill **must** resolve at least one channel before save. An alert with no
 channels saves successfully and silently never notifies anyone — the second
@@ -335,19 +339,19 @@ inputs and follow these rules:
   the secret in chat at all. Prefer the UI path when the user seems
   uncertain about exposing the token.
 
-### Step 6: Dry-run the full query and validate the threshold
+### Step 7: Dry-run the full query and validate the threshold
 
-Step 2.5 confirmed data flows. Step 6 does two things:
+Step 4 confirmed data flows. Step 7 does two things:
 
 1. **Validate query shape.** Run the full builder spec (with
    `groupBy`, formulas, disabled component queries, and non-string
-   filters) — Step 2.5's bare `count()` probe doesn't exercise these.
+   filters) — Step 4's bare `count()` probe doesn't exercise these.
    The create-alert schema accepts queries that error at evaluation
    (numeric `groupBy`, unquoted bool filter, mismatched aggregation).
    Any HTTP 5xx or "filter type mismatch" = fix the config before
    proceeding to (2). `disabled: true` on formula component queries
    (A, B in `A * 100 / B`) is the *recommended* pattern, not a failure
-   — see Step 4.
+   — see Step 5.
 2. **Calibrate the threshold.** Given the validated query, would the
    alert have fired a sensible number of times in the last hour?
 
@@ -376,19 +380,19 @@ Surface in the preview as **"would have fired N times in the last 1h"**:
    - **N is small and non-zero** → calibrated; proceed.
 3. **Exceptions:**
    - **Anomaly alerts** — skip the breach count entirely (Z-scores aren't
-     directly comparable to raw values). Step 2.5 already verified the
+     directly comparable to raw values). Step 4 already verified the
      underlying metric × service has data; nothing more to validate here.
    - **Log-based crash / panic / OOMKilled / FATAL alerts** — these
-     intentionally have zero matches in a healthy system. Step 2.5 has
+     intentionally have zero matches in a healthy system. Step 4 has
      already surfaced the zero-match result and obtained user confirmation;
      skip the breach count.
 
-If Step 2.5 was somehow skipped (e.g. a downstream skill is invoking this
+If Step 4 was somehow skipped (e.g. a downstream skill is invoking this
 flow mid-stream), the no-data stop rule applies here too: empty result →
 stop and ask the user (see *Required inputs* above) instead of saving an
 alert that will never fire.
 
-### Step 7: Preview the prepared config
+### Step 8: Preview the prepared config
 
 Emit a fenced JSON code block containing the exact payload that will be sent
 to `signoz:signoz_create_alert`, plus a one-paragraph plain-language summary:
@@ -412,11 +416,11 @@ to `signoz:signoz_create_alert`, plus a one-paragraph plain-language summary:
 > the last hour: would have fired N times.
 
 In autonomous mode the consumer proceeds. In interactive mode the human can
-intervene before Step 8.
+intervene before Step 9.
 
-### Step 8: Save and report
+### Step 9: Save and report
 
-1. Call `signoz:signoz_create_alert` with the JSON payload from Step 7.
+1. Call `signoz:signoz_create_alert` with the JSON payload from Step 8.
 2. **Name collision** — if `signoz:signoz_create_alert` returns a duplicate-name
    error, **do not** suffix-append or call `signoz:signoz_update_alert`. Stop and
    tell the user the existing alert blocked creation; offer to use a
@@ -437,7 +441,7 @@ intervene before Step 8.
   a guessed service is harder to undo than asking.
 - **Always paginate `signoz:signoz_list_alert_rules`.** Stopping at page 1 misses
   duplicates and produces noise.
-- **Dry-run is mandatory.** Step 2.5 (data probe) and Step 6 (full
+- **Dry-run is mandatory.** Step 4 (data probe) and Step 7 (full
   query + threshold calibration) are both required before
   `signoz:signoz_create_alert`. A never-firing alert is *worse* than no
   alert: it provides a false sense of safety.
