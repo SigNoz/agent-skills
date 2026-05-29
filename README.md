@@ -1,7 +1,7 @@
 # SigNoz Agent Skills
 
 Official SigNoz skills and MCP configuration for Claude Code, Codex, Cursor,
-and the [skills.sh](https://skills.sh) ecosystem. The MCP setup skill also
+Gemini CLI, and the [skills.sh](https://skills.sh) ecosystem. The MCP setup skill also
 includes client-specific recipes for VS Code/GitHub Copilot, Claude Desktop,
 Gemini CLI, Windsurf, Zed, Antigravity, OpenCode, and generic HTTP MCP
 clients.
@@ -86,6 +86,22 @@ If you picked the wrong region or need to change a self-hosted HTTP MCP
 endpoint, run `/signoz-mcp-setup` again with the correct region or URL and
 reload Cursor.
 
+### Gemini CLI
+
+```sh
+gemini extensions install SigNoz/agent-skills
+```
+
+When prompted, enter your SigNoz Cloud region (`us`, `us2`, `eu`, `eu2`, `in`, or `in2`).
+
+Then authenticate:
+
+```
+/mcp auth signoz
+```
+
+Follow the prompts to enter your SigNoz instance URL and API key.
+
 ### Other MCP Clients
 
 The setup skill includes native config recipes for VS Code/GitHub Copilot,
@@ -113,6 +129,8 @@ npx skills add SigNoz/agent-skills --skill signoz-writing-clickhouse-queries    
 ├── .agents/plugins/marketplace.json        # Codex marketplace
 ├── .claude-plugin/marketplace.json         # Claude Code marketplace
 ├── .cursor-plugin/marketplace.json         # Cursor marketplace
+├── gemini-extension.json                   # Gemini CLI extension manifest
+├── skills -> plugins/signoz/skills         # Gemini CLI skills (symlink)
 ├── plugins/signoz/
 │   ├── .codex-plugin/plugin.json           # Codex plugin manifest
 │   ├── .claude-plugin/plugin.json          # Claude Code plugin manifest
