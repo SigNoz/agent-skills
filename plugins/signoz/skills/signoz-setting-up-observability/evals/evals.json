@@ -1,0 +1,40 @@
+{
+  "skill_name": "signoz-setting-up-observability",
+  "evals": [
+    {
+      "id": 0,
+      "eval_name": "full-end-to-end-traces-service",
+      "prompt": "Traces are now flowing for our checkout service (service.name=checkout). Now that data is landing in SigNoz, set me up end-to-end — I want a dashboard, alerts, and a couple of saved views. Success for users is checkout requests completing under 1s with no 5xx.",
+      "expected_output": "Runs the full orchestration in order, not a single artifact. Phase 1 triage captures what checkout does and whether it calls external services. Phase 1.5 inventories existing dashboards/alerts/views/channels via signoz_list_* before creating anything (prefers modify over duplicate). Phase 2 captures an explicit SLI (good/valid events) and SLO target (e.g. 99.9% over 30d) BEFORE designing — uses the stated '<1s, no 5xx' as the SLI seed. Phase 3 explores with RED coverage and prefers SigNoz-derived span metrics (signoz_calls_total, signoz_latency_*) over raw trace aggregation. Phase 5 confirms a real notification channel (never invents one) and proposes concrete burn-rate windows + recovery thresholds (concrete values, not open-ended). Dry-runs every non-trivial panel via signoz_execute_builder_query before save (enforced inside the dashboard/alert sub-skills). Builds dashboard (Phase 6), saved views (Phase 7), and burn-rate alert pairs (Phase 8, not static thresholds for the SLI). Hands back IDs (not fabricated frontend URLs) and notes an export-to-code path. Delegates mechanical work to signoz-creating-dashboards / signoz-managing-views / signoz-creating-alerts. Must NOT reference signoz-writing-clickhouse-queries.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "eval_name": "service-with-external-dependencies",
+      "prompt": "payments service is fully instrumented and reporting to signoz now. it calls stripe and a postgres db. build me the whole observability setup for it — dashboards + alerts.",
+      "expected_output": "Phase 1 Q1 flags the Stripe + Postgres dependencies. Phase 3 discovers downstream topology FROM TRACES rather than trusting the description — filters client spans by kind_string='Client' (verifies it is not 'kind' / not 'SPAN_KIND_CLIENT') and groups by external_http_url / http_host for Stripe and db_name / db_operation for Postgres. Phase 6 dashboard includes a downstream-dependency row (client-span p99 + error rate per dependency). SLO/SLI captured before design; burn-rate alerts for the SLI; dependency error-rate/latency alerts proposed. Channel confirmed before any rule references it. Hands back IDs. No signoz-writing-clickhouse-queries reference.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "eval_name": "existing-dashboard-prefer-modify",
+      "prompt": "We've got cartservice telemetry flowing. Set up full observability for it — I think there might already be a cart dashboard floating around.",
+      "expected_output": "Phase 1.5 inventory runs FIRST: signoz_list_dashboards (+ get_dashboard) finds the existing cart dashboard, signoz_list_alert_rules and signoz_list_views surface existing artifacts. Surfaces the existing dashboard and prefers extending/modifying it (hands off to signoz-modifying-dashboards) over standing up a parallel duplicate. Still captures SLI/SLO and runs exploration so additions are SLO-aware. Reuses an existing notification channel from signoz_list_notification_channels before creating a new one. Does not silently create a second cart dashboard.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "eval_name": "alerts-only-subset-burn-rate",
+      "prompt": "data's flowing for the auth service. i don't need a dashboard — just wire up good alerts so we get paged when users can't log in. SLO is 99.5% successful logins over 30 days.",
+      "expected_output": "Honors the alerts-only deliverable (Phase 1 Q2) and skips the dashboard build, but still gates on SLI/SLO capture (Phase 2) — uses the stated 99.5%/30d. Phase 5 proposes burn-rate windows with absolute thresholds computed as burnRate*(1-SLO) (e.g. 14.4x -> 7.2% at 99.5%) and recovery thresholds below firing, via AskUserQuestion with concrete values. Confirms/creates the notification channel first (test message confirmed) before any rule references it by NAME not UUID. Builds a burn-rate pair (fast+slow) as one ANDed rule where the version allows, preferring signoz_calls_total error/total over raw trace aggregation; falls back to a baseline-tuned threshold and says so if no clean bad/total split exists. Mandatory annotations (summary/description/owning-team; runbook_url only if real). Delegates alert build mechanics to signoz-creating-alerts and the signoz://alert/* resources (does not restate alert payload schema). Does NOT emit a static threshold for the SLI.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "eval_name": "infra-monitoring-join-verification",
+      "prompt": "inventory-service runs on our own k8s cluster and is now sending traces + metrics to signoz. set up observability including the pod-level resource stuff (cpu, memory, restarts), full dashboard and alerts.",
+      "expected_output": "Phase 1 Q3 opts into infra monitoring. Phase 3 USE half VERIFIES the metric->service join before building — does not assume service.name is on infra metrics; checks whether host/pod metrics carry host.name / k8s.pod.name / k8s.deployment.name and that k8s.deployment.name matches service.name, via get_field_keys(signal='traces', fieldContext='resource') then get_field_keys(signal='metrics', metricName=...). Scopes the USE row by the CONFIRMED attribute, and asks the user for the workload selector if nothing joins rather than guessing. Dashboard gets both a RED row (service) and a USE row (pod CPU/memory/restarts/network). Cardinality classification (Phase 4) keeps high-card attrs off metric series. Dry-runs panels before save; burn-rate alerts for the SLI plus resource-layer alerts (OOM/restarts). Hands back IDs.",
+      "files": []
+    }
+  ]
+}
