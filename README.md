@@ -21,6 +21,7 @@ clients.
 | [signoz-writing-clickhouse-queries](plugins/signoz/skills/signoz-writing-clickhouse-queries/SKILL.md) | Optimized ClickHouse queries for SigNoz OpenTelemetry traces and logs. |
 | [signoz-searching-docs](plugins/signoz/skills/signoz-searching-docs/SKILL.md) | SigNoz docs guidance for instrumentation, setup, querying, alerts, and APIs. |
 | [signoz-managing-views](plugins/signoz/skills/signoz-managing-views/SKILL.md) | Create, list, inspect, update, or delete SigNoz saved Explorer views (logs, traces, metrics) via the SigNoz MCP server. |
+| [signoz-setting-up-observability](plugins/signoz/skills/signoz-setting-up-observability/SKILL.md) | Orchestrate the full post-ingestion observability setup for a service — SLI/SLO capture, RED/USE exploration, focused dashboards, saved views, burn-rate and absent-data alerts, and a tuning loop — sequencing the single-artifact skills into one SLO-aware workflow. |
 
 ## Installation
 
