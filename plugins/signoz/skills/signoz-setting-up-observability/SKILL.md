@@ -3,9 +3,9 @@ name: signoz-setting-up-observability
 description: >
   Run the full end-to-end observability setup for a service after its
   telemetry is already flowing into SigNoz — sequence SLI/SLO capture,
-  data exploration (RED/USE), a dashboard, saved Explorer views,
-  burn-rate alerts, and a tuning loop into one opinionated, SLO-aware
-  workflow. Make sure to use this skill whenever the user says "set up
+  data exploration (RED/USE), focused dashboards, saved Explorer views,
+  burn-rate and absent-data alerts, and a tuning loop into one
+  opinionated, SLO-aware workflow. Make sure to use this skill whenever the user says "set up
   observability after ingestion", "now that data is flowing, give me
   dashboards and alerts", "onboard this service to SigNoz end-to-end",
   "I want the full monitoring setup for X", or asks to go from raw
@@ -377,7 +377,19 @@ What this orchestration layer adds on top of that skill:
   exists in the ingested data, burn-rate isn't buildable yet — fall back
   to a baseline-tuned threshold rather than emit a broken rule. Let
   `signoz-creating-alerts` + `signoz://alert/*` pick the
-  version-correct rule shape.
+  version-correct rule shape. Note that creating-alerts' "would have
+  fired N times in the last 1h" calibration can't grade a 6h/3d
+  burn-rate window — don't read a "fired 0 times" there as tuned; the
+  Phase 9 re-tune-after-a-week loop is the real calibration.
+- **Burn-rate only covers ratio SLIs — schedule the non-ratio failure
+  modes too.** A service that stops emitting, or whose traffic
+  collapses, never burns error budget (the SLI ratio is undefined at
+  zero volume), so the burn-rate pair pages no one. A complete setup
+  adds a telemetry-presence / absent-data alert on the primary signal,
+  and treats traffic/throughput as its own signal. Hand these intents
+  to `signoz-creating-alerts` — it owns the rule shape (absent-data,
+  anomaly, threshold) and the healthy-zero handling; the orchestration
+  decision is only that they belong in the package.
 - **Batch + sequence.** Resolve/confirm the channel (Phase 5 mapping)
   before any rule references it, then create the alerts as a batch
   grouped by routing tier — not one rule per metric.
