@@ -354,6 +354,7 @@ dry-run uses the exact shape from `queryData`.
 | Section structure (infra/runtime) | Overview / Saturation / Errors / Latency | domain-specific |
 | Headline panels (services) | request rate, error rate, p50/p95/p99 latency, throughput | omit those that don't apply |
 | Headline panels (infra) | resource utilization (CPU, mem), saturation, error/restart counts, throughput | tailor to the technology |
+| Counter render unit (rate vs. count) | per-second rate | per-interval **increase** count over a wider window (24h–7d) for any low-volume / bursty / human-paced counter — requests, **error counts**, restarts, OOM kills — where `/sec` renders as tiny decimals (e.g. `0.03/s`); gauges (CPU/mem/queue depth) are already absolute and unaffected; note `increase` rescales its y-axis with the selected range, so prefer it deliberately, not by reflex |
 | Variables (services) | `service.name`, `deployment.environment` (or `deployment.environment.name` — verify which exists via `signoz:signoz_get_field_keys`) | add `k8s.cluster.name` / `k8s.namespace.name` when k8s-flavored |
 | Variables (k8s/infra) | `k8s.cluster.name`, `k8s.namespace.name` (or `host.name` for hostmetrics) | drop `service.name` — it is rarely populated on infra signals |
 | Layout | 2-column grid (`w: 6`), 12 columns wide | full-width (`w: 12`) for tables and time-series with many series |

@@ -178,6 +178,21 @@ pre-aggregated and cheap, whereas raw trace aggregation over a long alert
 window is expensive and an unstable alert source. (Confirm exact
 metric/label names via discovery — don't hardcode.)
 
+**Render any counter by the volume you just measured, not by reflex.**
+Not throughput-specific — it applies to every counter you'll graph
+(request rate, **error counts**, restarts, OOM kills, evictions), and
+low-volume errors and resource-layer events are the usual victims, not
+just requests. Per-second rate suits steady high-volume signals; where
+Phase 3 shows the count is low, bursty, or human-paced, a `/sec` graph
+renders as unreadable tiny decimals (`0.03/s`). Use the *symptom*, not a
+hard threshold: if per-second shows as fractions, pass that to Phase 6
+as intent — render a per-interval **increase** count over a wider window
+(24h–7d), not a rate. (Gauges — CPU, memory, queue depth — are already
+absolute; this is a counter concern.) It's a deliberate tradeoff
+(`increase` rescales its y-axis with the selected range), so make it a
+conscious call, never a blanket default either way.
+`signoz-creating-dashboards` owns the rate-vs-increase mechanic.
+
 **Verify the infra→service join (the USE half).** Don't assume
 `service.name` is present on host/container/k8s metrics — they often
 carry only `host.name` / `k8s.pod.name` / `k8s.node.name`, and
