@@ -374,7 +374,10 @@ Edit `opencode.json` or `opencode.jsonc`.
 - Claude Desktop: restart or reconnect the custom connector, then complete
   authentication.
 - Claude Code: run `/mcp`, select `signoz`, and complete authentication.
-- Codex: run `codex mcp login signoz`, then verify with `/mcp`.
+- Codex (SigNoz Cloud): run `codex mcp login signoz`, then verify with `/mcp`.
+- Codex (self-hosted HTTP): no OAuth step unless the server runs with
+  `OAUTH_ENABLED=true`; skip `codex mcp login` and verify the already-authenticated
+  `signoz` server with `/mcp`.
 - Gemini CLI: run `/mcp auth signoz`.
 - Windsurf: reload and complete authentication when prompted.
 - Zed: reload after stdio config changes.
