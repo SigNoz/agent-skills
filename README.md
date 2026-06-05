@@ -42,8 +42,21 @@ See the full setup guide in the [SigNoz MCP Server docs](https://signoz.io/docs/
 /plugin install signoz@signoz-skills
 ```
 
+Set your SigNoz Cloud region with the `SIGNOZ_REGION` environment variable
+before launching Claude Code (optional, defaults to `us`):
+
+```sh
+export SIGNOZ_REGION=eu   # one of: us, us2, eu, eu2, in, in2
+```
+
+The bundled MCP config expands this into the hosted endpoint
+`https://mcp.${SIGNOZ_REGION}.signoz.cloud/mcp`. Find your region under
+**Settings -> Ingestion** in SigNoz, or see the
+[region reference](https://signoz.io/docs/ingestion/signoz-cloud/keys/).
+
 Then run `/mcp`, select the `signoz` server, and complete the authentication flow.
-If the server is not connected yet, ask Claude Code to run `signoz-mcp-setup` first.
+For a self-hosted SigNoz, or to set the endpoint explicitly, ask Claude Code to
+run `signoz-mcp-setup`.
 
 Update:
 

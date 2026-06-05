@@ -1,7 +1,8 @@
 {
   "mcpServers": {
     "signoz": {
-      "url": "https://not-setup/mcp"
+      "type": "http",
+      "url": "https://mcp.${SIGNOZ_REGION:-us}.signoz.cloud/mcp"
     }
   }
 }
