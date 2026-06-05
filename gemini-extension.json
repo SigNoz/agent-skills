@@ -12,7 +12,7 @@
     {
       "name": "SIGNOZ_REGION",
       "label": "SigNoz Cloud region",
-      "description": "Your SigNoz Cloud region. Find it under Settings → Ingestion in SigNoz, or see https://signoz.io/docs/ingestion/signoz-cloud/overview/#endpoint. Common values: us, in, eu.",
+      "description": "Your SigNoz Cloud region. Find it under Settings → Ingestion in SigNoz, or see https://signoz.io/docs/ingestion/signoz-cloud/overview/#endpoint. Values: us, in, eu, us2, in2, eu2",
       "envVar": "SIGNOZ_REGION",
       "sensitive": false,
       "required": true,
