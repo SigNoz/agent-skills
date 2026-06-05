@@ -7,5 +7,5 @@
   },
   "repository": "https://github.com/SigNoz/agent-skills",
   "license": "MIT",
-  "mcpServers": "./.mcp.json"
+  "mcpServers": "./.signoz_claude_mcp.json"
 }

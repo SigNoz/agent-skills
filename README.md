@@ -130,7 +130,8 @@ npx skills add SigNoz/agent-skills --skill signoz-writing-clickhouse-queries    
 │   ├── .codex-plugin/plugin.json           # Codex plugin manifest
 │   ├── .claude-plugin/plugin.json          # Claude Code plugin manifest
 │   ├── .cursor-plugin/plugin.json          # Cursor plugin manifest
-│   ├── .mcp.json                           # Claude Code and Codex MCP config
+│   ├── .signoz_claude_mcp.json             # Claude Code MCP config
+│   ├── .mcp.json                           # Codex MCP config
 │   ├── mcp.json                            # Cursor MCP config
 │   ├── hooks/                              # Auto-allow hooks
 │   └── skills/
