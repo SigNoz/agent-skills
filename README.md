@@ -56,19 +56,39 @@ Update:
 
 ### Codex
 
-1. Open the repository in Codex (restart if already running).
-2. Run `/plugins` and install `signoz` from the `SigNoz` marketplace.
-3. Ask Codex to run `signoz-mcp-setup` with your SigNoz Cloud region or
-   self-hosted HTTP MCP URL. This updates the bundled `.mcp.json` placeholder
-   used by the Codex plugin.
-4. Restart Codex if the `signoz` MCP server does not appear.
-5. Run `codex mcp login signoz`, then `/mcp` to verify the connection.
+```sh
+codex plugin marketplace add SigNoz/agent-skills
+```
 
-The Codex plugin already declares `mcpServers: "./.mcp.json"`, so normal plugin
-installs do not need a separate native Codex MCP entry. To use in another repo,
-copy `plugins/signoz` into the target repo's `plugins/` directory, add a
-marketplace entry in `$REPO_ROOT/.agents/plugins/marketplace.json`, and repeat
-the setup step for that workspace.
+Then, in a Codex session started from your project:
+
+1. Run `/plugins`, open the `SigNoz` marketplace, and install `signoz`.
+2. Run `signoz-mcp-setup <region>` with your SigNoz Cloud region (`us`, `us2`,
+   `eu`, `eu2`, `in`, `in2`) or a self-hosted HTTP MCP URL. This rewrites the
+   bundled `.mcp.json` placeholder used by the Codex plugin to a concrete
+   endpoint.
+3. Authenticate the MCP server over OAuth:
+
+   ```sh
+   codex mcp login signoz
+   ```
+
+   Complete the browser flow with your SigNoz instance URL and a service account
+   API key.
+4. Verify the connection:
+
+   ```sh
+   codex mcp list   # signoz -> enabled, Auth = logged in
+   ```
+
+   or run `/mcp` in a session, then call any `signoz_*` tool. Restart Codex if
+   the `signoz` server does not appear.
+
+The Codex plugin declares `mcpServers: "./.mcp.json"`, so normal plugin installs
+do not need a separate native Codex MCP entry. To use in another repo, copy
+`plugins/signoz` into the target repo's `plugins/` directory, add a marketplace
+entry in `$REPO_ROOT/.agents/plugins/marketplace.json`, and repeat the setup
+step for that workspace.
 
 ### Cursor
 
