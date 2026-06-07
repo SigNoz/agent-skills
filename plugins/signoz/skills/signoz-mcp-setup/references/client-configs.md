@@ -33,11 +33,28 @@ Use these shapes for SigNoz Cloud hosted MCP URLs such as
 `https://mcp.us.signoz.cloud/mcp` and self-hosted HTTP MCP URLs such as
 `http://localhost:8000/mcp`.
 
-### Bundled Claude Code and Codex plugin
+### Bundled Claude Code plugin
 
-Update `.mcp.json` in the SigNoz plugin root using the concrete URL rule from
-`mcp-settings.md`. Codex does not reliably expand shell-style environment
-defaults in plugin MCP URLs.
+In `.signoz_claude_mcp.json` in the SigNoz plugin root, replace only the `url`
+value with the resolved MCP endpoint (concrete URL rule from `mcp-settings.md`).
+Leave the `type` field and other settings unchanged.
+
+```json
+{
+  "mcpServers": {
+    "signoz": {
+      "type": "http",
+      "url": "https://mcp.us.signoz.cloud/mcp"
+    }
+  }
+}
+```
+
+### Bundled Codex plugin
+
+In `.mcp.json` in the SigNoz plugin root, replace only the `url` value with the
+resolved MCP endpoint (concrete URL rule from `mcp-settings.md`). Codex does not
+reliably expand shell-style environment defaults in plugin MCP URLs.
 
 ```json
 {

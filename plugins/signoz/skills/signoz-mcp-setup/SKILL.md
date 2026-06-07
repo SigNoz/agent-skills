@@ -92,11 +92,13 @@ cannot complete interactive OAuth, use the header-based fallback in
 For bundled Claude Code, Codex, and Cursor plugin installs, edit the registration
 files using the reference editing rules:
 
-1. In `.mcp.json` for Claude Code and Codex, replace the full `url` value with
-   the resolved MCP endpoint.
-2. In `.signoz_cursor_mcp.json` for Cursor, replace the full `url` value with the
+1. In `.signoz_claude_mcp.json` for Claude Code, replace the full `url` value
+   with the resolved MCP endpoint.
+2. In `.mcp.json` for Codex, replace the full `url` value with the resolved MCP
+   endpoint.
+3. In `.signoz_cursor_mcp.json` for Cursor, replace the full `url` value with the
    resolved MCP endpoint.
-3. Preserve unrelated MCP servers and settings.
+4. Preserve unrelated MCP servers and settings.
 
 Claude Code and Codex target shape:
 

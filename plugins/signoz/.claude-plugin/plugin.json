@@ -7,5 +7,14 @@
   },
   "repository": "https://github.com/SigNoz/agent-skills",
   "license": "MIT",
-  "mcpServers": "./.mcp.json"
+  "mcpServers": "./.signoz_claude_mcp.json",
+  "userConfig": {
+    "SIGNOZ_REGION": {
+      "type": "string",
+      "title": "SigNoz Cloud Region",
+      "description": "Your SigNoz Cloud region code: us, us2, eu, eu2, in, or in2. Find it under Settings -> Ingestion (region reference: https://signoz.io/docs/ingestion/signoz-cloud/keys/).",
+      "default": "us",
+      "required": true
+    }
+  }
 }
