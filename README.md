@@ -89,7 +89,7 @@ reload Cursor.
 ### Gemini CLI
 
 ```sh
-gemini extensions install SigNoz/agent-skills
+gemini extensions install https://github.com/SigNoz/agent-skills
 ```
 
 When prompted, enter your SigNoz Cloud region (`us`, `us2`, `eu`, `eu2`, `in`, or `in2`).
