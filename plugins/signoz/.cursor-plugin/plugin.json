@@ -1,7 +1,7 @@
 {
   "name": "signoz",
   "displayName": "SigNoz",
-  "version": "2026.05.31.1",
+  "version": "2026.06.07.1",
   "description": "Official SigNoz plugin for MCP setup, docs, queries, dashboards, and alerts",
   "author": {
     "name": "SigNoz"
@@ -17,5 +17,27 @@
     "tracing",
     "logging"
   ],
-  "skills": "./skills/"
+  "mcpServers": "./.signoz_cursor_mcp.json",
+  "skills": "./skills/",
+  "variables": {
+    "type": "object",
+    "properties": {
+      "SIGNOZ_REGION": {
+        "type": "string",
+        "title": "SigNoz Region",
+        "description": "Select your SigNoz Cloud region. This is the region code shown in **Settings -> Ingestion** (see the [region reference](https://signoz.io/docs/ingestion/signoz-cloud/keys/))",
+        "enum": [
+          "us",
+          "us2",
+          "eu",
+          "eu2",
+          "in",
+          "in2"
+        ]
+      }
+    },
+    "required": [
+      "SIGNOZ_REGION"
+    ]
+  }
 }

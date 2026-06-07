@@ -1,0 +1,22 @@
+{
+  "name": "signoz",
+  "version": "2026.06.07.1",
+  "description": "Query SigNoz observability data(metrics, traces, logs, alerts, dashboards, services) via the SigNoz Cloud hosted MCP server.",
+  "mcpServers": {
+    "signoz": {
+      "httpUrl": "https://mcp.${SIGNOZ_REGION}.signoz.cloud/mcp",
+      "timeout": 30000
+    }
+  },
+  "settings": [
+    {
+      "name": "SIGNOZ_REGION",
+      "label": "SigNoz Cloud region",
+      "description": "Your SigNoz Cloud region. Find it under Settings → Ingestion in SigNoz, or see https://signoz.io/docs/ingestion/signoz-cloud/overview/#endpoint. Values: us, in, eu, us2, in2, eu2",
+      "envVar": "SIGNOZ_REGION",
+      "sensitive": false,
+      "required": true,
+      "default": "us"
+    }
+  ]
+}

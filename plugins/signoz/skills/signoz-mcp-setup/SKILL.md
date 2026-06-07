@@ -96,8 +96,8 @@ files using the reference editing rules:
    with the resolved MCP endpoint.
 2. In `.mcp.json` for Codex, replace the full `url` value with the resolved MCP
    endpoint.
-3. In `mcp.json` for Cursor, replace the full `url` value with the resolved MCP
-   endpoint.
+3. In `.signoz_cursor_mcp.json` for Cursor, replace the full `url` value with the
+   resolved MCP endpoint.
 4. Preserve unrelated MCP servers and settings.
 
 Claude Code and Codex target shape:
@@ -153,8 +153,11 @@ client-specific authentication step:
   Tools & MCP if prompted.
 - **VS Code / GitHub Copilot** — open Copilot Chat in Agent mode, approve the
   `signoz` server if prompted, then complete the authentication flow.
-- **Codex** — restart Codex if the server does not appear, then run
-  `codex mcp login signoz` and verify with `/mcp`.
+- **Codex** — restart Codex if the server does not appear. For SigNoz Cloud,
+  run `codex mcp login signoz` to complete OAuth, then verify with `/mcp`. For a
+  self-hosted HTTP endpoint (no OAuth unless the server runs with
+  `OAUTH_ENABLED=true`), skip the login step and just verify with `/mcp` that the
+  already-authenticated `signoz` server is connected.
 - **Claude Code** — restart Claude Code if the server does not appear, then run
   `/mcp`, select `signoz`, and complete authentication.
 - **Claude Desktop** — restart Claude Desktop or reconnect the custom

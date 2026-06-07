@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "signoz": {
+      "url": "https://mcp.${SIGNOZ_REGION:-not-setup}.signoz.cloud/mcp"
+    }
+  }
+}

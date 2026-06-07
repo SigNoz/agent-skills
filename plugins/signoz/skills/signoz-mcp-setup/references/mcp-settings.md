@@ -37,7 +37,7 @@ The SigNoz plugin may ship these bundled registration files in the plugin root:
 
 - `.signoz_claude_mcp.json` for Claude Code
 - `.mcp.json` for Codex
-- `mcp.json` for Cursor
+- `.signoz_cursor_mcp.json` for Cursor
 
 This reference file lives at `skills/signoz-mcp-setup/references/mcp-settings.md`,
 so the plugin root is two directories up from `skills/signoz-mcp-setup/`.
@@ -55,7 +55,7 @@ The URL should use a concrete endpoint in all bundled registration files:
 
 - `.signoz_claude_mcp.json` for Claude Code
 - `.mcp.json` for Codex
-- `mcp.json` for Cursor
+- `.signoz_cursor_mcp.json` for Cursor
 
 ```json
 "url": "https://mcp.us.signoz.cloud/mcp"
