@@ -51,9 +51,9 @@ defaults in plugin MCP URLs.
 
 ### Bundled Cursor plugin
 
-Update `mcp.json` in the SigNoz plugin root using the concrete URL rule from
-`mcp-settings.md`. Do not rely on shell-style environment defaults in Cursor
-plugin MCP URLs.
+Update `.signoz_cursor_mcp.json` in the SigNoz plugin root using the concrete URL
+rule from `mcp-settings.md`. Do not rely on shell-style environment defaults in
+Cursor plugin MCP URLs.
 
 ```json
 {

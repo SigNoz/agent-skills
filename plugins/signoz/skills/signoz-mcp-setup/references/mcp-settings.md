@@ -36,7 +36,7 @@ only the plain outcome: working, not set up, or configured but not connected.
 The SigNoz plugin may ship both bundled registration files in the plugin root:
 
 - `.mcp.json` for Claude Code and Codex
-- `mcp.json` for Cursor
+- `.signoz_cursor_mcp.json` for Cursor
 
 This reference file lives at `skills/signoz-mcp-setup/references/mcp-settings.md`,
 so the plugin root is two directories up from `skills/signoz-mcp-setup/`.
@@ -53,7 +53,7 @@ Use the client-specific shape for the registration file you are editing.
 The URL should use a concrete endpoint in both bundled registration files:
 
 - `.mcp.json` for Claude Code and Codex
-- `mcp.json` for Cursor
+- `.signoz_cursor_mcp.json` for Cursor
 
 ```json
 "url": "https://mcp.us.signoz.cloud/mcp"
