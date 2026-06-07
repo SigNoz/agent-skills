@@ -1,6 +1,6 @@
 {
   "name": "signoz",
-  "version": "2026.06.07",
+  "version": "2026.06.07.1",
   "description": "Query SigNoz observability data(metrics, traces, logs, alerts, dashboards, services) via the SigNoz Cloud hosted MCP server.",
   "mcpServers": {
     "signoz": {
