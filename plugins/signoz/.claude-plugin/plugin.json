@@ -12,9 +12,15 @@
     "SIGNOZ_REGION": {
       "type": "string",
       "title": "SigNoz Cloud Region",
-      "description": "Your SigNoz Cloud region code: us, us2, eu, eu2, in, or in2. Find it under Settings -> Ingestion (region reference: https://signoz.io/docs/ingestion/signoz-cloud/keys/).",
+      "description": "Your SigNoz Cloud region code: us, us2, eu, eu2, in, or in2. Find it under Settings -> Ingestion (region reference: https://signoz.io/docs/ingestion/signoz-cloud/keys/). Leave empty if you run self-hosted SigNoz.",
       "default": "us",
-      "required": true
+      "required": false
+    },
+    "SIGNOZ_SELF_HOSTED": {
+      "type": "string",
+      "title": "Self-hosted SigNoz? (type yes / no)",
+      "description": "Type yes if you run your own SigNoz instead of SigNoz Cloud; leave blank or type no for SigNoz Cloud. If yes, the region above is ignored and you'll be prompted to point the plugin at your MCP URL with /signoz-mcp-setup after install.",
+      "default": ""
     }
   }
 }

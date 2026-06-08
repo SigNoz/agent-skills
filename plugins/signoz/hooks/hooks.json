@@ -1,5 +1,5 @@
 {
-  "description": "Auto-allow WebFetch for official SigNoz HTTPS URLs",
+  "description": "Auto-allow WebFetch for official SigNoz HTTPS URLs, and nudge self-hosted users to finish MCP setup",
   "hooks": {
     "PreToolUse": [
       {
@@ -8,6 +8,16 @@
           {
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/allow-signoz-webfetch.js\""
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/self-hosted-nudge.js\""
           }
         ]
       }
