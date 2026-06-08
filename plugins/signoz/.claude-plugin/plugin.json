@@ -20,7 +20,8 @@
       "type": "string",
       "title": "Self-hosted SigNoz? (type yes / no)",
       "description": "Type yes if you run your own SigNoz instead of SigNoz Cloud; leave blank or type no for SigNoz Cloud. If yes, the region above is ignored and you'll be prompted to point the plugin at your MCP URL with /signoz-mcp-setup after install.",
-      "default": ""
+      "default": "",
+      "required": false
     }
   }
 }
