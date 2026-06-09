@@ -54,6 +54,12 @@ set to `yes`, the region is ignored, and at the next session start the plugin
 reminds you to point it at your instance — run `signoz-mcp-setup` with your
 self-hosted HTTP `/mcp` URL (for example `http://localhost:8000/mcp`).
 
+> **The reminder fires on session start, not at install time.** Because you
+> install the plugin mid-session, its `SessionStart` hook has no session-start
+> event to fire on yet. Start a new session to trigger it: run `/clear`, restart
+> Claude Code, or resume with `/resume` (or `claude --continue`). The reminder
+> then appears on your first prompt of the new session.
+
 To change the region later, reconfigure the plugin's options or run
 `signoz-mcp-setup`.
 
@@ -68,7 +74,7 @@ Update:
 /plugin update signoz@signoz-skills
 ```
 
-> The plugin ships a `PreToolUse` hook that auto-allows `WebFetch` to `signoz.io` domains. This does not affect `Bash`-based network calls (`curl`, `wget`), which follow the normal permission flow. It also ships a `SessionStart` hook that, only when **Self-hosted SigNoz?** is set to `yes` and the MCP endpoint still points at SigNoz Cloud, reminds you to finish setup with `signoz-mcp-setup`.
+> The plugin ships a `PreToolUse` hook that auto-allows `WebFetch` to `signoz.io` domains. This does not affect `Bash`-based network calls (`curl`, `wget`), which follow the normal permission flow. It also ships a `SessionStart` hook that, only when **Self-hosted SigNoz?** is set to `yes` and the MCP endpoint still points at SigNoz Cloud, reminds you to finish setup with `signoz-mcp-setup`. Since `SessionStart` hooks only fire at session boundaries, this reminder appears on the next session after install — start one with `/clear`, a restart, or `/resume`.
 
 ### Codex
 
