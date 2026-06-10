@@ -38,9 +38,10 @@ function needsSelfHostedSetup(registrationPath) {
   return lowered.includes("signoz.cloud") || lowered.includes("not-setup");
 }
 
-function emitContext(context) {
+function emitContext(context, userMessage) {
   process.stdout.write(
     JSON.stringify({
+      systemMessage: userMessage,
       hookSpecificOutput: {
         hookEventName: "SessionStart",
         additionalContext: context,
@@ -66,4 +67,7 @@ emitContext(
     "points at SigNoz Cloud. Tell the user to finish setup by running " +
     "/signoz-mcp-setup with their self-hosted MCP URL, for example: " +
     "/signoz-mcp-setup http://localhost:8000/mcp",
+  "SigNoz plugin is in self-hosted mode but its MCP server isn't configured yet. " +
+    "Run /signoz-mcp-setup with your self-hosted MCP URL to finish setup, " +
+    "for example: /signoz-mcp-setup http://localhost:8000/mcp",
 );
