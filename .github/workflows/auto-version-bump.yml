@@ -125,6 +125,14 @@ jobs:
               mv "gemini-extension.json.tmp" "gemini-extension.json"
               echo "Bumped gemini-extension.json -> $NEW (lockstep with signoz)"
             fi
+
+            # The root skills/ directory is a real copy of the signoz plugin
+            # skills (not a symlink — Gemini's extension installer rewrites
+            # symlinks into dangling temp paths). Keep it in lockstep.
+            if [[ "$PLUGIN_NAME" == "signoz" && -d "plugins/signoz/skills" ]]; then
+              rsync -a --delete plugins/signoz/skills/ skills/
+              echo "Synced plugins/signoz/skills -> skills/"
+            fi
           done
 
           if [[ -z "$BUMPED" ]]; then
@@ -143,6 +151,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add plugins/**/.claude-plugin/plugin.json plugins/**/.codex-plugin/plugin.json plugins/**/.cursor-plugin/plugin.json gemini-extension.json
+          git add -A skills
           git commit -m "chore: auto-bump CalVer for ${{ steps.bump.outputs.count }} plugin(s)"
           git pull --rebase origin main || { git rebase --abort 2>/dev/null; echo "ERROR: rebase failed"; exit 1; }
           git push

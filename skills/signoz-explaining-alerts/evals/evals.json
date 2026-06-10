@@ -1,0 +1,40 @@
+{
+  "skill_name": "signoz-explaining-alerts",
+  "evals": [
+    {
+      "id": 0,
+      "eval_name": "fuzzy-match-audit",
+      "prompt": "Explain my checkout error rate alert. Is it configured correctly?",
+      "expected_output": "Agent paginates signoz_list_alert_rules to find candidates (multiple 'checkout-svc Error Rate > 3%' rules + eval-1 alerts exist on staging). Surfaces ambiguity and either asks user or picks closest with a clear assumption note. Then signoz_get_alert + signoz_get_alert_history (7d), produces structured explanation (Overview, Query breakdown — including the formula A*100/B, Threshold, Evaluation, Notification, Labels), AND performs the audit (Step 5) since user asked 'configured correctly'.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "eval_name": "formula-having-decode",
+      "prompt": "What does alert 019de287-a765-7c80-93e7-f2f0f2f5f927 do? Specifically explain how the count guard works and what conditions trigger a fire.",
+      "expected_output": "Agent calls signoz_get_alert directly with the rule ID. Decodes the 3-query structure: A=p99(duration_nano) WITH having: count()>50, B=count() (disabled), F1=A pass-through. Explains that the having clause is the count guard — it suppresses any 1-minute bucket where span count <= 50, so the threshold evaluator sees no data for those buckets and cannot fire. Translates op=above + matchType=on_average + target=1s into plain language. Pulls fire history.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "eval_name": "anomaly-threshold-explain",
+      "prompt": "Help me understand alert rule 019de287-6752-7629-83e4-375919d56dd8 — I'm confused about how anomaly thresholds work versus regular ones.",
+      "expected_output": "Agent fetches the rule, identifies ruleType=anomaly_rule, and explicitly contrasts anomaly vs threshold semantics: target=3 means 3 standard deviations from the learned baseline, NOT 3 raw req/s. Explains daily seasonality: the baseline adapts to hour-of-day patterns. Mentions z-score algorithm. Notes that lower target = more sensitive (more noise). Pulls fire history. Section order from skill (Anomaly specifics) followed.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "eval_name": "url-parse-panic-logs",
+      "prompt": "What does this alarm fire on? https://us2.staging.signoz.cloud/alerts/edit?ruleId=019dad90-1754-770f-8dae-d28a897167e3",
+      "expected_output": "Agent extracts ruleId from the URL query string, calls signoz_get_alert, identifies as LOGS_BASED_ALERT for 'Payments service panic logs'. Decodes the body filter (panic / fatal / etc keywords), groupBy, threshold target=0/at_least_once (any panic log fires it). Pulls fire history. Explains in plain language without dumping the JSON.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "eval_name": "multi-severity-audit-kafka",
+      "prompt": "Audit alert 019dad90-1c73-715e-b040-79901928deb2 (kafka consumer lag) — anything I should change?",
+      "expected_output": "Agent fetches the rule, decodes the multi-severity threshold spec (warning at lag >= 50, critical at >= 200), explains the tiered routing. Performs Step 5 audit: flags missing labels.severity (rule has no severity label even though thresholds have severity tiers), considers groupBy cardinality, evaluates threshold calibration, suggests adding severity label, runbook annotations, alertOnAbsent if relevant. Pulls fire history.",
+      "files": []
+    }
+  ]
+}

@@ -33,6 +33,7 @@ npx skills add https://github.com/anthropics/skills --skill skill-creator
 - **Reference files.** Move material >300 lines into `references/`, `scripts/`, or `assets/`. Any reference file longer than 100 lines must start with a `## Contents` table-of-contents.
 - **SKILL.md length.** Keep the body under 500 lines. Use progressive disclosure — link to specific reference files with a clear "read this when X" pointer rather than burying detail inline.
 - **Plugin manifests.** Keep `plugins/signoz/.codex-plugin/plugin.json` and `plugins/signoz/.cursor-plugin/plugin.json` in sync with the Claude manifest when adding or removing skills.
+- **Root `skills/` directory.** The root `skills/` directory is a generated copy of `plugins/signoz/skills/` for the Gemini CLI extension (Gemini's installer cannot follow symlinks). Never edit it directly — edit `plugins/signoz/skills/` and the auto-bump workflow syncs the copy on merge to `main`.
 
 ### Further reading
 
