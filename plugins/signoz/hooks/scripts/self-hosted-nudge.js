@@ -25,7 +25,11 @@ function needsSelfHostedSetup(registrationPath) {
   let url;
 
   try {
-    url = JSON.parse(raw)?.mcpServers?.signoz?.url;
+    // Read the single bundled MCP server's URL regardless of its key. The
+    // Claude Code registration keys the server `mcp` (not `signoz`), so a
+    // hardcoded `.signoz` lookup would always miss and nudge on every session.
+    const servers = JSON.parse(raw)?.mcpServers ?? {};
+    url = Object.values(servers)[0]?.url;
   } catch {
     return false;
   }
