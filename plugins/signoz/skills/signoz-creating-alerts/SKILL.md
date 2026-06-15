@@ -21,9 +21,9 @@ the same flow.
 
 ## Prerequisites
 
-This skill calls SigNoz MCP server tools (`signoz:signoz_create_alert`,
-`signoz:signoz_list_alert_rules`, `signoz:signoz_get_field_keys`, etc.). Before running the
-workflow, confirm the `signoz:signoz_*` tools are available. If they are not,
+This skill calls SigNoz MCP server tools (`signoz_create_alert`,
+`signoz_list_alert_rules`, `signoz_get_field_keys`, etc.). Before running the
+workflow, confirm the `signoz_*` tools are available. If they are not,
 run `signoz-mcp-setup` first to initialize or repair the MCP connection. Do not
 try to fall back to raw HTTP calls or fabricate alert configs without the MCP
 tools.
@@ -41,7 +41,7 @@ Do NOT use when the user wants to:
 - Understand what an existing alert monitors → `signoz-explaining-alerts`.
 - Diagnose why an existing alert fired → `signoz-investigating-alerts`.
 - Modify thresholds, queries, or routing on an existing alert → call
-  `signoz:signoz_update_alert` directly.
+  `signoz_update_alert` directly.
 
 ## Required inputs (strict)
 
@@ -52,10 +52,10 @@ The skill enforces a strict input contract:
 | Input | Required | Source if missing |
 |---|---|---|
 | Alert intent (NL goal) | yes | `$ARGUMENTS` or recent user turn |
-| Resource attribute filter (e.g. `service.name`, `k8s.namespace.name`, `host.name`) | yes | discover via `signoz:signoz_get_field_keys` + `signoz:signoz_get_field_values` |
+| Resource attribute filter (e.g. `service.name`, `k8s.namespace.name`, `host.name`) | yes | discover via `signoz_get_field_keys` + `signoz_get_field_values` |
 | Threshold value(s) | inferred from intent | derive a sensible default and surface in the preview |
 | Severity | inferred from intent | default `warning`; promote to `critical` only if user said "page", "wake up", "critical" |
-| Notification channel | yes | `signoz:signoz_list_notification_channels` + offer "create new" |
+| Notification channel | yes | `signoz_list_notification_channels` + offer "create new" |
 
 If a required input is missing and cannot be discovered, **stop before
 calling any write tool** and ask the user. The host application decides
@@ -76,7 +76,7 @@ What to include in the question:
 
 In autonomous mode (no human), escalate to the caller or fill the gap
 from upstream context. Either way, do not proceed to
-`signoz:signoz_create_alert` with a guessed value.
+`signoz_create_alert` with a guessed value.
 
 ## Workflow
 
@@ -109,12 +109,12 @@ When the user does not name a service / host / namespace, the SigNoz MCP
 guideline applies: **always prefer a resource-attribute filter**. Discover
 candidates instead of guessing:
 
-1. Call `signoz:signoz_get_field_keys` with `fieldContext=resource` to enumerate
+1. Call `signoz_get_field_keys` with `fieldContext=resource` to enumerate
    resource attributes for the chosen signal.
-2. Call `signoz:signoz_get_field_values` for the most likely attribute (typically
+2. Call `signoz_get_field_values` for the most likely attribute (typically
    `service.name`, then `host.name`, then `k8s.namespace.name`) to get
    concrete values.
-3. If the user mentioned a metric by name, call `signoz:signoz_list_metrics` with a
+3. If the user mentioned a metric by name, call `signoz_list_metrics` with a
    search term to verify the exact OTel metric name. Wrong names create
    alerts that never fire.
 
@@ -128,15 +128,15 @@ Step 2), check for existing alerts before probing data or authoring a
 new config — both are wasted work if the user wants to update an
 existing rule instead.
 
-Call `signoz:signoz_list_alert_rules` and **paginate through every page** —
+Call `signoz_list_alert_rules` and **paginate through every page** —
 `pagination.hasMore` is true until you have walked the full list. This lists
-*configured* alert rules (the durable state); do not use `signoz:signoz_list_alerts`,
+*configured* alert rules (the durable state); do not use `signoz_list_alerts`,
 which returns currently triggered/active alert instances and will silently
 miss rules that are configured but not firing right now. Check for existing
 rules that match the user's intent (same signal + same scope + similar
 threshold). If a likely duplicate exists, surface it and ask whether to
 create a new one anyway, modify the existing one (out of scope here — use
-`signoz:signoz_update_alert`), or cancel.
+`signoz_update_alert`), or cancel.
 
 ### Step 4: Probe data existence for the chosen filter (fail fast)
 
@@ -150,14 +150,14 @@ silently never fires.
 Run a single probe over the last 1 hour using the same filter the alert
 will use, but with the simplest aggregation that confirms data exists:
 
-- **Metrics**: `signoz:signoz_execute_builder_query` with `count()`
+- **Metrics**: `signoz_execute_builder_query` with `count()`
   (or `count_distinct(service.name)` if scope-discovering). Use
-  `signoz:signoz_query_metrics` when you already have a concrete
+  `signoz_query_metrics` when you already have a concrete
   `metricName` — it auto-applies aggregation defaults and accepts
   `filter`/`groupBy`, but requires a concrete `metricName` (no PromQL,
   no filter-only probes).
-- **Logs**: `signoz:signoz_aggregate_logs` with `count()` over the filter.
-- **Traces**: `signoz:signoz_aggregate_traces` with `count()` over the filter.
+- **Logs**: `signoz_aggregate_logs` with `count()` over the filter.
+- **Traces**: `signoz_aggregate_traces` with `count()` over the filter.
 
 Inspect the result:
 
@@ -167,7 +167,7 @@ Inspect the result:
   inputs* above), describing what was missing and offering concrete
   recovery:
   - Service doesn't emit the metric → call
-    `signoz:signoz_get_field_values signal=metrics name=service.name metricName=<metric>`
+    `signoz_get_field_values signal=metrics name=service.name metricName=<metric>`
     to list the services that *do* emit it; let the user pick a different
     service or a different metric.
   - Wrong attribute name (`service` instead of `service.name`) → suggest
@@ -306,19 +306,19 @@ Step 4 confirmed data flows. Step 6 does two things:
    alert have fired a sensible number of times in the last hour?
 
 Run the full primary query (or formula) over the last hour:
-- `signoz:signoz_execute_builder_query` for **all** builder, formula,
+- `signoz_execute_builder_query` for **all** builder, formula,
   and PromQL queries — set `compositeQuery.queries[].type` to
   `builder_query` / `builder_formula` / `promql` as appropriate. For
   PromQL put the query string in `spec.query` and read
   `signoz://promql/instructions` for the UTF-8 quoted-selector form
   SigNoz requires (`{"metric.name.with.dots"}` — not the underscored
   or bare-dotted forms).
-- `signoz:signoz_aggregate_logs` / `signoz:signoz_aggregate_traces`
+- `signoz_aggregate_logs` / `signoz_aggregate_traces`
   when those fit better.
-- `signoz:signoz_query_metrics` when the alert query targets a single
+- `signoz_query_metrics` when the alert query targets a single
   known metric by `metricName` — the tool auto-applies aggregation
   defaults and accepts `filter`, `groupBy`, and `formula` alongside.
-  PromQL is not supported here; use `signoz:signoz_execute_builder_query`
+  PromQL is not supported here; use `signoz_execute_builder_query`
   for that.
 
 Compute how many evaluation points breached the proposed threshold.
@@ -356,13 +356,13 @@ the dry-run so any threshold-driven severity changes (warning → critical)
 are settled before the user is asked to pick routing, and so we never
 create a notification channel inline for an alert that fails validation.
 
-1. Call `signoz:signoz_list_notification_channels` to enumerate existing channels.
+1. Call `signoz_list_notification_channels` to enumerate existing channels.
 2. If the user named a channel ("send to slack-infra"), use it if it exists;
    if not, fall through.
 3. Otherwise present the user with two options:
    - **Pick from existing** — list channels with their type (Slack, PagerDuty,
      email, webhook) so the user can choose.
-   - **Create new inline** — call `signoz:signoz_create_notification_channel` with
+   - **Create new inline** — call `signoz_create_notification_channel` with
      channel parameters the user provides (name, type, type-specific config
      like Slack webhook URL or PagerDuty integration key).
 4. If neither path resolves a channel, stop and ask the user for a
@@ -389,7 +389,7 @@ inputs and follow these rules:
   or any other field that the host may persist for resume. Refer to it
   symbolically (e.g. "the webhook you just provided").
 - **One-pass only.** Pass the secret directly to
-  `signoz:signoz_create_notification_channel` and do not retain it in any
+  `signoz_create_notification_channel` and do not retain it in any
   intermediate prose. After the create call succeeds, refer to the
   channel by name; after a failure, ask the user to re-paste rather than
   echoing what they sent.
@@ -414,9 +414,9 @@ does).
 
 ### Step 9: Save and report
 
-1. Call `signoz:signoz_create_alert` with the config from Step 8.
-2. **Name collision** — if `signoz:signoz_create_alert` returns a duplicate-name
-   error, **do not** suffix-append or call `signoz:signoz_update_alert`. Stop and
+1. Call `signoz_create_alert` with the config from Step 8.
+2. **Name collision** — if `signoz_create_alert` returns a duplicate-name
+   error, **do not** suffix-append or call `signoz_update_alert`. Stop and
    tell the user the existing alert blocked creation; offer to use a
    different name or modify the existing alert (which is out of scope for
    this skill).
@@ -431,11 +431,11 @@ does).
 - **Strict inputs over guessing** Resource attribute and channel are
   required. If missing, stop and ask the user (see *Required inputs* above). Creating an alert on
   a guessed service is harder to undo than asking.
-- **Always paginate `signoz:signoz_list_alert_rules`** Stopping at page 1 misses
+- **Always paginate `signoz_list_alert_rules`** Stopping at page 1 misses
   duplicates and produces noise.
 - **Dry-run is mandatory** Step 4 (data probe) and Step 6 (full
   query + threshold calibration) are both required before
-  `signoz:signoz_create_alert`. A never-firing alert is *worse* than no
+  `signoz_create_alert`. A never-firing alert is *worse* than no
   alert: it provides a false sense of safety.
 - **Threshold operators use canonical words** Prefer `op: "above"` /
   `"below"` / `"equals"` / `"not_equals"`. Numeric codes (`"1"`–`"7"`)
@@ -445,11 +445,11 @@ does).
   `LOGS_BASED_ALERT`. Mismatches fail validation.
 - **Anomaly rules are metrics-only** `anomaly_rule` + non-metric alertType
   is rejected.
-- **Channels must exist.** Use names from `signoz:signoz_list_notification_channels`
+- **Channels must exist.** Use names from `signoz_list_notification_channels`
   exactly, or create the channel inline first.
 - **Never echo channel secrets.** Slack webhook URLs, PagerDuty integration
   keys, and similar webhook tokens are secrets. Pass them to
-  `signoz:signoz_create_notification_channel` once and never repeat the
+  `signoz_create_notification_channel` once and never repeat the
   value in chat output, previews, confirmations, summaries, clarification
   payloads, or navigation suggestions. Refer to the channel by name only
   after creation; ask the user to re-paste on failure rather than

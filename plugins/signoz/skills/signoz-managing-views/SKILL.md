@@ -27,11 +27,11 @@ below.
 
 ## Prerequisites
 
-This skill calls SigNoz MCP server tools (`signoz:signoz_create_view`,
-`signoz:signoz_list_views`, `signoz:signoz_get_view`,
-`signoz:signoz_update_view`, `signoz:signoz_delete_view`,
-`signoz:signoz_get_field_keys`, `signoz:signoz_get_field_values`). Before
-running the workflow, confirm the `signoz:signoz_*` tools are available. If
+This skill calls SigNoz MCP server tools (`signoz_create_view`,
+`signoz_list_views`, `signoz_get_view`,
+`signoz_update_view`, `signoz_delete_view`,
+`signoz_get_field_keys`, `signoz_get_field_values`). Before
+running the workflow, confirm the `signoz_*` tools are available. If
 they are not, run `signoz-mcp-setup` first to initialize or repair the MCP
 connection. Do not fall back to raw HTTP calls or fabricate view payloads
 without the MCP tools.
@@ -89,7 +89,7 @@ optional.
    the `Skill` tool to invoke `signoz-generating-queries`. The sub-skill
    handles field discovery, type checking, and live-data validation in one
    pass — adapting an example payload from `signoz://view/examples` or
-   running a bare `signoz:signoz_search_traces` call skips the field-type
+   running a bare `signoz_search_traces` call skips the field-type
    checks and service-name resolution that catch silent 400s before they
    become permanent bad views. Skipping it means a malformed filter becomes
    a saved view that must be deleted and recreated.
@@ -98,9 +98,9 @@ optional.
 5. **Mandatory pre-save sample fetch.** Probe with the **exact** filter
    from `compositeQuery.queries[0].spec` against the destination
    signal:
-   - `sourcePage=traces` → `signoz:signoz_search_traces` with `limit=1`
-   - `sourcePage=logs` → `signoz:signoz_search_logs` with `limit=1`
-   - `sourcePage=metrics` → `signoz:signoz_query_metrics` with the
+   - `sourcePage=traces` → `signoz_search_traces` with `limit=1`
+   - `sourcePage=logs` → `signoz_search_logs` with `limit=1`
+   - `sourcePage=metrics` → `signoz_query_metrics` with the
      `metricName` from `spec.aggregations[0].metricName` plus the same
      filter, `timeRange=1h`, `requestType=scalar`. Repeat per metric
      query if the view has multiple. The tool requires `metricName` —
@@ -111,16 +111,16 @@ optional.
    Empty → save anyway / revise / abort. Autonomous mode without
    authorization to persist empty views: abort and escalate.
 6. **Preview before writing — this step is not optional.** Before calling
-   `signoz:signoz_create_view`, show the user a summary: name, sourcePage,
+   `signoz_create_view`, show the user a summary: name, sourcePage,
    panelType, the full filter expression, and the Step 5 probe result
    ("sample fetch: N rows in last 1h"). For a human in the loop, wait
    for confirmation. For an autonomous agent, log the preview and proceed.
-7. Call `signoz:signoz_create_view`. The server populates `id`,
+7. Call `signoz_create_view`. The server populates `id`,
    `createdAt/By`, `updatedAt/By` — never send those.
 
 ### List or find views
 
-`signoz:signoz_list_views` requires a `sourcePage`. If the user did not
+`signoz_list_views` requires a `sourcePage`. If the user did not
 specify one and is searching by name, call it once per signal (traces,
 logs, metrics) and merge — do not guess. Use the `name` and `category`
 parameters for server-side partial-match filtering when the user gives a
@@ -134,17 +134,17 @@ long as `hasMore = true`, keep paginating — there is no page-count cap.
 
 ### Get a single view
 
-Use `signoz:signoz_get_view` with the UUID. The returned `data` object is
+Use `signoz_get_view` with the UUID. The returned `data` object is
 the canonical SavedView shape — it is what you pass back to
-`signoz:signoz_update_view`. Treat that data as the source of truth, not
+`signoz_update_view`. Treat that data as the source of truth, not
 whatever the user described from memory.
 
 ### Update a view (GET-then-PUT)
 
-`signoz:signoz_update_view` is a **full-body replace** (HTTP PUT
+`signoz_update_view` is a **full-body replace** (HTTP PUT
 upstream). Sending a partial body wipes the unspecified fields. The flow:
 
-1. `signoz:signoz_get_view` with the view's `id` → returns
+1. `signoz_get_view` with the view's `id` → returns
    `{ "status": "success", "data": { ...SavedView... } }`.
 2. Take the `data` object. Strip server-populated fields (`id`,
    `createdAt`, `createdBy`, `updatedAt`, `updatedBy`) — the MCP server
@@ -169,7 +169,7 @@ upstream). Sending a partial body wipes the unspecified fields. The flow:
    prevents silent mistakes and gives the user a chance to catch a wrong
    target view. Wait for confirmation on any change to `compositeQuery`,
    since that changes what the view actually shows.
-7. Call `signoz:signoz_update_view` with `{ "viewId": "<id>", "view": <modified data> }`.
+7. Call `signoz_update_view` with `{ "viewId": "<id>", "view": <modified data> }`.
 
 ### Delete a view
 
@@ -181,20 +181,20 @@ snapshot and exposes a `restore` action), but treat that as a recovery
 affordance, not a substitute for getting the delete right. Treat this like
 dropping a row from a shared table:
 
-1. **List to locate.** Call `signoz:signoz_list_views` to find the view
+1. **List to locate.** Call `signoz_list_views` to find the view
    by name. If `sourcePage` is unknown, search all three signals.
-2. **Get to confirm — mandatory.** Call `signoz:signoz_get_view` with the
+2. **Get to confirm — mandatory.** Call `signoz_get_view` with the
    UUID from step 1. Do NOT skip this step even when you got the UUID from
    a list result that looks correct. List results are paginated and a name
-   match is not a UUID guarantee — `signoz:signoz_get_view` is the confirmation
+   match is not a UUID guarantee — `signoz_get_view` is the confirmation
    that the UUID maps to the view the user named.
-   Never call `signoz:signoz_delete_view` on a UUID without a prior
-   `signoz:signoz_get_view` confirming the matching name and `sourcePage`.
+   Never call `signoz_delete_view` on a UUID without a prior
+   `signoz_get_view` confirming the matching name and `sourcePage`.
 3. **Show and ask.** Present the resolved view's name, `sourcePage`, and
    category, and explicitly ask for confirmation. Do **not** auto-confirm
    based on the original prompt, even an emphatic one — destructive
    operations get a fresh confirmation against the resolved target.
-4. Call `signoz:signoz_delete_view`. Report success with the deleted
+4. Call `signoz_delete_view`. Report success with the deleted
    view's name (not just the UUID), so the user can recognize it.
 
 For autonomous agents without a human in the loop: refuse delete unless
@@ -218,7 +218,7 @@ call.
   tenant, even when emitted by the same service. Lifting an attribute
   from a sibling dashboard panel, alert rule, or view that targets a
   different signal is the most common source of empty saved views.
-  `signoz:signoz_get_field_keys signal=<sourcePage>` is necessary but
+  `signoz_get_field_keys signal=<sourcePage>` is necessary but
   not sufficient — sparse emission still produces zero-result views.
   Only the sample fetch confirms.
 
@@ -231,20 +231,20 @@ call.
 
 | Operation | Tools called | Key guard |
 |-----------|-------------|-----------|
-| Create | read `signoz://view/instructions` + `signoz://view/examples` → `signoz-generating-queries` → **sample fetch on exact filter** → preview → `signoz:signoz_create_view` | Mandatory pre-save sample fetch; preview before write; no legacy fields |
-| List | `signoz:signoz_list_views` (× 3 if no sourcePage given) | Check `pagination.hasMore` |
-| Get | `signoz:signoz_get_view(viewId)` | Returns canonical body for update |
-| Update | `signoz:signoz_get_view` → modify → **sample fetch if `compositeQuery` changed** → diff preview → `signoz:signoz_update_view` | Full-body replace; sample fetch when compositeQuery changes; diff preview required |
-| Delete | `signoz:signoz_list_views` → `signoz:signoz_get_view` → confirm → `signoz:signoz_delete_view` | Get-before-delete mandatory; fresh confirmation |
+| Create | read `signoz://view/instructions` + `signoz://view/examples` → `signoz-generating-queries` → **sample fetch on exact filter** → preview → `signoz_create_view` | Mandatory pre-save sample fetch; preview before write; no legacy fields |
+| List | `signoz_list_views` (× 3 if no sourcePage given) | Check `pagination.hasMore` |
+| Get | `signoz_get_view(viewId)` | Returns canonical body for update |
+| Update | `signoz_get_view` → modify → **sample fetch if `compositeQuery` changed** → diff preview → `signoz_update_view` | Full-body replace; sample fetch when compositeQuery changes; diff preview required |
+| Delete | `signoz_list_views` → `signoz_get_view` → confirm → `signoz_delete_view` | Get-before-delete mandatory; fresh confirmation |
 
 ## Common mistakes
 
 | Mistake | Fix |
 |---------|-----|
-| Hand-composing `compositeQuery` from examples or memory (even after reading `signoz://view/examples`) | Use the `Skill` tool to invoke `signoz-generating-queries` — reading examples and validating with `signoz:signoz_search_traces` is not a substitute |
-| Lifting an attribute name from a metric, alert rule, or sibling view and using it in a `sourcePage=traces` / `=logs` view filter without re-verifying on the destination signal | Field keys are signal-scoped; an attribute on metrics may not exist on traces or logs. Always re-check via `signoz:signoz_get_field_keys signal=<sourcePage>` **and** run the mandatory pre-save sample fetch — the key check is necessary but not sufficient |
+| Hand-composing `compositeQuery` from examples or memory (even after reading `signoz://view/examples`) | Use the `Skill` tool to invoke `signoz-generating-queries` — reading examples and validating with `signoz_search_traces` is not a substitute |
+| Lifting an attribute name from a metric, alert rule, or sibling view and using it in a `sourcePage=traces` / `=logs` view filter without re-verifying on the destination signal | Field keys are signal-scoped; an attribute on metrics may not exist on traces or logs. Always re-check via `signoz_get_field_keys signal=<sourcePage>` **and** run the mandatory pre-save sample fetch — the key check is necessary but not sufficient |
 | Skipping the pre-save sample fetch because `signoz-generating-queries` already validated the query | The sub-skill validates the query *it* authored; the filter you persist may have been edited or lifted since then. The Step 5 sample fetch is mandatory regardless |
-| Skipping `signoz:signoz_get_view` before delete (relying on list UUID alone) | Always call `signoz:signoz_get_view` to confirm name+sourcePage before `signoz:signoz_delete_view` |
+| Skipping `signoz_get_view` before delete (relying on list UUID alone) | Always call `signoz_get_view` to confirm name+sourcePage before `signoz_delete_view` |
 | Sending legacy fields: `builder`, `promql`, `unit`, top-level `id`, `queryFormulas` | Read schema resources; server returns HTTP 400 silently |
 | `signal` ≠ `sourcePage` in builder query | Every `builder_query.signal` must equal the view's `sourcePage` |
 | Partial update body (omitting unchanged fields) | GET full body first → modify only changed fields → PUT entire body |

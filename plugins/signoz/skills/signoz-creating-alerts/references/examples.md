@@ -11,18 +11,18 @@ log-volume groupBy, and anomaly detection.
 1. Intent parsed: metric, CPU, scope `service.name = checkout`,
    thresholds 80% (warning) / 90% (critical), severity bumped to critical
    on the higher level because "page me" was used.
-2. `signoz:signoz_list_metrics searchText=cpu` → confirms `system.cpu.utilization`.
-3. `signoz:signoz_list_alert_rules` (paginated) → no existing CPU alert for checkout.
-4. `signoz:signoz_list_notification_channels` → presents existing channels;
+2. `signoz_list_metrics searchText=cpu` → confirms `system.cpu.utilization`.
+3. `signoz_list_alert_rules` (paginated) → no existing CPU alert for checkout.
+4. `signoz_list_notification_channels` → presents existing channels;
    user picks `slack-infra` for warning and `pagerduty-oncall` for critical.
 5. Builds JSON: `METRIC_BASED_ALERT`, `threshold_rule`,
    `signal=metrics`, two thresholds (`op="above"`,
    `matchType="on_average"`, `targetUnit="percent"`), filter
    `service.name = 'checkout'`.
-6. Dry-run via `signoz:signoz_execute_builder_query` over last 1h: returns data,
+6. Dry-run via `signoz_execute_builder_query` over last 1h: returns data,
    would have fired 0 times (clean baseline).
 7. Emits a one-paragraph plain-language summary — no JSON dump.
-8. Calls `signoz:signoz_create_alert`. Reports created alert with ID, threshold
+8. Calls `signoz_create_alert`. Reports created alert with ID, threshold
    summary, channel routing, and dry-run result.
 
 ## Error-rate formula alert
@@ -32,8 +32,8 @@ log-volume groupBy, and anomaly detection.
 **Agent:**
 1. Intent parsed: traces, error-rate formula, scope
    `service.name = payments`, threshold 5%, severity default warning.
-2. `signoz:signoz_get_field_keys fieldContext=resource signal=traces` confirms
-   `service.name`. `signoz:signoz_get_field_values` confirms `payments` exists.
+2. `signoz_get_field_keys fieldContext=resource signal=traces` confirms
+   `service.name`. `signoz_get_field_values` confirms `payments` exists.
 3. No existing payments error-rate alert.
 4. Builds formula alert: query A counts spans with `hasError = true` for
    `service.name = 'payments'`, query B counts all spans for the same
@@ -52,7 +52,7 @@ log-volume groupBy, and anomaly detection.
 **Agent:**
 1. Intent parsed: logs, volume threshold, scope = all services (groupBy
    `service.name`), threshold 1000/min, severity warning.
-2. `signoz:signoz_get_field_keys signal=logs fieldContext=resource` confirms
+2. `signoz_get_field_keys signal=logs fieldContext=resource` confirms
    `service.name` exists; **no service filter required** since the user
    said "any service" → groupBy provides the scoping.
 3. Builds: `LOGS_BASED_ALERT`, `signal=logs`,
@@ -74,7 +74,7 @@ log-volume groupBy, and anomaly detection.
 1. Intent parsed: metric, anomaly detection, scope
    `service.name = api-gateway`. Anomaly detection requires
    `METRIC_BASED_ALERT` + `anomaly_rule`.
-2. `signoz:signoz_list_metrics searchText=duration` → finds
+2. `signoz_list_metrics searchText=duration` → finds
    `http.server.request.duration`.
 3. Builds: `anomaly_rule`, `algorithm=zscore`, `seasonality=daily`,
    threshold target 3 (3 standard deviations), `op: "above"`,

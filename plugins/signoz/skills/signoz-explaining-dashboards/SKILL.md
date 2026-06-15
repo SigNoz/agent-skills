@@ -16,9 +16,9 @@ description: >
 
 ## Prerequisites
 
-This skill calls SigNoz MCP server tools (`signoz:signoz_get_dashboard`,
-`signoz:signoz_list_dashboards`). Before running the workflow, confirm the
-`signoz:signoz_*` tools are available. If they are not, the SigNoz MCP server
+This skill calls SigNoz MCP server tools (`signoz_get_dashboard`,
+`signoz_list_dashboards`). Before running the workflow, confirm the
+`signoz_*` tools are available. If they are not, the SigNoz MCP server
 is not installed or configured — run `signoz-mcp-setup` first to initialize or
 repair the MCP connection. Do not guess at a dashboard's contents from its
 title alone.
@@ -43,7 +43,7 @@ dashboard name, UUID, or it is clear from context (e.g., an @mention or
 auto-context providing a dashboard resource), use that.
 
 If the target dashboard is ambiguous:
-1. Call `signoz:signoz_list_dashboards` to list existing dashboards. **Paginate through
+1. Call `signoz_list_dashboards` to list existing dashboards. **Paginate through
    all pages** — check `pagination.hasMore` in the response. If `hasMore` is true,
    call again with `offset` set to `pagination.nextOffset` and repeat until all
    pages are exhausted. Never stop at the first page.
@@ -51,7 +51,7 @@ If the target dashboard is ambiguous:
 
 ### Step 2: Fetch the full dashboard configuration
 
-Call `signoz:signoz_get_dashboard` with the dashboard UUID. This is **mandatory** — you
+Call `signoz_get_dashboard` with the dashboard UUID. This is **mandatory** — you
 need the complete JSON to explain the dashboard accurately. Never guess based on
 the title alone.
 
@@ -131,7 +131,7 @@ beat wrong chips.
 
 ## Guardrails
 
-- **Fetch before explaining**: Always call `signoz:signoz_get_dashboard` to get the full
+- **Fetch before explaining**: Always call `signoz_get_dashboard` to get the full
   configuration. Never explain based on the dashboard title or listing alone.
 - **Interpret, don't dump**: Translate queries into plain operational language. Never
   show raw query JSON to the user unless they specifically ask.
@@ -144,7 +144,7 @@ beat wrong chips.
   explain skill is about understanding the dashboard structure, not inspecting
   current data.
 - **Paginate dashboard listing**: When searching for a dashboard by name, always
-  paginate through all pages of `signoz:signoz_list_dashboards` before concluding a
+  paginate through all pages of `signoz_list_dashboards` before concluding a
   dashboard does not exist.
 - **All query types**: Handle builder, ClickHouse SQL, and PromQL queries — each
   requires a different interpretation approach. For builder queries, read the
@@ -158,9 +158,9 @@ beat wrong chips.
 **User:** "Explain my PostgreSQL dashboard"
 
 **Agent:**
-1. Calls `signoz:signoz_list_dashboards` (paginates all pages) — finds "PostgreSQL
+1. Calls `signoz_list_dashboards` (paginates all pages) — finds "PostgreSQL
    Overview" dashboard with UUID `abc-123`.
-2. Calls `signoz:signoz_get_dashboard` with UUID `abc-123` — gets full configuration.
+2. Calls `signoz_get_dashboard` with UUID `abc-123` — gets full configuration.
 3. Provides structured explanation:
    - **Overview**: "This dashboard monitors PostgreSQL database health across
      connections, query performance, buffer cache efficiency, and replication. It
@@ -184,7 +184,7 @@ provided via @mention or auto-context)
 
 **Agent:**
 1. Extracts dashboard UUID from the provided context.
-2. Calls `signoz:signoz_get_dashboard` — gets full configuration.
+2. Calls `signoz_get_dashboard` — gets full configuration.
 3. Provides a focused panel-by-panel walkthrough grouped by row sections,
    explaining what each panel shows and what to watch for.
 4. Skips the health/gaps sections unless something notable stands out, since the

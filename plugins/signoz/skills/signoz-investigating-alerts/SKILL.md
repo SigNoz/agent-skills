@@ -23,11 +23,11 @@ statically; investigate diagnoses a specific incident.
 
 ## Prerequisites
 
-This skill calls SigNoz MCP server tools heavily (`signoz:signoz_get_alert`,
-`signoz:signoz_get_alert_history`, `signoz:signoz_execute_builder_query`,
-`signoz:signoz_query_metrics`, `signoz:signoz_search_traces`, `signoz:signoz_search_logs`,
-`signoz:signoz_get_trace_details`, etc.). Before running the workflow,
-confirm the `signoz:signoz_*` tools are available. If they are not, the
+This skill calls SigNoz MCP server tools heavily (`signoz_get_alert`,
+`signoz_get_alert_history`, `signoz_execute_builder_query`,
+`signoz_query_metrics`, `signoz_search_traces`, `signoz_search_logs`,
+`signoz_get_trace_details`, etc.). Before running the workflow,
+confirm the `signoz_*` tools are available. If they are not, the
 SigNoz MCP server is not installed or configured — run `signoz-mcp-setup` first
 to initialize or repair the MCP connection. The investigation depends on
 correlating multiple MCP queries; without the server there is no way to ground
@@ -45,7 +45,7 @@ Do NOT use when the user wants to:
 - Understand what an alert is configured to monitor → `signoz-explaining-alerts`.
 - Create a new alert → `signoz-creating-alerts`.
 - Modify an alert (raise threshold, add hysteresis) → call
-  `signoz:signoz_update_alert` directly.
+  `signoz_update_alert` directly.
 - Run a free-form ad-hoc investigation without an alert as the anchor →
   `signoz-generating-queries`.
 
@@ -54,10 +54,10 @@ Do NOT use when the user wants to:
 | Input | Required | Source if missing |
 |---|---|---|
 | Alert identifier (rule ID or name) | yes | `$ARGUMENTS[0]` or recent context |
-| Time window | no | default to most recent fire from `signoz:signoz_get_alert_history` |
+| Time window | no | default to most recent fire from `signoz_get_alert_history` |
 
 If the alert name is fuzzy, this skill is **best-effort** (read-only):
-1. Call `signoz:signoz_list_alert_rules`, paginate, fuzzy-match the name.
+1. Call `signoz_list_alert_rules`, paginate, fuzzy-match the name.
 2. State the interpretation: "Investigating fire of 'High Error Rate —
    Checkout' (id 42) at 14:32 UTC. If you meant a different alert or
    fire, tell me."
@@ -79,11 +79,11 @@ alerts.
 
 ### Step 1: Resolve alert + fire window (Tier 0)
 
-1. Resolve the alert id via `signoz:signoz_list_alert_rules` (paginated) if
+1. Resolve the alert id via `signoz_list_alert_rules` (paginated) if
    not given.
-2. Call `signoz:signoz_get_alert` for the full rule config — needed to know
+2. Call `signoz_get_alert` for the full rule config — needed to know
    what query, threshold, and resource scope the alert evaluated.
-3. Call `signoz:signoz_get_alert_history` with a 7d lookback. From the
+3. Call `signoz_get_alert_history` with a 7d lookback. From the
    response:
    - **Pick the fire window**. Default to the most recent fire. If the
      user passed an explicit time window via `$ARGUMENTS[1]`, honor it.
@@ -101,8 +101,8 @@ threshold tickle or flap) and quantifies the magnitude.
 
 1. Re-run the alert's primary query over a window centered on the fire
    start: `[fire_start - 30m, fire_start + 30m]`.
-   - Use `signoz:signoz_execute_builder_query` for builder/formula alerts.
-   - Use `signoz:signoz_query_metrics` for PromQL alerts.
+   - Use `signoz_execute_builder_query` for builder/formula alerts.
+   - Use `signoz_query_metrics` for PromQL alerts.
 2. Compute:
    - **Peak value** during the fire window.
    - **Threshold breach magnitude**: `(peak - threshold) / threshold *
@@ -138,7 +138,7 @@ baseline window.
 
 3. For each neighbor signal:
    - Query both windows (fire + baseline) via
-     `signoz:signoz_execute_builder_query` or `signoz:signoz_query_metrics`.
+     `signoz_execute_builder_query` or `signoz_query_metrics`.
    - Compute the delta (% change in fire window vs baseline).
    - Rank by absolute delta.
 
@@ -156,16 +156,16 @@ specific failing operations.
 
 1. **Traces** (if the alert is service-scoped and traces are
    available):
-   - Call `signoz:signoz_search_traces` for the fire window with filter:
+   - Call `signoz_search_traces` for the fire window with filter:
      `service.name = <scope>` AND `hasError = true`. Cap at top 20.
    - Group results by `name` (operation) and `error_message`. Surface
      the top 3 by frequency with a representative trace ID for each.
-   - Optionally call `signoz:signoz_get_trace_details` on one representative
+   - Optionally call `signoz_get_trace_details` on one representative
      to extract specific span attributes (DB statement, downstream URL,
      status code).
 
 2. **Logs** for the fire window:
-   - Call `signoz:signoz_search_logs` with filter:
+   - Call `signoz_search_logs` with filter:
      `<scope_filter>` AND `severity_text IN ('ERROR', 'FATAL')`. Cap
      at top 20 most recent.
    - Group by `body` pattern (or `exception.type` if present). Surface
@@ -248,7 +248,7 @@ handles so the user can act immediately:
   the exact filter and time window.
 - "Tune this alert" if the fire was marginal — name the field
   (`matchType`, `target`, `recoveryTarget`) and the change to make
-  via `signoz:signoz_update_alert`.
+  via `signoz_update_alert`.
 - "Open an incident" or "page the owning team" if the cause is
   cross-service.
 
@@ -314,7 +314,7 @@ the full picture. The chip surface is capped; the prose is not.
   speed at scale.
 - **Do not modify any alert.** Investigate is read-only. If the user
   says "and tighten this alert", surface that as a next-step
-  recommendation; do not call `signoz:signoz_update_alert`.
+  recommendation; do not call `signoz_update_alert`.
 - **Stay in scope.** Static rule explanation belongs to
   `signoz-explaining-alerts`. Cause analysis without an alert anchor
   belongs to `signoz-generating-queries`.
@@ -328,7 +328,7 @@ the full picture. The chip surface is capped; the prose is not.
 
 **Agent:**
 1. Resolves alert: "High Error Rate — Checkout" (id 42).
-2. `signoz:signoz_get_alert_history` → most recent fire 2h ago at 14:32 UTC,
+2. `signoz_get_alert_history` → most recent fire 2h ago at 14:32 UTC,
    sustained for 8m, single fire (not flapping).
 3. **Tier 1**: re-runs error-rate formula over `[14:02, 15:02]`. Peak
    error rate 12.4% (vs 5% threshold — 148% over). Pre-fire baseline
@@ -409,7 +409,7 @@ the full picture. The chip surface is capped; the prose is not.
      and short-lived; baseline already near threshold).
    - **Next steps**: change `matchType` to `on_average` (smooths
      transient spikes) OR raise threshold to 85% with hysteresis
-     (`recoveryTarget: 75`). Use `signoz:signoz_update_alert` to apply.
+     (`recoveryTarget: 75`). Use `signoz_update_alert` to apply.
 
 ---
 
@@ -470,7 +470,7 @@ the full picture. The chip surface is capped; the prose is not.
   (service / host / k8s) to the neighbor signals to pull in Tier 2.
 - `references/baseline-comparison.md` — query templates that pair
   fire-window and baseline-window calls cleanly, including how to
-  format `signoz:signoz_execute_builder_query` for both.
+  format `signoz_execute_builder_query` for both.
 - `signoz-explaining-alerts` skill — to decode the rule before
   investigating, if the user is unfamiliar with what the alert
   monitors.
