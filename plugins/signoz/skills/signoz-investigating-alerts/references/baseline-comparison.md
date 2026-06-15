@@ -3,7 +3,7 @@
 ## Contents
 
 - Window selection
-- Builder query template (`signoz:signoz_execute_builder_query`)
+- Builder query template (`signoz_execute_builder_query`)
 - Computing the delta
 - Surfacing the comparison
 - When the baseline is invalid
@@ -30,7 +30,7 @@ Given a fire that started at `T_fire_start` and lasted `D` minutes:
 State both window timestamps in **UTC absolute** in the output, plus a
 relative description ("24h before fire").
 
-## Builder query template (`signoz:signoz_execute_builder_query`)
+## Builder query template (`signoz_execute_builder_query`)
 
 For each neighbor signal, run the same builder query twice — once per
 window. The only thing that changes is `start` / `end`.
@@ -84,7 +84,7 @@ In the Tier 2 output for each signal, present:
 
 ```
 - p99 latency: 4.1s vs 320ms baseline (+1180%)
-  query: signoz:signoz_execute_builder_query — p99(durationNano) on
+  query: signoz_execute_builder_query — p99(durationNano) on
          service.name = checkout, fire window 14:32-14:40 UTC vs
          baseline 14:32-14:40 UTC (24h prior)
 ```
@@ -98,7 +98,7 @@ re-run the comparison without rebuilding the parameters.
 Skip baseline comparison and call out the limitation if:
 
 - The baseline window overlaps with another firing of the same alert
-  (`signoz:signoz_get_alert_history` shows a fire in the baseline window).
+  (`signoz_get_alert_history` shows a fire in the baseline window).
   In that case use a 7-day median or the user's confirmed
   known-healthy window.
 - The service was deployed within 24h before the baseline window —
@@ -114,13 +114,13 @@ Skip baseline comparison and call out the limitation if:
 Tier 3 does not require a baseline — the question is "what happened",
 not "what changed". Run a single fire-window query for each:
 
-- `signoz:signoz_search_traces` with the resource filter + `hasError = true`.
+- `signoz_search_traces` with the resource filter + `hasError = true`.
   Cap at 20. Group by `name` (operation) and surface the top 3 by
   count with one representative `trace_id` each.
-- `signoz:signoz_search_logs` with the resource filter +
+- `signoz_search_logs` with the resource filter +
   `severity_text IN ('ERROR', 'FATAL')`. Cap at 20 most recent. Group
   by message pattern (or `exception.type`) and surface the top 3.
-- For deep drill on one trace, `signoz:signoz_get_trace_details(trace_id)`
+- For deep drill on one trace, `signoz_get_trace_details(trace_id)`
   extracts span-level attributes (DB statement, peer service, status
   code) — useful when the operation name alone doesn't identify the
   failing call.

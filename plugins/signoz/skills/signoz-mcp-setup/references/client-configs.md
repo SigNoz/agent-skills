@@ -14,7 +14,9 @@ SigNoz MCP Server docs and adds OpenCode's native config shape.
 
 ## Safety Rules
 
-- Keep the MCP server name `signoz`.
+- Keep each file's existing server key. The bundled Claude Code file
+  (`.signoz_claude_mcp.json`) ships `mcp`; the Codex and Cursor bundled files and
+  native client configs use `signoz`. Do not rename it.
 - Prefer SigNoz Cloud OAuth over header-based auth whenever the client supports
   interactive OAuth.
 - Do not write service account API keys, bearer tokens, or header-based auth
@@ -22,7 +24,8 @@ SigNoz MCP Server docs and adds OpenCode's native config shape.
 - If secrets are needed for self-hosted stdio, prefer user-level config,
   environment-variable references, or a command the user can run.
 - When editing JSON, TOML, or JSONC, preserve unrelated settings and other MCP
-  servers. Update only the `signoz` server entry.
+  servers. Update only the existing SigNoz server entry, and do not rename its
+  key.
 - If the client supports both project and user/global config, prefer the scope
   the user requested. If they did not choose, prefer user/global for secrets
   and project scope for non-secret hosted MCP URLs.
@@ -37,12 +40,12 @@ Use these shapes for SigNoz Cloud hosted MCP URLs such as
 
 In `.signoz_claude_mcp.json` in the SigNoz plugin root, replace only the `url`
 value with the resolved MCP endpoint (concrete URL rule from `mcp-settings.md`).
-Leave the `type` field and other settings unchanged.
+Leave the server key (`mcp`), the `type` field, and other settings unchanged.
 
 ```json
 {
   "mcpServers": {
-    "signoz": {
+    "mcp": {
       "type": "http",
       "url": "https://mcp.us.signoz.cloud/mcp"
     }

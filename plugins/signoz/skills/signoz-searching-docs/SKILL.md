@@ -20,8 +20,8 @@ Prefer the SigNoz MCP server tools when available; fall back to direct HTTP fetc
 
 ### Preferred: MCP tools
 
-- `signoz:signoz_search_docs` — BM25 search over the indexed docs corpus. Pass the user's natural-language query as `query`. Narrow with `section_slug` when the question maps cleanly to a single docs section (the tool's own schema lists valid slugs — defer to it rather than memorizing). Trust the ranking — the index handles relevance.
-- `signoz:signoz_fetch_doc` — full markdown for one indexed page. Pass the canonical URL or `/docs/...` path; optionally narrow to a section with `heading`.
+- `signoz_search_docs` — BM25 search over the indexed docs corpus. Pass the user's natural-language query as `query`. Narrow with `section_slug` when the question maps cleanly to a single docs section (the tool's own schema lists valid slugs — defer to it rather than memorizing). Trust the ranking — the index handles relevance.
+- `signoz_fetch_doc` — full markdown for one indexed page. Pass the canonical URL or `/docs/...` path; optionally narrow to a section with `heading`.
 
 ### Fallback: direct HTTP fetch
 
@@ -45,7 +45,7 @@ Accept: text/markdown
 1. **Identify the domain** from the user's question: instrumentation, OpenTelemetry setup, querying, dashboards, alerts, troubleshooting, deployment, or API docs.
 2. **Check the heuristics table below**. If a heuristic matches, read it before answering — heuristics encode product decisions (which path/method fits the user's environment), useful in both paths.
 3. **Search and fetch** — pick the path based on tool availability:
-   - **With MCP tools**: call `signoz:signoz_search_docs` with the user's query; pass `section_slug` if the domain maps cleanly to one. Read the top 1-3 results and call `signoz:signoz_fetch_doc` on the chosen URL (use `heading` to narrow if the page is large and the question is sub-section-specific).
+   - **With MCP tools**: call `signoz_search_docs` with the user's query; pass `section_slug` if the domain maps cleanly to one. Read the top 1-3 results and call `signoz_fetch_doc` on the chosen URL (use `heading` to narrow if the page is large and the question is sub-section-specific).
    - **Without MCP tools**: grep `sitemap.md` for candidate pages, rank the best 2-5 by how directly they answer the task, and `GET` the top page(s) with `Accept: text/markdown`. Heuristic coverage is sparse — for topics without a heuristic row, skim the sitemap by section path and prefer setup/troubleshooting/API-reference pages over overviews.
    - Fetch **one page** for narrow questions; fetch **multiple pages** when the task spans setup + troubleshooting, or method-selection + language guide. Keep the set small.
 4. **Answer from the fetched docs** and cite canonical `https://signoz.io/docs/...` URLs.

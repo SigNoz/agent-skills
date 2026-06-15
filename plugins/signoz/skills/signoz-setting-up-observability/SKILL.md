@@ -41,12 +41,12 @@ autonomous host fills the gap from upstream context instead of blocking.
 
 ## Prerequisites
 
-This skill calls SigNoz MCP server tools (`signoz:signoz_list_services`,
-`signoz:signoz_list_dashboards`, `signoz:signoz_get_field_keys`,
-`signoz:signoz_execute_builder_query`, `signoz:signoz_create_dashboard`,
-`signoz:signoz_create_alert`, `signoz:signoz_create_view`, etc.) and
+This skill calls SigNoz MCP server tools (`signoz_list_services`,
+`signoz_list_dashboards`, `signoz_get_field_keys`,
+`signoz_execute_builder_query`, `signoz_create_dashboard`,
+`signoz_create_alert`, `signoz_create_view`, etc.) and
 delegates to sibling skills. Before running the workflow, confirm the
-`signoz:signoz_*` tools are available. If they are not, the SigNoz MCP
+`signoz_*` tools are available. If they are not, the SigNoz MCP
 server is not installed or configured — run `signoz-mcp-setup` first. Do
 not fall back to raw HTTP calls or fabricate payloads.
 
@@ -66,7 +66,7 @@ directly:
 - Just a saved Explorer view → `signoz-managing-views`.
 - A one-off exploratory query → `signoz-generating-queries`.
 - A concept/doc lookup (SRE methods, OTel conventions, burn-rate math)
-  → `signoz-searching-docs` / `signoz:signoz_search_docs`.
+  → `signoz-searching-docs` / `signoz_search_docs`.
 
 Each phase below points to the skill that does the mechanical work; this
 skill owns the order and the decisions.
@@ -90,7 +90,7 @@ phase.
    memory, restarts, network) with no extra instrumentation — see Phase
    3. Skip if a platform team already owns the host/cluster dashboard.
 4. **Which signals are emitted?** traces / logs / metrics. Drives which
-   `signoz:signoz_get_field_keys` calls you make.
+   `signoz_get_field_keys` calls you make.
 5. **What's the canonical resource filter?** Usually `service.name`.
    Confirm the exact value before querying — don't guess.
 6. **What does success look like for users of this service?** (Sets up
@@ -112,11 +112,11 @@ value is a single up-front sweep so you *sequence around* what exists
 instead of hitting collisions mid-build:
 
 - **Is the service reporting, and under what exact name?**
-  (`signoz:signoz_list_services`.) This name is the resource filter every
+  (`signoz_list_services`.) This name is the resource filter every
   later phase reuses — pin it before anything else.
 - **Does a dashboard / alert / saved view already exist for it?** If so,
   plan to **extend** it — route to `signoz-modifying-dashboards`,
-  `signoz-managing-views`, or `signoz:signoz_update_alert` — rather than
+  `signoz-managing-views`, or `signoz_update_alert` — rather than
   standing up a parallel one. `signoz-explaining-dashboards` /
   `signoz-explaining-alerts` summarize anything you're inheriting.
 - **Is there a notification channel to reuse?** (Carried into Phase 5.)
@@ -147,9 +147,9 @@ background: `signoz-searching-docs`.)
 
 `signoz-generating-queries` owns the exploration itself — the
 discover-before-querying rule, every discovery call
-(`signoz:signoz_list_metrics`, `signoz:signoz_get_field_keys`,
-`signoz:signoz_get_field_values`,
-`signoz:signoz_get_service_top_operations`), tool choice, and the
+(`signoz_list_metrics`, `signoz_get_field_keys`,
+`signoz_get_field_values`,
+`signoz_get_service_top_operations`), tool choice, and the
 no-data distinction. Drive it to inventory the data; don't restate its
 query mechanics here. (`signoz-searching-docs` covers the RED/USE methods
 and SigNoz field semantics if you need a refresher.)
@@ -258,7 +258,7 @@ Lock in before creating alerts:
 
 1. **Notification routing.** Decide *which* channel each severity tier
    routes to (e.g. critical → PagerDuty, warning → Slack). Reuse an
-   existing channel from `signoz:signoz_list_notification_channels` where
+   existing channel from `signoz_list_notification_channels` where
    one fits; never invent a name. The actual channel resolution/creation
    and secret handling are owned by `signoz-creating-alerts` (Phase 8) —
    here you only lock the tier→channel mapping.

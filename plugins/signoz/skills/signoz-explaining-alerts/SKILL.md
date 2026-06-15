@@ -24,9 +24,9 @@ this skill does **not** investigate any specific fire — that is
 
 ## Prerequisites
 
-This skill calls SigNoz MCP server tools (`signoz:signoz_get_alert`,
-`signoz:signoz_list_alert_rules`, `signoz:signoz_get_alert_history`). Before running
-the workflow, confirm the `signoz:signoz_*` tools are available. If they are
+This skill calls SigNoz MCP server tools (`signoz_get_alert`,
+`signoz_list_alert_rules`, `signoz_get_alert_history`). Before running
+the workflow, confirm the `signoz_*` tools are available. If they are
 not, run `signoz-mcp-setup` first to initialize or repair the MCP connection.
 Do not guess at alert configuration from the rule name alone.
 
@@ -42,7 +42,7 @@ Do NOT use when the user wants to:
 - Create a new alert → `signoz-creating-alerts`.
 - Diagnose why an alert fired or correlate signals around a fire window
   → `signoz-investigating-alerts`.
-- Modify an existing alert → call `signoz:signoz_update_alert` directly.
+- Modify an existing alert → call `signoz_update_alert` directly.
 
 ## Required inputs
 
@@ -53,7 +53,7 @@ Do NOT use when the user wants to:
 If the input is missing or ambiguous, this skill is **best-effort** (not
 strict — read-only operations are cheap to recover from):
 
-1. Call `signoz:signoz_list_alert_rules`, paginate through every page, and find
+1. Call `signoz_list_alert_rules`, paginate through every page, and find
    the closest name match.
 2. State the interpretation in the response:
    "Interpreting your request as alert 'High Error Rate — Checkout' (id 42).
@@ -66,7 +66,7 @@ strict — read-only operations are cheap to recover from):
 
 If the user provided a numeric id, skip to Step 2. Otherwise:
 
-1. Call `signoz:signoz_list_alert_rules` and **paginate every page** —
+1. Call `signoz_list_alert_rules` and **paginate every page** —
    `pagination.hasMore` is true until the full list is walked.
 2. Match by name (case-insensitive substring). If multiple match,
    present the candidates and ask which one (interactive) or pick the
@@ -74,14 +74,14 @@ If the user provided a numeric id, skip to Step 2. Otherwise:
 
 ### Step 2: Fetch the full configuration
 
-Call `signoz:signoz_get_alert` with the rule id. This is **mandatory** — the
+Call `signoz_get_alert` with the rule id. This is **mandatory** — the
 list response does not include the full condition / thresholds /
 notification settings, and explanations based on the name alone are
 guesses.
 
 ### Step 3: Pull a one-line fire-frequency summary
 
-Call `signoz:signoz_get_alert_history` for the rule with a 7-day lookback. From
+Call `signoz_get_alert_history` for the rule with a 7-day lookback. From
 the response, derive a single line:
 
 > Fired N times in the last 7d (last fire: <relative-time>).
@@ -256,7 +256,7 @@ wrong chips.
 
 ## Guardrails
 
-- **Fetch before explaining.** Always call `signoz:signoz_get_alert`. Do not
+- **Fetch before explaining.** Always call `signoz_get_alert`. Do not
   base explanations on the rule name or list response alone.
 - **Always pull fire history.** The one-line frequency summary is
   cheap (one MCP call) and grounds the explanation. Skip it only if
@@ -274,25 +274,25 @@ wrong chips.
   the user asks. Explain is about understanding the rule, not
   inspecting current data.
 - **Paginate alert listing.** Before concluding an alert does not
-  exist, walk every page of `signoz:signoz_list_alert_rules`.
+  exist, walk every page of `signoz_list_alert_rules`.
 - **SigNoz evaluation model.** SigNoz uses `evalWindow` + `frequency`
   + `matchType`, not Prometheus-style `for` durations. Don't describe
   the evaluation model in Prometheus terms.
 - **Stay in scope.** Investigation of a specific fire window belongs
   to `signoz-investigating-alerts`. Modifications belong to
-  `signoz:signoz_update_alert`.
+  `signoz_update_alert`.
 
 ## Examples
 
 **User:** "Explain my checkout error rate alert"
 
 **Agent:**
-1. `signoz:signoz_list_alert_rules` (paginated) → finds "High Error Rate —
+1. `signoz_list_alert_rules` (paginated) → finds "High Error Rate —
    Checkout" id 42.
-2. `signoz:signoz_get_alert id=42` → traces formula (A errored spans / B
+2. `signoz_get_alert id=42` → traces formula (A errored spans / B
    total spans × 100), single critical threshold at 5%, `op=1`,
    `matchType=1`, channel `pagerduty-oncall`.
-3. `signoz:signoz_get_alert_history id=42 lookback=7d` → fired 3 times,
+3. `signoz_get_alert_history id=42 lookback=7d` → fired 3 times,
    last fire 2h ago.
 4. Replies:
 
@@ -320,11 +320,11 @@ wrong chips.
 **User:** "Explain alert rule 17 — is it well configured?"
 
 **Agent:**
-1. `signoz:signoz_get_alert id=17` → metrics, `system.cpu.utilization`,
+1. `signoz_get_alert id=17` → metrics, `system.cpu.utilization`,
    two thresholds (warning 80%, critical 90%), `matchType=3` on_average,
    filter `deployment.environment.name = 'production'`, groupBy
    `host.name`.
-2. `signoz:signoz_get_alert_history id=17` → has not fired in last 7d.
+2. `signoz_get_alert_history id=17` → has not fired in last 7d.
 3. The user asked "is it well configured?" — the TL;DR leads with the
    **verdict**, not a generic description. Then explanation + full
    audit:
@@ -354,7 +354,7 @@ wrong chips.
 **User:** "Help me understand this anomaly detection alert" (alert id 88)
 
 **Agent:**
-1. `signoz:signoz_get_alert id=88` → `ruleType: anomaly_rule`,
+1. `signoz_get_alert id=88` → `ruleType: anomaly_rule`,
    `algorithm=zscore`, `seasonality=daily`, target 3, metric
    `http.server.request.duration`, scope `service.name = 'api-gateway'`.
 2. History: fired 1 time in last 7d.
