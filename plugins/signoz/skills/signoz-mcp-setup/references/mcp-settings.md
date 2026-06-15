@@ -19,9 +19,9 @@ Antigravity, or OpenCode, read
 
 Silently determine `signoz-server-state`:
 
-1. If `signoz:signoz_*` MCP tools are available, try a lightweight read-only
-   call such as `signoz:signoz_search_docs` for `mcp setup` or
-   `signoz:signoz_list_services` with a small lookback.
+1. If `signoz_*` MCP tools are available, try a lightweight read-only
+   call such as `signoz_search_docs` for `mcp setup` or
+   `signoz_list_services` with a small lookback.
 2. If the call returns SigNoz-specific content, state is **working**.
 3. If the call fails, returns no tools, or only generic/empty content, read the
    plugin registration files below.
@@ -42,8 +42,12 @@ The SigNoz plugin may ship these bundled registration files in the plugin root:
 This reference file lives at `skills/signoz-mcp-setup/references/mcp-settings.md`,
 so the plugin root is two directories up from `skills/signoz-mcp-setup/`.
 
-Update every registration file that exists. Do not create duplicate MCP server
-entries, and do not rename the `signoz` server.
+Update every registration file that exists. Replace only the `url` value and
+preserve each file's existing server key and `type`: the Claude Code file
+(`.signoz_claude_mcp.json`) ships the server key `mcp`, while the Codex and
+Cursor files ship `signoz`. Do not create duplicate MCP server entries, and do
+not rename the existing server — renaming the Claude Code key changes the tool
+namespace (`plugin:signoz:mcp`) and forces re-authentication.
 
 ## Editing Rules
 

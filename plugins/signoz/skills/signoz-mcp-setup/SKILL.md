@@ -5,7 +5,7 @@ description: >
   Cursor, VS Code/GitHub Copilot, Claude Desktop, Gemini CLI, Windsurf, Zed,
   Antigravity, OpenCode, or another MCP client. Use this skill before any
   SigNoz docs, query, dashboard, alert, or view workflow when
-  `signoz:signoz_*` tools are unavailable, or when the user says "setup SigNoz
+  `signoz_*` tools are unavailable, or when the user says "setup SigNoz
   MCP", "configure SigNoz plugin", "wrong region", "change SigNoz region",
   "MCP auth failed", or asks to connect SigNoz Cloud or a self-hosted MCP
   endpoint, even if they do not mention the plugin.
@@ -92,27 +92,30 @@ cannot complete interactive OAuth, use the header-based fallback in
 For bundled Claude Code, Codex, and Cursor plugin installs, edit the registration
 files using the reference editing rules:
 
-1. In `.signoz_claude_mcp.json` for Claude Code, replace the full `url` value
-   with the resolved MCP endpoint.
-2. In `.mcp.json` for Codex, replace the full `url` value with the resolved MCP
-   endpoint.
-3. In `.signoz_cursor_mcp.json` for Cursor, replace the full `url` value with the
-   resolved MCP endpoint.
+1. In `.signoz_claude_mcp.json` for Claude Code, replace only the `url` value
+   with the resolved MCP endpoint. Preserve the existing server key and `type`:
+   this file ships the server key `mcp`, and renaming it changes the tool
+   namespace (`plugin:signoz:mcp`) and forces re-authentication.
+2. In `.mcp.json` for Codex, replace only the `url` value with the resolved MCP
+   endpoint, preserving the existing `signoz` server key.
+3. In `.signoz_cursor_mcp.json` for Cursor, replace only the `url` value with the
+   resolved MCP endpoint, preserving the existing `signoz` server key.
 4. Preserve unrelated MCP servers and settings.
 
-Claude Code and Codex target shape:
+Claude Code target shape (keep the `mcp` server key and `type`):
 
 ```json
 {
   "mcpServers": {
-    "signoz": {
+    "mcp": {
+      "type": "http",
       "url": "https://mcp.us.signoz.cloud/mcp"
     }
   }
 }
 ```
 
-Cursor target shape:
+Codex and Cursor target shape (keep the `signoz` server key):
 
 ```json
 {
@@ -142,7 +145,8 @@ For native client setup, use `client-configs.md`:
   user-level config, environment-variable references, or short commands the
   user can run locally.
 - Preserve unrelated MCP servers and existing client settings.
-- Keep the server name `signoz`.
+- Keep the server name `signoz` in native client configs (the bundled Claude
+  Code plugin file is the only one that uses the `mcp` key — do not rename it).
 
 ### Step 5: Tell the user how to finish
 
