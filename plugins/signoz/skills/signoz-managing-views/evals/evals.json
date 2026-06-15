@@ -38,12 +38,12 @@
       "id": 1,
       "name": "list-views-no-sourcepage",
       "prompt": "Show me all my saved views.",
-      "expected_output": "Agent recognizes no sourcePage was given, calls signoz:signoz_list_views three times (once for each of traces, logs, metrics), merges results, and presents them organized by sourcePage. Checks pagination.hasMore for each signal before concluding.",
+      "expected_output": "Agent recognizes no sourcePage was given, calls signoz:signoz_list_views four times (once for each of traces, logs, metrics, meter), merges results, and presents them organized by sourcePage. Checks pagination.hasMore for each page before concluding.",
       "files": [],
       "assertions": [
         {
-          "text": "Agent calls signoz:signoz_list_views for all three signals: traces, logs, and metrics",
-          "description": "Without a sourcePage the agent must query all three"
+          "text": "Agent calls signoz:signoz_list_views for all four pages: traces, logs, metrics, and meter",
+          "description": "Without a sourcePage the agent must query all four Explorer pages, including meter (Cost Meter)"
         },
         {
           "text": "Agent checks pagination.hasMore before concluding the list is complete",
@@ -143,6 +143,31 @@
         {
           "text": "signal in every builder_query matches the view's sourcePage",
           "description": "signal != sourcePage is a server-side error"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "create-cost-meter-view",
+      "prompt": "Save a view that tracks our log ingestion volume from the Cost Meter so I can find it later.",
+      "expected_output": "Agent recognizes this is a Cost Meter view and resolves sourcePage=meter (not metrics). Reads the schema resources, builds a builder_query with signal=metrics and source=meter against a meter metric (e.g. signoz.meter.log.size), sets panelType=graph. Runs the mandatory pre-save sample fetch via signoz:signoz_query_metrics with source=meter, the metricName, timeRange=24h, requestType=scalar. Shows a preview (name, sourcePage=meter, metric/filter, sample-fetch result), confirms, and calls signoz:signoz_create_view. Reports name, UUID, and sourcePage=meter.",
+      "files": [],
+      "assertions": [
+        {
+          "text": "sourcePage is set to 'meter' (not 'metrics')",
+          "description": "Cost Meter views file under the distinct 'meter' Explorer page; using 'metrics' mis-files them so they're invisible in the Meter Explorer"
+        },
+        {
+          "text": "Every builder_query spec has signal='metrics' AND source='meter'",
+          "description": "A meter view is queried on the metrics signal against the meter store; omitting source='meter' silently queries the default store, and the server rejects a meter view without it"
+        },
+        {
+          "text": "Agent runs the pre-save sample fetch via signoz:signoz_query_metrics with source=meter before signoz:signoz_create_view",
+          "description": "Step 5 of the create flow, adapted for meter: the 1-row/scalar probe must carry source=meter so it hits the meter store"
+        },
+        {
+          "text": "Agent shows a preview and calls signoz:signoz_create_view, reporting the UUID and sourcePage=meter",
+          "description": "Preview-before-write and report-back apply to meter views like any other"
         }
       ]
     }
