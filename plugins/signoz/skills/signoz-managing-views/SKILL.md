@@ -4,20 +4,20 @@ description: >
   Use when the user wants to create, list, get, update, rename, or delete a
   SigNoz saved Explorer view. Trigger on phrases like "save this query as a
   view", "save this filter", "bookmark this search", "list my saved views",
-  "show me views for traces/logs/metrics", "rename the X view", "update my
+  "show me views for traces/logs/metrics/meter", "rename the X view", "update my
   saved view to also filter Y", "delete the X view", or any request to manage
   Explorer saved views — even if they don't say "view" explicitly. Also use
   when someone wants to share a recurring Explorer query with their team and
   asks how to "save" or "bookmark" it.
-argument-hint: <view name, sourcePage (traces/logs/metrics), and filter intent>
+argument-hint: <view name, sourcePage (traces/logs/metrics/meter), and filter intent>
 ---
 
 # Managing Saved Views
 
 Create, read, update, and delete SigNoz **saved Explorer views** via the
 SigNoz MCP server. A saved view is a reusable snapshot of an Explorer query
-on the Logs, Traces, or Metrics page — name + filters + panel type, scoped
-to one `sourcePage`. They are not dashboards and not alerts.
+on the Logs, Traces, Metrics, or Cost Meter page — name + filters + panel
+type, scoped to one `sourcePage`. They are not dashboards and not alerts.
 
 This skill covers the full CRUD surface in one place because the operations
 share the same schema, the same identity model (UUID per view), and the same
@@ -65,8 +65,8 @@ Read both MCP resources by URI using your client's resource-read mechanism:
 
 - `signoz://view/instructions` — SavedView field reference, `sourcePage`
   rules, the GET-then-PUT update flow, the minimal create body.
-- `signoz://view/examples` — three round-tripped payloads (traces list, logs
-  list, metrics graph) you can adapt verbatim.
+- `signoz://view/examples` — round-tripped payloads (traces list, logs list,
+  metrics graph, and a Cost Meter graph) you can adapt verbatim.
 
 The server returns HTTP 400 on legacy v3/v4 fields (`builder`, `promql`,
 `unit`, top-level `id`, `queryFormulas`, `queryTraceOperator`) — the failure
@@ -78,8 +78,11 @@ optional.
 ### Create a view
 
 1. **Resolve `sourcePage`** — must be exactly one of `traces`, `logs`,
-   `metrics`. If the user's intent is ambiguous ("save this query"), ask
-   which Explorer they mean. It cannot be inferred from filter strings alone.
+   `metrics`, `meter`. If the user's intent is ambiguous ("save this query"),
+   ask which Explorer they mean. It cannot be inferred from filter strings
+   alone. Use `meter` for **Cost Meter** (usage / billing) views — it is a
+   distinct Explorer page from `metrics`, even though the query runs on the
+   metrics signal (see Step 4).
 2. **Read the schema resources.** Read both `signoz://view/instructions`
    and `signoz://view/examples` using your client's resource-read mechanism
    before composing any payload. Do not skip this step even if you think
@@ -93,8 +96,13 @@ optional.
    checks and service-name resolution that catch silent 400s before they
    become permanent bad views. Skipping it means a malformed filter becomes
    a saved view that must be deleted and recreated.
-4. **Enforce `signal == sourcePage`** in every `builder_query` spec. A
-   `sourcePage:"traces"` view with `signal:"logs"` is a server-side error.
+4. **Enforce the signal rule** in every `builder_query` spec.
+   - For `traces` / `logs` / `metrics`: `signal == sourcePage`. A
+     `sourcePage:"traces"` view with `signal:"logs"` is a server-side error.
+   - For `meter` (Cost Meter): `signal:"metrics"` **and** `source:"meter"` —
+     a Cost Meter view is queried on the metrics signal against the meter
+     store. Omitting `source:"meter"` silently queries the default metrics
+     store; setting `source:"meter"` on a non-`meter` sourcePage is rejected.
 5. **Mandatory pre-save sample fetch.** Probe with the **exact** filter
    from `compositeQuery.queries[0].spec` against the destination
    signal:
@@ -105,6 +113,10 @@ optional.
      filter, `timeRange=1h`, `requestType=scalar`. Repeat per metric
      query if the view has multiple. The tool requires `metricName` —
      a filter-only probe is not supported.
+   - `sourcePage=meter` → `signoz_query_metrics` with the `metricName`
+     from `spec.aggregations[0].metricName`, **`source=meter`**, the same
+     filter, `timeRange=24h` (Cost Meter rolls up hourly, so a 1h window
+     can be a single partial bucket), `requestType=scalar`.
 
    Required even if Step 3 ran cleanly: the sub-skill validates the
    query *it* authored, not whatever you persist after edits or lifts.
@@ -121,8 +133,8 @@ optional.
 ### List or find views
 
 `signoz_list_views` requires a `sourcePage`. If the user did not
-specify one and is searching by name, call it once per signal (traces,
-logs, metrics) and merge — do not guess. Use the `name` and `category`
+specify one and is searching by name, call it once per page (traces,
+logs, metrics, meter) and merge — do not guess. Use the `name` and `category`
 parameters for server-side partial-match filtering when the user gives a
 substring; do not fetch everything and grep client-side.
 
@@ -153,9 +165,10 @@ upstream). Sending a partial body wipes the unspecified fields. The flow:
 3. **If the update changes `compositeQuery`** (new filter, different panel
    type, different aggregation), invoke `signoz-generating-queries` to
    build and validate the new query before proceeding. Do not hand-edit
-   `compositeQuery` from the user's description — the same
-   `signal == sourcePage` rule applies, and `panelType` changes often
-   imply a `stepInterval` change too. For pure metadata tweaks (rename,
+   `compositeQuery` from the user's description — the same Step 4 signal
+   rule applies (including the `meter` case: `signal:"metrics"` +
+   `source:"meter"`), and `panelType` changes often imply a `stepInterval`
+   change too. For pure metadata tweaks (rename,
    recategorize), skip this step and do not touch `compositeQuery`.
 4. Modify only the field(s) the user asked to change.
 5. **Mandatory pre-save sample fetch — when `compositeQuery` changed.**
@@ -182,7 +195,8 @@ affordance, not a substitute for getting the delete right. Treat this like
 dropping a row from a shared table:
 
 1. **List to locate.** Call `signoz_list_views` to find the view
-   by name. If `sourcePage` is unknown, search all three signals.
+   by name. If `sourcePage` is unknown, search all four pages (traces,
+   logs, metrics, meter).
 2. **Get to confirm — mandatory.** Call `signoz_get_view` with the
    UUID from step 1. Do NOT skip this step even when you got the UUID from
    a list result that looks correct. List results are paginated and a name
@@ -220,7 +234,8 @@ call.
   different signal is the most common source of empty saved views.
   `signoz_get_field_keys signal=<sourcePage>` is necessary but
   not sufficient — sparse emission still produces zero-result views.
-  Only the sample fetch confirms.
+  Only the sample fetch confirms. (For a `meter` view, field keys live on
+  `signal=metrics` with `source=meter`, not `signal=meter`.)
 
   A saved view returning zero rows under its own filter is a
   permanent artifact in a shared workspace; the human preview can't
@@ -232,7 +247,7 @@ call.
 | Operation | Tools called | Key guard |
 |-----------|-------------|-----------|
 | Create | read `signoz://view/instructions` + `signoz://view/examples` → `signoz-generating-queries` → **sample fetch on exact filter** → preview → `signoz_create_view` | Mandatory pre-save sample fetch; preview before write; no legacy fields |
-| List | `signoz_list_views` (× 3 if no sourcePage given) | Check `pagination.hasMore` |
+| List | `signoz_list_views` (× 4 if no sourcePage given: traces/logs/metrics/meter) | Check `pagination.hasMore` |
 | Get | `signoz_get_view(viewId)` | Returns canonical body for update |
 | Update | `signoz_get_view` → modify → **sample fetch if `compositeQuery` changed** → diff preview → `signoz_update_view` | Full-body replace; sample fetch when compositeQuery changes; diff preview required |
 | Delete | `signoz_list_views` → `signoz_get_view` → confirm → `signoz_delete_view` | Get-before-delete mandatory; fresh confirmation |
@@ -246,7 +261,8 @@ call.
 | Skipping the pre-save sample fetch because `signoz-generating-queries` already validated the query | The sub-skill validates the query *it* authored; the filter you persist may have been edited or lifted since then. The Step 5 sample fetch is mandatory regardless |
 | Skipping `signoz_get_view` before delete (relying on list UUID alone) | Always call `signoz_get_view` to confirm name+sourcePage before `signoz_delete_view` |
 | Sending legacy fields: `builder`, `promql`, `unit`, top-level `id`, `queryFormulas` | Read schema resources; server returns HTTP 400 silently |
-| `signal` ≠ `sourcePage` in builder query | Every `builder_query.signal` must equal the view's `sourcePage` |
+| `signal` ≠ `sourcePage` in builder query | For traces/logs/metrics, every `builder_query.signal` must equal the view's `sourcePage`. For a `meter` view, use `signal:"metrics"` + `source:"meter"` (not `signal:"meter"`) |
+| Filing a Cost Meter view under `sourcePage:"metrics"` (with `source:"meter"`) | Cost Meter views go under `sourcePage:"meter"` — otherwise they're invisible in the Meter Explorer and mis-filed under Metrics. The server rejects `source:"meter"` on a non-`meter` page |
 | Partial update body (omitting unchanged fields) | GET full body first → modify only changed fields → PUT entire body |
 | Declaring "no such view" after only page 1 | Check `pagination.hasMore`; continue with `offset = pagination.nextOffset` |
 | Using PromQL or raw ClickHouse in a view | Only `queryType: "builder"` is supported; offer a dashboard panel instead |
