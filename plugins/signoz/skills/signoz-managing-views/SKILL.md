@@ -96,6 +96,8 @@ optional.
    checks and service-name resolution that catch silent 400s before they
    become permanent bad views. Skipping it means a malformed filter becomes
    a saved view that must be deleted and recreated.
+   For a `meter` view, tell `signoz-generating-queries` it's a **Cost Meter**
+   query (`source=meter`) so discovery hits the meter store, not the default one.
 4. **Enforce the signal rule** in every `builder_query` spec.
    - For `traces` / `logs` / `metrics`: `signal == sourcePage`. A
      `sourcePage:"traces"` view with `signal:"logs"` is a server-side error.
@@ -125,7 +127,8 @@ optional.
 6. **Preview before writing — this step is not optional.** Before calling
    `signoz_create_view`, show the user a summary: name, sourcePage,
    panelType, the full filter expression, and the Step 5 probe result
-   ("sample fetch: N rows in last 1h"). For a human in the loop, wait
+   ("sample fetch: N rows in last 1h" — for a `meter` view the probe window
+   is 24h, so report it as such). For a human in the loop, wait
    for confirmation. For an autonomous agent, log the preview and proceed.
 7. Call `signoz_create_view`. The server populates `id`,
    `createdAt/By`, `updatedAt/By` — never send those.
@@ -168,7 +171,9 @@ upstream). Sending a partial body wipes the unspecified fields. The flow:
    `compositeQuery` from the user's description — the same Step 4 signal
    rule applies (including the `meter` case: `signal:"metrics"` +
    `source:"meter"`), and `panelType` changes often imply a `stepInterval`
-   change too. For pure metadata tweaks (rename,
+   change too. For a `meter` view, tell `signoz-generating-queries` it is a
+   **Cost Meter** query (`source=meter`) so it discovers and validates against
+   the meter store. For pure metadata tweaks (rename,
    recategorize), skip this step and do not touch `compositeQuery`.
 4. Modify only the field(s) the user asked to change.
 5. **Mandatory pre-save sample fetch — when `compositeQuery` changed.**
@@ -232,10 +237,11 @@ call.
   tenant, even when emitted by the same service. Lifting an attribute
   from a sibling dashboard panel, alert rule, or view that targets a
   different signal is the most common source of empty saved views.
-  `signoz_get_field_keys signal=<sourcePage>` is necessary but
+  `signoz_get_field_keys signal=<destination signal>` is necessary but
   not sufficient — sparse emission still produces zero-result views.
-  Only the sample fetch confirms. (For a `meter` view, field keys live on
-  `signal=metrics` with `source=meter`, not `signal=meter`.)
+  Only the sample fetch confirms. The destination signal equals `sourcePage`
+  for traces/logs/metrics; for a `meter` view it is `signal=metrics` with
+  `source=meter` (never `signal=meter`).
 
   A saved view returning zero rows under its own filter is a
   permanent artifact in a shared workspace; the human preview can't
@@ -257,7 +263,7 @@ call.
 | Mistake | Fix |
 |---------|-----|
 | Hand-composing `compositeQuery` from examples or memory (even after reading `signoz://view/examples`) | Use the `Skill` tool to invoke `signoz-generating-queries` — reading examples and validating with `signoz_search_traces` is not a substitute |
-| Lifting an attribute name from a metric, alert rule, or sibling view and using it in a `sourcePage=traces` / `=logs` view filter without re-verifying on the destination signal | Field keys are signal-scoped; an attribute on metrics may not exist on traces or logs. Always re-check via `signoz_get_field_keys signal=<sourcePage>` **and** run the mandatory pre-save sample fetch — the key check is necessary but not sufficient |
+| Lifting an attribute name from a metric, alert rule, or sibling view and using it in a `sourcePage=traces` / `=logs` view filter without re-verifying on the destination signal | Field keys are signal-scoped; an attribute on metrics may not exist on traces or logs. Always re-check via `signoz_get_field_keys signal=<destination signal>` (for a `meter` view, `signal=metrics source=meter` — never `signal=meter`) **and** run the mandatory pre-save sample fetch — the key check is necessary but not sufficient |
 | Skipping the pre-save sample fetch because `signoz-generating-queries` already validated the query | The sub-skill validates the query *it* authored; the filter you persist may have been edited or lifted since then. The Step 5 sample fetch is mandatory regardless |
 | Skipping `signoz_get_view` before delete (relying on list UUID alone) | Always call `signoz_get_view` to confirm name+sourcePage before `signoz_delete_view` |
 | Sending legacy fields: `builder`, `promql`, `unit`, top-level `id`, `queryFormulas` | Read schema resources; server returns HTTP 400 silently |
