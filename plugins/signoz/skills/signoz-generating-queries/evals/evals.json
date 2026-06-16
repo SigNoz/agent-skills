@@ -35,6 +35,13 @@
       "prompt": "My users are reporting the app is slow, can you investigate?",
       "expected_output": "Agent does NOT scatter-shot many queries. Either asks a clarifying question to scope (which service/endpoint/time) OR starts with one focused overview query (e.g., overall p99 latency or error rate by service) and presents findings before drilling.",
       "files": []
+    },
+    {
+      "id": 5,
+      "eval_name": "metrics-cost-meter-ingestion-by-service",
+      "prompt": "How much log data is each service ingesting?",
+      "expected_output": "Agent recognizes ingestion *bytes* live only in the Cost Meter store, so it uses the metrics signal with source=meter. Discovers the metric via signoz_list_metrics with source=meter (e.g. signoz.meter.log.size) rather than assuming a fixed list, then signoz_query_metrics with source=meter, groupBy service.name, stepInterval 3600 (meter buckets hourly). groupBy works like a normal metric here because service is an attribute the meter retains. Does NOT omit source=meter (which would hit the empty default store). Reports per-service ingested bytes over the window. Understands that slicing by an attribute the meter does not retain would fall back to a direct count aggregation (signoz_aggregate_logs) — bytes are only in the meter.",
+      "files": []
     }
   ]
 }

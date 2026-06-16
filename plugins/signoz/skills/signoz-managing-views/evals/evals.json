@@ -150,12 +150,16 @@
       "id": 5,
       "name": "create-cost-meter-view",
       "prompt": "Save a view that tracks our log ingestion volume from the Cost Meter so I can find it later.",
-      "expected_output": "Agent recognizes this is a Cost Meter view and resolves sourcePage=meter (not metrics). Reads the schema resources, builds a builder_query with signal=metrics and source=meter against a meter metric (e.g. signoz.meter.log.size), sets panelType=graph. Runs the mandatory pre-save sample fetch via signoz:signoz_query_metrics with source=meter, the metricName, timeRange=24h, requestType=scalar. Shows a preview (name, sourcePage=meter, metric/filter, sample-fetch result), confirms, and calls signoz:signoz_create_view. Reports name, UUID, and sourcePage=meter.",
+      "expected_output": "Agent recognizes this is a Cost Meter view and resolves sourcePage=meter (not metrics). Reads the schema resources, then builds the query via signoz-generating-queries told it is a Cost Meter query (source=meter) so discovery hits the meter store and finds a meter metric (e.g. signoz.meter.log.size). The resulting builder_query has signal=metrics and source=meter, panelType=graph. Runs the mandatory pre-save sample fetch via signoz:signoz_query_metrics with source=meter, the metricName, timeRange=24h, requestType=scalar. Shows a preview (name, sourcePage=meter, metric/filter, sample-fetch result), confirms, and calls signoz:signoz_create_view. Reports name, UUID, and sourcePage=meter.",
       "files": [],
       "assertions": [
         {
           "text": "sourcePage is set to 'meter' (not 'metrics')",
           "description": "Cost Meter views file under the distinct 'meter' Explorer page; using 'metrics' mis-files them so they're invisible in the Meter Explorer"
+        },
+        {
+          "text": "Query construction is delegated to signoz-generating-queries with the Cost Meter context (source=meter), so metric discovery hits the meter store rather than the default metrics store",
+          "description": "Create-flow Step 3 mandates signoz-generating-queries; for a meter view the agent must pass the source=meter context so the meter-unaware default discovery path doesn't miss signoz.meter.* metrics"
         },
         {
           "text": "Every builder_query spec has signal='metrics' AND source='meter'",

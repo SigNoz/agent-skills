@@ -51,6 +51,7 @@ Map the user's intent to the right signal:
 | Find specific log entries, error messages, stack traces | **logs** | Text search, pattern matching, severity filtering. |
 | Find specific traces, slow requests, error spans | **traces** | Per-request detail, span attributes, duration filtering. |
 | Infrastructure metrics (CPU, memory, disk, network) | **metrics** | Always metrics for resource utilization. |
+| Ingestion volume (bytes or count), cost, or billing usage | **metrics** with `source=meter` (Cost Meter) | `signoz.meter.*` ingestion metrics (logs/spans/datapoints by count **and** bytes) live only in the meter store; bytes are unavailable on the raw signals. Dollar **cost is not a metric** — derive it from volume × per-unit price (see Step 2). groupBy/filter work like a normal metric, but only over the limited attribute set the meter retains (not arbitrary log/trace fields). For a *count* sliced by an attribute the meter doesn't carry, aggregate logs/traces directly instead. |
 | "How many X per Y" (count/rate grouped by dimension) | **traces** or **logs** (aggregate) | Use `signoz_aggregate_traces` or `signoz_aggregate_logs` for grouped counts. |
 
 If the signal is genuinely ambiguous, ask the user before proceeding. The
@@ -69,6 +70,19 @@ Run discovery calls in parallel where possible:
   matching the user's intent (e.g., `searchText: "http"`, `searchText: "latency"`).
   The response includes metric type, temporality, and isMonotonic — pass these to
   `signoz_query_metrics` to avoid extra lookups.
+- **For Cost Meter** (ingestion volume, cost, billing): pass `source=meter` to
+  `signoz_list_metrics` to discover the metrics (`signoz.meter.*`) — they're
+  invisible in the default store and the set evolves, so don't hardcode it.
+  groupBy/filters/aggregations then work like any metric, with three caveats:
+  *bytes exist only here* (count is also available via direct
+  `signoz_aggregate_logs`/`_traces`); the meter retains only a *limited
+  attribute set* — discover groupable keys via `signoz_get_field_keys(signal:
+  "metrics", source: "meter")`, and fall back to a direct count (no bytes) to
+  slice by an attribute it lacks; and **dollar cost is not a meter metric** —
+  the store holds only volume, so don't `searchText: "cost"` expecting a hit.
+  For a cost question, query the volume metric (bytes for logs/traces, count
+  for metric datapoints) and multiply by the per-unit price from Settings →
+  Billing — ask the user for the price if you don't have it.
 - **For traces**: Call `signoz_list_services` to confirm the service name exists.
   Optionally call `signoz_get_service_top_operations` for the service to find
   operation names. Call `signoz_get_field_keys(signal: "traces")` if you need
@@ -112,6 +126,9 @@ from context (e.g., from a dashboard or @mention), skip redundant discovery.
   are ANDed together.
 - For `signoz_query_metrics`, pass `metricType`, `temporality`, and `isMonotonic`
   from the `signoz_list_metrics` response to avoid an extra auto-fetch round trip.
+- For **Cost Meter**, carry `source=meter` on `signoz_query_metrics` too (signal
+  stays `metrics`); meter data is bucketed hourly, so set `stepInterval: 3600`
+  over a window of at least a few hours.
 
 ### Step 5: Handle results
 
@@ -160,7 +177,9 @@ from context (e.g., from a dashboard or @mention), skip redundant discovery.
   `traces`). This signals to the SigNoz UI that the user wants to apply the
   query to an explorer page. Only emit `apply_filter` when the user's primary
   intent is to obtain a runnable query — not when the user is asking a
-  one-shot data question that the analysis text already answers.
+  one-shot data question that the analysis text already answers. For a Cost
+  Meter query keep `signal: metrics` and ensure the resolved `compositeQuery`
+  spec carries `source: meter`.
 
 ## Examples
 
@@ -211,3 +230,15 @@ from context (e.g., from a dashboard or @mention), skip redundant discovery.
 2. Presents: "Error count for frontend over the last 6 hours. Spike at 11:30 UTC
    — error count jumped from ~5/min to ~45/min, returning to baseline by 12:15."
 3. Offers: "Want me to check what error types appeared during the spike?"
+
+---
+
+**User:** "How much log data is each service ingesting?"
+
+**Agent:**
+1. Bytes by service → Cost Meter. `signoz_list_metrics(searchText: "log",
+   source: "meter")` finds `signoz.meter.log.size`.
+2. Calls `signoz_query_metrics(metricName: "signoz.meter.log.size",
+   source: "meter", groupBy: "service.name", stepInterval: 3600, timeRange: "24h")`.
+3. Presents per-service ingestion bytes. (Bytes live only in the meter; to slice
+   by an attribute it lacks, fall back to a direct count.)
