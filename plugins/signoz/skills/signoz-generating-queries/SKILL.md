@@ -51,7 +51,7 @@ Map the user's intent to the right signal:
 | Find specific log entries, error messages, stack traces | **logs** | Text search, pattern matching, severity filtering. |
 | Find specific traces, slow requests, error spans | **traces** | Per-request detail, span attributes, duration filtering. |
 | Infrastructure metrics (CPU, memory, disk, network) | **metrics** | Always metrics for resource utilization. |
-| Ingestion volume (bytes or count), cost, or billing usage | **metrics** with `source=meter` (Cost Meter) | `signoz.meter.*` ingestion metrics (logs/spans/datapoints by count **and** bytes) live only in the meter store; bytes are unavailable on the raw signals. groupBy/filter work like a normal metric, but only over the limited attribute set the meter retains (not arbitrary log/trace fields). For a *count* sliced by an attribute the meter doesn't carry, aggregate logs/traces directly instead. |
+| Ingestion volume (bytes or count), cost, or billing usage | **metrics** with `source=meter` (Cost Meter) | `signoz.meter.*` ingestion metrics (logs/spans/datapoints by count **and** bytes) live only in the meter store; bytes are unavailable on the raw signals. Dollar **cost is not a metric** — derive it from volume × per-unit price (see Step 2). groupBy/filter work like a normal metric, but only over the limited attribute set the meter retains (not arbitrary log/trace fields). For a *count* sliced by an attribute the meter doesn't carry, aggregate logs/traces directly instead. |
 | "How many X per Y" (count/rate grouped by dimension) | **traces** or **logs** (aggregate) | Use `signoz_aggregate_traces` or `signoz_aggregate_logs` for grouped counts. |
 
 If the signal is genuinely ambiguous, ask the user before proceeding. The
@@ -73,12 +73,16 @@ Run discovery calls in parallel where possible:
 - **For Cost Meter** (ingestion volume, cost, billing): pass `source=meter` to
   `signoz_list_metrics` to discover the metrics (`signoz.meter.*`) — they're
   invisible in the default store and the set evolves, so don't hardcode it.
-  groupBy/filters/aggregations then work like any metric, with two caveats:
-  *bytes and cost exist only here* (count is also available via direct
-  `signoz_aggregate_logs`/`_traces`), and the meter retains only a *limited
+  groupBy/filters/aggregations then work like any metric, with three caveats:
+  *bytes exist only here* (count is also available via direct
+  `signoz_aggregate_logs`/`_traces`); the meter retains only a *limited
   attribute set* — discover groupable keys via `signoz_get_field_keys(signal:
   "metrics", source: "meter")`, and fall back to a direct count (no bytes) to
-  slice by an attribute it lacks.
+  slice by an attribute it lacks; and **dollar cost is not a meter metric** —
+  the store holds only volume, so don't `searchText: "cost"` expecting a hit.
+  For a cost question, query the volume metric (bytes for logs/traces, count
+  for metric datapoints) and multiply by the per-unit price from Settings →
+  Billing — ask the user for the price if you don't have it.
 - **For traces**: Call `signoz_list_services` to confirm the service name exists.
   Optionally call `signoz_get_service_top_operations` for the service to find
   operation names. Call `signoz_get_field_keys(signal: "traces")` if you need
