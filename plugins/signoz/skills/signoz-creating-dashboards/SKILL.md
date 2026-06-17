@@ -360,6 +360,13 @@ dry-run uses the exact shape from `queryData`.
 | Layout | 2-column grid (`w: 6`), 12 columns wide | full-width (`w: 12`) for tables and time-series with many series |
 | GroupBy on per-service panels | `service.name` resource attribute | drop when filtering to a single service |
 
+**Sections and `panelMap`** A section is a `panelTypes: "row"` widget
+followed in `widgets[]` by the panels under it. Mirror that grouping in
+`panelMap`: one entry per row, keyed by the row id, listing only the
+panels that follow it up to the next row. Do not put every panel under
+a single row id — that renders on load but collapses the whole
+dashboard when one section is toggled.
+
 **Title and description** The dashboard title should name the
 technology and the scope clearly: "PostgreSQL — prod-us-east-1", not
 just "PostgreSQL". Description should answer "what is this for" in one
