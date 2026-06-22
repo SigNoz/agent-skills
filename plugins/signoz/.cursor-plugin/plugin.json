@@ -24,8 +24,8 @@
     "properties": {
       "SIGNOZ_REGION": {
         "type": "string",
-        "title": "SigNoz Region",
-        "description": "Select your SigNoz Cloud region. This is the region code shown in **Settings -> Ingestion** (see the [region reference](https://signoz.io/docs/ingestion/signoz-cloud/keys/))",
+        "title": "SigNoz Cloud Region",
+        "description": "Your SigNoz Cloud region code, shown under **Settings -> Ingestion** (see the [region reference](https://signoz.io/docs/ingestion/signoz-cloud/keys/)). The bundled MCP config fills this into `https://mcp.<region>.signoz.cloud/mcp`. Self-hosted SigNoz? Any region you pick here is ignored — run `/signoz-mcp-setup` with your own HTTP `/mcp` URL instead.",
         "enum": [
           "us",
           "us2",
@@ -34,10 +34,16 @@
           "in",
           "in2"
         ]
+      },
+      "SIGNOZ_SELF_HOSTED": {
+        "type": "string",
+        "title": "Self-hosted SigNoz? (yes / no)",
+        "description": "Choose `yes` if you run your own SigNoz instead of SigNoz Cloud; choose `no` (or leave unset) for SigNoz Cloud. If `yes`, the region above is ignored: after install, run `/signoz-mcp-setup` in an agent chat with your self-hosted HTTP `/mcp` URL (for example `/signoz-mcp-setup http://localhost:8000/mcp`), then reload Cursor.",
+        "enum": [
+          "no",
+          "yes"
+        ]
       }
-    },
-    "required": [
-      "SIGNOZ_REGION"
-    ]
+    }
   }
 }

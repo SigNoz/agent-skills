@@ -118,11 +118,29 @@ Not yet on the public Cursor Marketplace. Install via a Team Marketplace:
 
 1. Add `https://github.com/SigNoz/agent-skills` as a team marketplace in `Settings -> Plugins`.
 2. Install the `signoz` plugin from the marketplace panel.
+
+On install, Cursor prompts for your **SigNoz Cloud Region** (one of `us`, `us2`,
+`eu`, `eu2`, `in`, `in2`). The bundled MCP config fills this into the hosted
+endpoint `https://mcp.<region>.signoz.cloud/mcp`. Find your region under
+**Settings -> Ingestion** in SigNoz, or see the
+[region reference](https://signoz.io/docs/ingestion/signoz-cloud/keys/).
+
+The install dialog also asks **Self-hosted SigNoz?** Choose `yes` if you run your
+own SigNoz instead of SigNoz Cloud (choose `no` or leave it unset for Cloud).
+When set to `yes`, the region is ignored — point Cursor at your instance by
+running `/signoz-mcp-setup` with your self-hosted HTTP `/mcp` URL.
+
 3. Run `/signoz-mcp-setup` in an agent chat with your SigNoz Cloud region or
-   self-hosted HTTP MCP URL. This updates the bundled `.signoz_cursor_mcp.json`
-   placeholder used by the Cursor plugin.
+   self-hosted HTTP MCP URL (for example `/signoz-mcp-setup http://localhost:8000/mcp`).
+   This updates the bundled `.signoz_cursor_mcp.json` placeholder used by the
+   Cursor plugin.
 4. Reload Cursor, then open MCP settings and complete authentication for the
    `signoz` server if prompted.
+
+> **Unlike Claude Code, Cursor does not run the plugin's `SessionStart` hook**, so
+> there is no automatic session-start reminder for self-hosted setup. The
+> self-hosted next steps are surfaced in the install dialog's **Self-hosted
+> SigNoz?** description instead — follow them, then run `/signoz-mcp-setup`.
 
 If you picked the wrong region or need to change a self-hosted HTTP MCP
 endpoint, run `/signoz-mcp-setup` again with the correct region or URL and
