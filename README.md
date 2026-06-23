@@ -130,7 +130,7 @@ SigNoz Cloud regions (`us`, `us2`, `eu`, `eu2`, `in`, `in2`) plus a
 - **Self-hosted** — choose `self-hosted`. This skips the Cloud OAuth and leaves
   the MCP endpoint unconfigured. After install you **must** run
   `/signoz-mcp-setup` with your own HTTP `/mcp` URL (next step) to point Cursor
-  at your instance. The `sessionStart` hook below also reminds you.
+  at your instance.
 
 3. **Self-hosted only:** run `/signoz-mcp-setup` in an agent chat with your
    self-hosted HTTP MCP URL (for example `/signoz-mcp-setup http://localhost:8000/mcp`).
@@ -139,13 +139,6 @@ SigNoz Cloud regions (`us`, `us2`, `eu`, `eu2`, `in`, `in2`) plus a
    configured the endpoint.)
 4. Reload Cursor, then open MCP settings and complete authentication for the
    `signoz` server if prompted.
-
-> Like the Claude Code plugin, the Cursor plugin ships a `sessionStart` hook
-> (`hooks/cursor-hooks.json`) that reminds you to finish MCP setup as soon as a
-> session starts, as long as the bundled MCP endpoint is still the `not-setup`
-> placeholder. It goes quiet once `/signoz-mcp-setup` has pointed it at a real
-> Cloud or self-hosted endpoint. Since hooks fire at session boundaries, reload
-> Cursor (or start a new chat) after install to trigger it.
 
 If you picked the wrong region or need to change a self-hosted HTTP MCP
 endpoint, run `/signoz-mcp-setup` again with the correct region or URL and
@@ -203,7 +196,7 @@ npx skills add SigNoz/agent-skills --skill signoz-writing-clickhouse-queries    
 │   ├── .signoz_claude_mcp.json             # Claude Code MCP config
 │   ├── .mcp.json                           # Codex MCP config
 │   ├── .signoz_cursor_mcp.json             # Cursor MCP config
-│   ├── hooks/                              # Claude (hooks.json) + Cursor (cursor-hooks.json) hooks
+│   ├── hooks/                              # Auto-allow hooks
 │   └── skills/
 │       ├── signoz-mcp-setup/
 │       │   └── references/                 # Endpoint mapping and client recipes

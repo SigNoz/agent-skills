@@ -19,7 +19,6 @@
   ],
   "mcpServers": "./.signoz_cursor_mcp.json",
   "skills": "./skills/",
-  "hooks": "./hooks/cursor-hooks.json",
   "variables": {
     "type": "object",
     "properties": {
