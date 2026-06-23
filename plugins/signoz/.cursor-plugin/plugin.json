@@ -1,7 +1,7 @@
 {
   "name": "signoz",
   "displayName": "SigNoz",
-  "version": "2026.06.23",
+  "version": "2026.06.17",
   "description": "Official SigNoz plugin for MCP setup, docs, queries, dashboards, and alerts",
   "author": {
     "name": "SigNoz"
@@ -26,14 +26,15 @@
       "SIGNOZ_REGION": {
         "type": "string",
         "title": "SigNoz Region",
-        "description": "Select your SigNoz Cloud region. This is the region code shown in **Settings -> Ingestion** (see the [region reference](https://signoz.io/docs/ingestion/signoz-cloud/keys/)). Self-hosted SigNoz? Pick any region here (it is ignored), then run `/signoz-mcp-setup` with your own HTTP `/mcp` URL after install.",
+        "description": "SigNoz Cloud: select your region code (shown under **Settings -> Ingestion**; see the [region reference](https://signoz.io/docs/ingestion/signoz-cloud/keys/)) and Cursor will connect to `https://mcp.<region>.signoz.cloud/mcp` and start the OAuth login. Self-hosted SigNoz: choose **self-hosted** — this skips the Cloud OAuth and leaves the MCP endpoint unconfigured. After install, you MUST run `/signoz-mcp-setup` in an Agent chat with your own HTTP `/mcp` URL (for example `/signoz-mcp-setup http://localhost:8000/mcp`) to point it at your instance.",
         "enum": [
           "us",
           "us2",
           "eu",
           "eu2",
           "in",
-          "in2"
+          "in2",
+          "self-hosted"
         ]
       }
     },

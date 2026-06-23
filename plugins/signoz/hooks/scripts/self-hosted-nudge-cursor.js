@@ -10,9 +10,10 @@
 //     plugin-root variable, unlike Claude's ${CLAUDE_PLUGIN_ROOT}).
 //
 // Detection is intentionally limited to what the docs support: nudge while the
-// bundled Cursor MCP URL is still the `not-setup` placeholder (or empty). Once
-// /signoz-mcp-setup rewrites it to a real Cloud or self-hosted endpoint, the
-// hook goes quiet.
+// bundled Cursor MCP URL is still unconfigured — the `not-setup` placeholder, an
+// empty URL, or the `self-hosted` sentinel produced when the user picks
+// "self-hosted" at the region prompt. Once /signoz-mcp-setup rewrites it to a
+// real Cloud or self-hosted endpoint, the hook goes quiet.
 
 const fs = require("fs");
 const path = require("path");
@@ -42,20 +43,28 @@ function readMcpUrl(registration) {
 const url = readMcpUrl(registrationPath);
 const lowered = typeof url === "string" ? url.toLowerCase() : "";
 
-// The Cursor MCP placeholder is `not-setup`; an empty/missing URL counts too.
+// Unconfigured states: the `not-setup` placeholder, an empty/missing URL, or the
+// `self-hosted` sentinel from picking "self-hosted" at the region prompt. Real
+// Cloud regions (us, us2, eu, ...) match none of these.
+const isSelfHosted = lowered.includes("self-hosted");
 const unconfigured =
-  typeof url !== "string" || lowered.trim() === "" || lowered.includes("not-setup");
+  typeof url !== "string" ||
+  lowered.trim() === "" ||
+  lowered.includes("not-setup") ||
+  isSelfHosted;
 
 if (!unconfigured) {
   // Already pointed at a real endpoint — nothing to nudge about.
   process.exit(0);
 }
 
-process.stdout.write(
-  JSON.stringify({
-    additional_context:
-      "The SigNoz Cursor plugin's MCP server is not configured yet. Tell the " +
-      "user to run /signoz-mcp-setup with their SigNoz Cloud region (us, us2, " +
-      "eu, eu2, in, in2) or a self-hosted HTTP /mcp URL, then reload Cursor.",
-  }),
-);
+const additional_context = isSelfHosted
+  ? "The SigNoz Cursor plugin is set to self-hosted, so its MCP server is not " +
+    "configured yet. Tell the user to run /signoz-mcp-setup with their " +
+    "self-hosted HTTP /mcp URL (for example /signoz-mcp-setup " +
+    "http://localhost:8000/mcp), then reload Cursor."
+  : "The SigNoz Cursor plugin's MCP server is not configured yet. Tell the user " +
+    "to run /signoz-mcp-setup with their SigNoz Cloud region (us, us2, eu, eu2, " +
+    "in, in2) or a self-hosted HTTP /mcp URL, then reload Cursor.";
+
+process.stdout.write(JSON.stringify({ additional_context }));

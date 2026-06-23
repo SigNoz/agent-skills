@@ -119,21 +119,24 @@ Not yet on the public Cursor Marketplace. Install via a Team Marketplace:
 1. Add `https://github.com/SigNoz/agent-skills` as a team marketplace in `Settings -> Plugins`.
 2. Install the `signoz` plugin from the marketplace panel.
 
-On install, Cursor prompts for your **SigNoz Region** (one of `us`, `us2`,
-`eu`, `eu2`, `in`, `in2`). The bundled MCP config fills this into the hosted
-endpoint `https://mcp.<region>.signoz.cloud/mcp`. Find your region under
-**Settings -> Ingestion** in SigNoz, or see the
-[region reference](https://signoz.io/docs/ingestion/signoz-cloud/keys/).
+On install, Cursor prompts for your **SigNoz Region**. The picker offers the
+SigNoz Cloud regions (`us`, `us2`, `eu`, `eu2`, `in`, `in2`) plus a
+**`self-hosted`** option:
 
-**Self-hosted SigNoz?** Pick any region at the prompt (it is ignored), then point
-Cursor at your instance after install by running `/signoz-mcp-setup` with your
-self-hosted HTTP `/mcp` URL. The `sessionStart` hook below reminds you to do this
-while the endpoint is still unconfigured.
+- **SigNoz Cloud** — select your region. The bundled MCP config fills it into
+  `https://mcp.<region>.signoz.cloud/mcp` and Cursor starts the OAuth login.
+  Find your region under **Settings -> Ingestion** in SigNoz, or see the
+  [region reference](https://signoz.io/docs/ingestion/signoz-cloud/keys/).
+- **Self-hosted** — choose `self-hosted`. This skips the Cloud OAuth and leaves
+  the MCP endpoint unconfigured. After install you **must** run
+  `/signoz-mcp-setup` with your own HTTP `/mcp` URL (next step) to point Cursor
+  at your instance. The `sessionStart` hook below also reminds you.
 
-3. Run `/signoz-mcp-setup` in an agent chat with your SigNoz Cloud region or
+3. **Self-hosted only:** run `/signoz-mcp-setup` in an agent chat with your
    self-hosted HTTP MCP URL (for example `/signoz-mcp-setup http://localhost:8000/mcp`).
    This updates the bundled `.signoz_cursor_mcp.json` placeholder used by the
-   Cursor plugin.
+   Cursor plugin. (SigNoz Cloud users can skip this — the region picker already
+   configured the endpoint.)
 4. Reload Cursor, then open MCP settings and complete authentication for the
    `signoz` server if prompted.
 
