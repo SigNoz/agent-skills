@@ -139,11 +139,10 @@ running `/signoz-mcp-setup` with your self-hosted HTTP `/mcp` URL.
 
 > Like the Claude Code plugin, the Cursor plugin ships a `sessionStart` hook
 > (`hooks/cursor-hooks.json`) that reminds you to finish MCP setup as soon as a
-> session starts, whenever the bundled MCP endpoint is still the `not-setup`
-> placeholder (or, in self-hosted mode, still points at SigNoz Cloud). It goes
-> quiet once `/signoz-mcp-setup` has pointed it at a real endpoint. Since hooks
-> fire at session boundaries, reload Cursor (or start a new chat) after install
-> to trigger it.
+> session starts, as long as the bundled MCP endpoint is still the `not-setup`
+> placeholder. It goes quiet once `/signoz-mcp-setup` has pointed it at a real
+> Cloud or self-hosted endpoint. Since hooks fire at session boundaries, reload
+> Cursor (or start a new chat) after install to trigger it.
 
 If you picked the wrong region or need to change a self-hosted HTTP MCP
 endpoint, run `/signoz-mcp-setup` again with the correct region or URL and

@@ -4,25 +4,21 @@
 // Cursor 1.7), but with a different contract than Claude Code:
 //   - event key is `sessionStart` (camelCase), wired in hooks/cursor-hooks.json
 //   - output schema is { "additional_context": "<text>" } on stdout
-//   - there is no ${CLAUDE_PLUGIN_ROOT} and no CLAUDE_PLUGIN_OPTION_* env var
-// So this script resolves the plugin root from its own location and detects the
-// unconfigured/placeholder MCP URL directly, treating the SIGNOZ_SELF_HOSTED
-// plugin variable as a best-effort hint when Cursor happens to pass it through.
+//   - per the Cursor plugins reference, a hook command's relative path resolves
+//     "relative to the plugin root", so this script is invoked directly and
+//     locates its own bundled files from __dirname (Cursor exposes no
+//     plugin-root variable, unlike Claude's ${CLAUDE_PLUGIN_ROOT}).
+//
+// Detection is intentionally limited to what the docs support: nudge while the
+// bundled Cursor MCP URL is still the `not-setup` placeholder (or empty). Once
+// /signoz-mcp-setup rewrites it to a real Cloud or self-hosted endpoint, the
+// hook goes quiet.
 
 const fs = require("fs");
 const path = require("path");
 
-function isTruthy(value) {
-  if (typeof value !== "string") {
-    return false;
-  }
-  return ["true", "1", "yes", "on"].includes(value.trim().toLowerCase());
-}
-
-// Cursor does not expose a plugin-root env var, so derive it from this script's
-// location: hooks/scripts/ -> plugin root.
-const pluginRoot = path.join(__dirname, "..", "..");
-const registrationPath = path.join(pluginRoot, ".signoz_cursor_mcp.json");
+// hooks/scripts/ -> plugin root. Independent of the hook's working directory.
+const registrationPath = path.join(__dirname, "..", "..", ".signoz_cursor_mcp.json");
 
 function readMcpUrl(registration) {
   let raw;
@@ -43,39 +39,23 @@ function readMcpUrl(registration) {
   }
 }
 
-// Cursor may forward the SIGNOZ_SELF_HOSTED plugin variable as an argv (when the
-// hooks.json command interpolates ${SIGNOZ_SELF_HOSTED}) or as an env var. A
-// literal "${...}" means it was not substituted, so treat that as unknown.
-function selfHostedSignal() {
-  for (const candidate of [process.argv[2], process.env.SIGNOZ_SELF_HOSTED]) {
-    if (typeof candidate === "string" && !candidate.includes("${") && isTruthy(candidate)) {
-      return true;
-    }
-  }
-  return false;
-}
-
 const url = readMcpUrl(registrationPath);
 const lowered = typeof url === "string" ? url.toLowerCase() : "";
 
 // The Cursor MCP placeholder is `not-setup`; an empty/missing URL counts too.
 const unconfigured =
   typeof url !== "string" || lowered.trim() === "" || lowered.includes("not-setup");
-// Self-hosted users who left a Cloud region selected need to repoint the URL.
-const selfHostedOnCloud = selfHostedSignal() && lowered.includes("signoz.cloud");
 
-if (!unconfigured && !selfHostedOnCloud) {
-  // Already pointed at a real endpoint with no self-hosted/Cloud mismatch.
+if (!unconfigured) {
+  // Already pointed at a real endpoint — nothing to nudge about.
   process.exit(0);
 }
 
-const context = selfHostedOnCloud
-  ? "The SigNoz Cursor plugin is in self-hosted mode but its MCP server still " +
-    "points at SigNoz Cloud. Tell the user to finish setup by running " +
-    "/signoz-mcp-setup with their self-hosted MCP URL (for example " +
-    "/signoz-mcp-setup http://localhost:8000/mcp), then reload Cursor."
-  : "The SigNoz Cursor plugin's MCP server is not configured yet. Tell the user " +
-    "to run /signoz-mcp-setup with their SigNoz Cloud region (us, us2, eu, eu2, " +
-    "in, in2) or a self-hosted HTTP /mcp URL, then reload Cursor.";
-
-process.stdout.write(JSON.stringify({ additional_context: context }));
+process.stdout.write(
+  JSON.stringify({
+    additional_context:
+      "The SigNoz Cursor plugin's MCP server is not configured yet. Tell the " +
+      "user to run /signoz-mcp-setup with their SigNoz Cloud region (us, us2, " +
+      "eu, eu2, in, in2) or a self-hosted HTTP /mcp URL, then reload Cursor.",
+  }),
+);
