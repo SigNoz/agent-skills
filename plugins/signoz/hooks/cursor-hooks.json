@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "description": "Nudge self-hosted or unconfigured users to finish SigNoz MCP setup at session start",
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "command": "node \"./hooks/scripts/self-hosted-nudge-cursor.js\" \"${SIGNOZ_SELF_HOSTED}\""
+      }
+    ]
+  }
+}
