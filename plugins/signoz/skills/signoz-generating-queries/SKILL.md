@@ -101,8 +101,8 @@ from context (e.g., from a dashboard or @mention), skip redundant discovery.
 | Question type | Tool | When to use |
 |---|---|---|
 | Metric time series or scalar | `signoz_query_metrics` | Any metrics query. Handles aggregation defaults automatically. Supports formulas via `formula` + `formulaQueries` params. |
-| Log search (find matching entries) | `signoz_search_logs` | Finding specific log lines. Use `searchText` for body text, `query` for field filters, `severity` for level filtering. |
-| Trace search (find matching spans) | `signoz_search_traces` | Finding specific traces/spans. Use `service`, `operation`, `error`, `minDuration`/`maxDuration` shortcuts plus `query` for field filters. |
+| Log search (find matching entries) | `signoz_search_logs` | Finding specific log lines. Use `searchText` for body text, `filter` for field filters, `severity` for level filtering. |
+| Trace search (find matching spans) | `signoz_search_traces` | Finding specific traces/spans. Use `service`, `operation`, `error`, `minDuration`/`maxDuration` shortcuts plus `filter` for field filters. |
 | Log aggregation (count, avg, percentiles) | `signoz_aggregate_logs` | "How many errors?", "error count by service", "p99 response time from logs". Set `requestType` to `scalar` for totals or `time_series` for trends. |
 | Trace aggregation (count, avg, percentiles) | `signoz_aggregate_traces` | "p99 latency for checkout", "error count per operation", "request rate by endpoint". Set `requestType` to `scalar` for totals or `time_series` for trends. |
 | Complex multi-query or formula | `signoz_execute_builder_query` | Only when the simpler tools above cannot express the query — e.g., joining multiple data sources, complex filter expressions, or queries needing the full Query Builder v5 schema. Read `signoz://traces/query-builder-guide` before using. |
@@ -121,8 +121,8 @@ from context (e.g., from a dashboard or @mention), skip redundant discovery.
   (e.g., `6h`, `24h`) or Unix millisecond `start`/`end`.
 - Use shortcut parameters (`service`, `severity`, `operation`, `error`) when they
   match the user's filters — they are simpler and less error-prone than building
-  `query` expressions.
-- Combine shortcut params with `query`/`filter` for additional constraints — they
+  `filter` expressions.
+- Combine shortcut params with `filter` for additional constraints — they
   are ANDed together.
 - For `signoz_query_metrics`, pass `metricType`, `temporality`, and `isMonotonic`
   from the `signoz_list_metrics` response to avoid an extra auto-fetch round trip.
