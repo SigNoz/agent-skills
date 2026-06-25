@@ -33,6 +33,11 @@ connected. It accepts a SigNoz Cloud region such as `us`, `us2`, `eu`, `eu2`,
 Plugin updates can reset bundled MCP registration files to the placeholder; if
 that happens, rerun `signoz-mcp-setup`.
 
+The skills are authored against the current SigNoz MCP server contract. If a
+tool call fails because a parameter or schema looks different from what a skill
+describes, update or reconfigure the SigNoz MCP server before changing the
+workflow.
+
 See the full setup guide in the [SigNoz MCP Server docs](https://signoz.io/docs/ai/signoz-mcp-server/).
 
 ### Claude Code

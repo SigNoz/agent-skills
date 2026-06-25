@@ -187,7 +187,7 @@ upstream). Sending a partial body wipes the unspecified fields. The flow:
    prevents silent mistakes and gives the user a chance to catch a wrong
    target view. Wait for confirmation on any change to `compositeQuery`,
    since that changes what the view actually shows.
-7. Call `signoz_update_view` with `{ "viewId": "<id>", "view": <modified data> }`.
+7. Call `signoz_update_view` with `{ "id": "<id>", "view": <modified data> }`.
 
 ### Delete a view
 
@@ -254,7 +254,7 @@ call.
 |-----------|-------------|-----------|
 | Create | read `signoz://view/instructions` + `signoz://view/examples` → `signoz-generating-queries` → **sample fetch on exact filter** → preview → `signoz_create_view` | Mandatory pre-save sample fetch; preview before write; no legacy fields |
 | List | `signoz_list_views` (× 4 if no sourcePage given: traces/logs/metrics/meter) | Check `pagination.hasMore` |
-| Get | `signoz_get_view(viewId)` | Returns canonical body for update |
+| Get | `signoz_get_view(id)` | Returns canonical body for update |
 | Update | `signoz_get_view` → modify → **sample fetch if `compositeQuery` changed** → diff preview → `signoz_update_view` | Full-body replace; sample fetch when compositeQuery changes; diff preview required |
 | Delete | `signoz_list_views` → `signoz_get_view` → confirm → `signoz_delete_view` | Get-before-delete mandatory; fresh confirmation |
 

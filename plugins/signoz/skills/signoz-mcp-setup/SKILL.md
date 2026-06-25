@@ -48,6 +48,11 @@ Do not fall back to raw HTTP calls for SigNoz data when MCP is unavailable.
 The MCP server is the supported API surface for this plugin's live SigNoz
 workflows.
 
+The workflow skills assume the current SigNoz MCP server contract. If a
+SigNoz tool reports schema or parameter errors that contradict the skill
+instructions, repair or update the MCP server connection instead of inventing
+alternate raw HTTP calls or teaching legacy parameters.
+
 ### Step 2: Identify the client
 
 Use the client named in `$ARGUMENTS` or the user's latest message. If no
