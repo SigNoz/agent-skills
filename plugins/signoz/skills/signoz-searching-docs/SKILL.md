@@ -20,7 +20,7 @@ Prefer the SigNoz MCP server tools when available; fall back to direct HTTP fetc
 
 ### Preferred: MCP tools
 
-- `signoz_search_docs` — BM25 search over the indexed docs corpus. Pass the user's natural-language query as `query`. Narrow with `section_slug` when the question maps cleanly to a single docs section (the tool's own schema lists valid slugs — defer to it rather than memorizing). Trust the ranking — the index handles relevance.
+- `signoz_search_docs` — BM25 search over the indexed docs corpus. Pass the user's natural-language query as `searchText`. Narrow with `section_slug` when the question maps cleanly to a single docs section (the tool's own schema lists valid slugs — defer to it rather than memorizing). Trust the ranking — the index handles relevance.
 - `signoz_fetch_doc` — full markdown for one indexed page. Pass the canonical URL or `/docs/...` path; optionally narrow to a section with `heading`.
 
 ### Fallback: direct HTTP fetch
