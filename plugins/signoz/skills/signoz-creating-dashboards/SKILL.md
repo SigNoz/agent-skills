@@ -188,9 +188,9 @@ stated technology. Pick up to ~5 representative signals and check them
   prefix (e.g. `searchText="postgresql"`). Empty result → metric family
   is not being ingested. *Early out:* if this returns empty, declare
   "None present" and skip the rest of the metric probes — they will all
-  return zero. Note: `signoz_list_metrics` has no `timeRange` parameter;
-  pass `start`/`end` (unix-ms strings) only if you need a window other
-  than the server default.
+  return zero. Use `timeRange` for a relative window, or pass
+  `start`/`end` (unix-ms strings) when you need an exact window instead
+  of the server default.
 - **Trace-based templates** (APM-style): call
   `signoz_aggregate_traces` with `aggregation=count`,
   `timeRange=1h`. No filter is needed for the "is anything flowing"
