@@ -4,19 +4,19 @@
   "description": "Query SigNoz observability data(metrics, traces, logs, alerts, dashboards, services) via the SigNoz Cloud hosted MCP server.",
   "mcpServers": {
     "signoz": {
-      "httpUrl": "https://mcp.${SIGNOZ_REGION}.signoz.cloud/mcp",
+      "httpUrl": "${SIGNOZ_MCP_URL}",
       "timeout": 30000
     }
   },
   "settings": [
     {
-      "name": "SIGNOZ_REGION",
-      "label": "SigNoz Cloud region",
-      "description": "Your SigNoz Cloud region. Find it under Settings → Ingestion in SigNoz, or see https://signoz.io/docs/ingestion/signoz-cloud/overview/#endpoint. Values: us, in, eu, us2, in2, eu2",
-      "envVar": "SIGNOZ_REGION",
+      "name": "SIGNOZ_MCP_URL",
+      "label": "SigNoz MCP endpoint",
+      "description": "SigNoz Cloud: https://mcp.<region>.signoz.cloud/mcp (regions: us, in, eu, us2, in2, eu2; find yours under Settings → Ingestion, or see https://signoz.io/docs/ingestion/signoz-cloud/overview/#endpoint). Self-hosted SigNoz: your own /mcp URL, e.g. http://localhost:8000/mcp",
+      "envVar": "SIGNOZ_MCP_URL",
       "sensitive": false,
       "required": true,
-      "default": "us"
+      "default": "https://mcp.us.signoz.cloud/mcp"
     }
   ]
 }
