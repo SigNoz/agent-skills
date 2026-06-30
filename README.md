@@ -155,7 +155,12 @@ reload Cursor.
 gemini extensions install https://github.com/SigNoz/agent-skills
 ```
 
-When prompted, enter your SigNoz Cloud region (`us`, `us2`, `eu`, `eu2`, `in`, or `in2`).
+When prompted for the **SigNoz MCP endpoint**, enter:
+
+- **SigNoz Cloud:** `https://mcp.<region>.signoz.cloud/mcp` — replace `<region>` with
+  your region (`us`, `us2`, `eu`, `eu2`, `in`, or `in2`). The default is the `us`
+  Cloud endpoint.
+- **Self-hosted SigNoz:** your own `/mcp` URL, for example `http://localhost:8000/mcp`.
 
 Then authenticate:
 
