@@ -9,19 +9,12 @@
   "license": "MIT",
   "mcpServers": "./.signoz_claude_mcp.json",
   "userConfig": {
-    "SIGNOZ_REGION": {
+    "SIGNOZ_MCP_URL": {
       "type": "string",
-      "title": "SigNoz Cloud Region",
-      "description": "Your SigNoz Cloud region code: us, us2, eu, eu2, in, or in2. Find it under Settings -> Ingestion (region reference: https://signoz.io/docs/ingestion/signoz-cloud/keys/). Leave empty if you run self-hosted SigNoz.",
-      "default": "us",
-      "required": false
-    },
-    "SIGNOZ_SELF_HOSTED": {
-      "type": "string",
-      "title": "Self-hosted SigNoz? (type yes / no)",
-      "description": "Type yes if you run your own SigNoz instead of SigNoz Cloud; leave blank or type no for SigNoz Cloud. If yes, the region above is ignored: after install, start a new session (/clear or restart) and Claude will remind you to point it at your MCP URL by running /signoz-mcp-setup (for example: /signoz-mcp-setup http://localhost:8000/mcp).",
-      "default": "",
-      "required": false
+      "title": "SigNoz MCP endpoint",
+      "description": "SigNoz Cloud: keep the default and edit the region segment to match yours — https://mcp.<region>.signoz.cloud/mcp (regions: us, us2, eu, eu2, in, in2; find yours under Settings -> Ingestion, or see https://signoz.io/docs/ingestion/signoz-cloud/keys/). After install, run /mcp, select signoz, and complete the Cloud OAuth login. Self-hosted SigNoz: enter your own HTTP /mcp URL, for example http://localhost:8000/mcp.",
+      "default": "https://mcp.us.signoz.cloud/mcp",
+      "required": true
     }
   }
 }
