@@ -25,13 +25,14 @@ clients.
 
 ## Installation
 
-The Claude Code, Codex, and Cursor plugins ship with MCP registration files
-plus an MCP setup skill so users do not have to hand-edit MCP configuration.
-After installing, run `signoz-mcp-setup` once if the MCP server is not already
-connected. It accepts a SigNoz Cloud region such as `us`, `us2`, `eu`, `eu2`,
-`in`, or `in2`, any hosted MCP URL, or a self-hosted HTTP `/mcp` endpoint.
-Plugin updates can reset bundled MCP registration files to the placeholder; if
-that happens, rerun `signoz-mcp-setup`.
+The Claude Code, Codex, and Cursor plugins ship with MCP registration files so
+users do not have to hand-edit MCP configuration. Claude Code asks for the MCP
+endpoint URL during install. Codex and Cursor can use `signoz-mcp-setup` when an
+endpoint needs to be initialized or repaired; it accepts a SigNoz Cloud region
+such as `us`, `us2`, `eu`, `eu2`, `in`, or `in2`, any hosted MCP URL, or a
+self-hosted HTTP `/mcp` endpoint. Plugin updates can reset bundled MCP
+registration files to the placeholder; if that happens, rerun
+`signoz-mcp-setup`.
 
 The skills are authored against the current SigNoz MCP server contract. If a
 tool call fails because a parameter or schema looks different from what a skill
@@ -47,30 +48,17 @@ See the full setup guide in the [SigNoz MCP Server docs](https://signoz.io/docs/
 /plugin install signoz@signoz-skills
 ```
 
-On install, Claude Code prompts for your **SigNoz Cloud Region** (defaults to
-`us`; one of `us`, `us2`, `eu`, `eu2`, `in`, `in2`). The bundled MCP config fills
-this into the hosted endpoint `https://mcp.<region>.signoz.cloud/mcp`. Find your
+On install, Claude Code prompts for your **SigNoz MCP endpoint**. For SigNoz
+Cloud, keep the default `https://mcp.us.signoz.cloud/mcp` or edit the region
+segment to your region (`us`, `us2`, `eu`, `eu2`, `in`, or `in2`). Find your
 region under **Settings -> Ingestion** in SigNoz, or see the
-[region reference](https://signoz.io/docs/ingestion/signoz-cloud/keys/).
+[region reference](https://signoz.io/docs/ingestion/signoz-cloud/keys/). For a
+self-hosted SigNoz, enter your own HTTP `/mcp` URL, for example
+`http://localhost:8000/mcp`.
 
-The install dialog also asks **Self-hosted SigNoz?** Type `yes` if you run your
-own SigNoz instead of SigNoz Cloud (leave it blank or type `no` for Cloud). When
-set to `yes`, the region is ignored, and at the next session start the plugin
-reminds you to point it at your instance — run `signoz-mcp-setup` with your
-self-hosted HTTP `/mcp` URL (for example `http://localhost:8000/mcp`).
-
-> **The reminder fires on session start, not at install time.** Because you
-> install the plugin mid-session, its `SessionStart` hook has no session-start
-> event to fire on yet. Start a new session to trigger it: run `/clear`, restart
-> Claude Code, or resume with `/resume` (or `claude --continue`). The reminder
-> then appears immediately at the start of the new session — no prompt needed.
-
-To change the region later, reconfigure the plugin's options or run
-`signoz-mcp-setup`.
-
-Then run `/mcp`, select the `signoz` server, and complete the authentication flow.
-For a self-hosted SigNoz, or to set the endpoint explicitly, ask Claude Code to
-run `signoz-mcp-setup`.
+Then run `/mcp`, select the `signoz` server, and complete the authentication
+flow if prompted. To change the endpoint later, reconfigure the plugin's options
+or run `signoz-mcp-setup` with the new region or MCP URL.
 
 Update:
 
@@ -79,7 +67,7 @@ Update:
 /plugin update signoz@signoz-skills
 ```
 
-> The plugin ships a `PreToolUse` hook that auto-allows `WebFetch` to `signoz.io` domains. This does not affect `Bash`-based network calls (`curl`, `wget`), which follow the normal permission flow. It also ships a `SessionStart` hook that, only when **Self-hosted SigNoz?** is set to `yes` and the MCP endpoint still points at SigNoz Cloud, shows a reminder to finish setup with `signoz-mcp-setup` as soon as the session starts. Since `SessionStart` hooks only fire at session boundaries, this reminder appears on the next session after install — start one with `/clear`, a restart, or `/resume`.
+> The plugin ships a `PreToolUse` hook that auto-allows `WebFetch` to `signoz.io` domains. This does not affect `Bash`-based network calls (`curl`, `wget`), which follow the normal permission flow.
 
 ### Codex
 
