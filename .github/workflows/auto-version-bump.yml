@@ -131,17 +131,24 @@ jobs:
               if [[ -f ".devin-plugin/plugin.json" ]]; then
                 # Devin's plugin loader enforces strict semver, which forbids
                 # leading zeros in numeric identifiers — CalVer's MM/DD segments
-                # have one whenever the month or day is under 10. Strip them
-                # (base-10 forced via `10#` so bash doesn't misread "08"/"09" as
-                # invalid octal) and fold any same-day micro suffix into build
-                # metadata instead of a fourth dot segment, e.g.:
-                #   2026.07.02   -> 2026.7.2
-                #   2026.07.02.1 -> 2026.7.2+1
+                # have one whenever the month or day is under 10 (base-10 forced
+                # via `10#` so bash doesn't misread "08"/"09" as invalid octal).
+                # Fold the day and any same-day micro suffix into the patch
+                # number itself (day*100 + micro) rather than build metadata:
+                # semver explicitly excludes build metadata (+x) from precedence
+                # comparisons, so a same-day micro bump encoded that way would
+                # compare equal to the base version and a strict-semver update
+                # path could skip it. Encoding it in patch keeps same-day bumps
+                # strictly increasing, e.g.:
+                #   2026.07.02   -> 2026.7.200
+                #   2026.07.02.1 -> 2026.7.201
+                #   2026.07.02.2 -> 2026.7.202
                 IFS='.' read -ra VER_PARTS <<< "$NEW"
-                DEVIN_VERSION="${VER_PARTS[0]}.$((10#${VER_PARTS[1]})).$((10#${VER_PARTS[2]}))"
-                if [[ -n "${VER_PARTS[3]:-}" ]]; then
-                  DEVIN_VERSION="${DEVIN_VERSION}+${VER_PARTS[3]}"
-                fi
+                DEVIN_DAY=$((10#${VER_PARTS[2]}))
+                DEVIN_MICRO="${VER_PARTS[3]:-0}"
+                DEVIN_MICRO=$((10#$DEVIN_MICRO))
+                DEVIN_PATCH=$((DEVIN_DAY * 100 + DEVIN_MICRO))
+                DEVIN_VERSION="${VER_PARTS[0]}.$((10#${VER_PARTS[1]})).${DEVIN_PATCH}"
 
                 if ! jq --arg v "$DEVIN_VERSION" '.version = $v' ".devin-plugin/plugin.json" > ".devin-plugin/plugin.json.tmp"; then
                   echo "ERROR: jq failed on .devin-plugin/plugin.json"

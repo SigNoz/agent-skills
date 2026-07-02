@@ -170,10 +170,11 @@ devin plugins install SigNoz/agent-skills
 
 This installs at user level and works across all projects. Devin's plugin
 system does not support bundled MCP servers or install-time config prompts, so
-run `signoz-mcp-setup` in a Devin session afterward with your SigNoz Cloud
+run `/signoz:signoz-mcp-setup` (Devin namespaces plugin skills as
+`/<plugin>:<skill>`) in a Devin session afterward with your SigNoz Cloud
 region (`us`, `us2`, `eu`, `eu2`, `in`, `in2`) or a self-hosted HTTP MCP URL.
-This writes a `signoz` entry into `.devin/config.json` (or
-`.devin/config.local.json` for a personal/self-hosted endpoint).
+This writes a `signoz` entry into the highest-precedence Devin config scope
+that already has one, or `~/.config/devin/config.json` by default.
 
 For SigNoz Cloud, start a new session and run `devin mcp login signoz` to
 complete OAuth. For self-hosted SigNoz, no OAuth step is needed unless the

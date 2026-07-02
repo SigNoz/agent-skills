@@ -192,16 +192,26 @@ Or edit `~/.gemini/settings.json`:
 
 ### Devin CLI
 
-Check these three files, in this order, for an existing `signoz` entry before
-picking where to write the new one — edit whichever one already has it:
+Devin merges MCP servers by name across scopes, with later-checked scopes
+overriding earlier ones: user/global is overridden by project, which is
+overridden by project-local. Check these three files in **precedence
+order — highest first** — for an existing `signoz` entry, since that is the
+one actually in effect:
 
-1. `~/.config/devin/config.json` (`%APPDATA%\devin\config.json` on Windows) —
-   user/global, applies to every project.
+1. `.devin/config.local.json` in the current project root — gitignored,
+   project-local. Highest precedence.
 2. `.devin/config.json` in the current project root — team-shared, committed.
-3. `.devin/config.local.json` in the current project root — gitignored,
-   project-local.
+3. `~/.config/devin/config.json` (`%APPDATA%\devin\config.json` on Windows) —
+   user/global, applies to every project. Lowest precedence.
 
-If none has a `signoz` entry yet, default to user/global
+Edit the **first (highest-precedence) file that already has a `signoz`
+entry** — editing a lower-precedence file while a higher one still defines
+`signoz` would be silently shadowed and the active endpoint would not change.
+If more than one scope defines `signoz`, tell the user which scope is
+currently winning and ask whether to update that one or remove the
+override so a lower scope takes effect instead.
+
+If no scope has a `signoz` entry yet, default to user/global
 (`~/.config/devin/config.json`): Devin CLI is a personal developer tool, so a
 per-machine endpoint is the sane default. Only use `.devin/config.json`
 instead when the user explicitly asks for a team-shared, project-committed
