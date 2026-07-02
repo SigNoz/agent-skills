@@ -2,8 +2,8 @@
 name: signoz-mcp-setup
 description: >
   Initialize or repair SigNoz MCP server configuration for Claude Code, Codex,
-  Cursor, VS Code/GitHub Copilot, Claude Desktop, Gemini CLI, Windsurf, Zed,
-  Antigravity, OpenCode, or another MCP client. Use this skill before any
+  Cursor, VS Code/GitHub Copilot, Claude Desktop, Gemini CLI, Devin CLI,
+  Windsurf, Zed, Antigravity, OpenCode, or another MCP client. Use this skill before any
   SigNoz docs, query, dashboard, alert, or view workflow when
   `signoz_*` tools are unavailable, or when the user says "setup SigNoz
   MCP", "configure SigNoz plugin", "wrong region", "change SigNoz region",
@@ -32,14 +32,49 @@ stdio/local-binary setup is requested.
 
 ## Configuration procedure
 
-### Step 1: Check state
+### Step 1: Identify the client
 
-Silently determine the SigNoz MCP server state using the reference flow:
+Determine this before checking state — it decides where state is allowed to be
+checked from.
+
+Use the client named in `$ARGUMENTS` or the user's latest message. If no
+client is named, infer it only when the active environment is obvious (which
+agent CLI or editor is running this skill, not just what files happen to exist
+on disk):
+
+- Claude Code, Codex, or Cursor plugin install: use the bundled plugin
+  registration files.
+- VS Code / GitHub Copilot, Claude Desktop, Gemini CLI, Devin CLI, Windsurf,
+  Zed, Antigravity, or OpenCode: use the matching native client recipe in
+  `client-configs.md`.
+- Unknown or unsupported client: use the generic HTTP MCP recipe and point the
+  user to the SigNoz MCP Server docs for their client's exact config surface.
+
+If you need to edit a native client config and the client is still ambiguous,
+ask which client they want to configure.
+
+### Step 2: Check state
+
+Silently determine the SigNoz MCP server state using the reference flow,
+**scoped to the client identified in Step 1**:
+
+- For a Claude Code, Codex, or Cursor bundled plugin install, the reference
+  flow's registration-file fallback applies.
+- For every other client — including Devin CLI — do not read or search for
+  `.signoz_claude_mcp.json`, `.mcp.json`, or `.signoz_cursor_mcp.json`. Those
+  are bundled files for a different client's plugin distribution and are
+  irrelevant here even if a file-search tool happens to find them (for
+  example when this skill is linked from a local checkout of the
+  `agent-skills` source repo itself, which ships all three files side by
+  side). Check that client's own native config location instead, per
+  `client-configs.md`.
+
+State outcomes:
 
 - **working** — continue with the user's original SigNoz request.
-- **not-setup** — run Step 2.
+- **not-setup** — run Step 3.
 - **configured-but-not-working** — if the user provided a new region or MCP URL,
-  run Step 2. Otherwise tell them the SigNoz MCP server is configured but not
+  run Step 3. Otherwise tell them the SigNoz MCP server is configured but not
   connected, then ask for the SigNoz Cloud region or MCP URL to repair it. If
   they believe the endpoint is already correct, tell them to complete the
   client authentication step in Step 5.
@@ -52,22 +87,6 @@ The workflow skills assume the current SigNoz MCP server contract. If a
 SigNoz tool reports schema or parameter errors that contradict the skill
 instructions, repair or update the MCP server connection instead of inventing
 alternate raw HTTP calls or teaching legacy parameters.
-
-### Step 2: Identify the client
-
-Use the client named in `$ARGUMENTS` or the user's latest message. If no
-client is named, infer it only when the active environment is obvious:
-
-- Claude Code, Codex, or Cursor plugin install: use the bundled plugin
-  registration files.
-- VS Code / GitHub Copilot, Claude Desktop, Gemini CLI, Windsurf, Zed,
-  Antigravity, or OpenCode: use the matching native client recipe in
-  `client-configs.md`.
-- Unknown or unsupported client: use the generic HTTP MCP recipe and point the
-  user to the SigNoz MCP Server docs for their client's exact config surface.
-
-If you need to edit a native client config and the client is still ambiguous,
-ask which client they want to configure.
 
 ### Step 3: Resolve the endpoint
 
@@ -172,6 +191,9 @@ client-specific authentication step:
 - **Claude Desktop** — restart Claude Desktop or reconnect the custom
   connector, then complete authentication when prompted.
 - **Gemini CLI** — restart Gemini CLI if needed, then run `/mcp auth signoz`.
+- **Devin CLI** — start a new session so the updated `.devin/config.json` is
+  picked up. For SigNoz Cloud, run `devin mcp login signoz` to complete OAuth.
+  For a self-hosted or header-based endpoint, no OAuth step is expected.
 - **Windsurf** — reload Windsurf and complete authentication when prompted.
 - **Zed** — reload Zed after config changes; self-hosted stdio mode reads the
   configured environment from the context server entry.

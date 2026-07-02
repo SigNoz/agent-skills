@@ -27,8 +27,22 @@ SigNoz MCP Server docs and adds OpenCode's native config shape.
   servers. Update only the existing SigNoz server entry, and do not rename its
   key.
 - If the client supports both project and user/global config, prefer the scope
-  the user requested. If they did not choose, prefer user/global for secrets
-  and project scope for non-secret hosted MCP URLs.
+  the user requested. If they did not choose:
+  1. **Check every scope the client supports for an existing `signoz` (or
+     equivalently-purposed) entry first.** If one exists anywhere, edit that
+     same file in place — do not pick a different scope for the new value.
+     This matters most for CLI clients like Devin CLI, Codex, and Claude Code
+     that support multiple config layers (user/global, project, project-local):
+     re-deriving the scope from scratch on every repair can silently create a
+     second, shadowing or shadowed entry in a different file, or make the
+     skill go looking for a project file in whatever directory the current
+     session happens to be in — even an unrelated project that has nothing to
+     do with the endpoint being configured.
+  2. Only when no existing entry is found in any scope, choose a scope: prefer
+     user/global for secrets and for CLI tools in general (they are
+     typically configured per developer machine, not per project), and
+     project scope only when the user asks for a team-shared, project-committed
+     value.
 
 ## Cloud or Self-Hosted HTTP
 
@@ -176,6 +190,34 @@ Or edit `~/.gemini/settings.json`:
 }
 ```
 
+### Devin CLI
+
+Check these three files, in this order, for an existing `signoz` entry before
+picking where to write the new one — edit whichever one already has it:
+
+1. `~/.config/devin/config.json` (`%APPDATA%\devin\config.json` on Windows) —
+   user/global, applies to every project.
+2. `.devin/config.json` in the current project root — team-shared, committed.
+3. `.devin/config.local.json` in the current project root — gitignored,
+   project-local.
+
+If none has a `signoz` entry yet, default to user/global
+(`~/.config/devin/config.json`): Devin CLI is a personal developer tool, so a
+per-machine endpoint is the sane default. Only use `.devin/config.json`
+instead when the user explicitly asks for a team-shared, project-committed
+value, and only use `.devin/config.local.json` when the user is in a specific
+project and wants a project-local (not machine-global) override.
+
+```json
+{
+  "mcpServers": {
+    "signoz": {
+      "url": "https://mcp.us.signoz.cloud/mcp"
+    }
+  }
+}
+```
+
 ### Windsurf
 
 Edit `~/.codeium/windsurf/mcp_config.json`.
@@ -271,8 +313,10 @@ Avoid storing real API keys in tracked project files.
 
 ### JSON clients using `mcpServers`
 
-Cursor, Claude Desktop, Windsurf, Gemini CLI, and Antigravity can use this
-basic stdio shape, with client-specific file locations from the HTTP section.
+Cursor, Claude Desktop, Windsurf, Gemini CLI, Devin CLI, and Antigravity can
+use this basic stdio shape, with client-specific file locations from the HTTP
+section. For Devin CLI, prefer `.devin/config.local.json` and its
+`${env:VAR_NAME}` interpolation syntax over literal secrets.
 
 ```json
 {
@@ -399,6 +443,10 @@ Edit `opencode.json` or `opencode.jsonc`.
   `OAUTH_ENABLED=true`; skip `codex mcp login` and verify the already-authenticated
   `signoz` server with `/mcp`.
 - Gemini CLI: run `/mcp auth signoz`.
+- Devin CLI (SigNoz Cloud): start a new session, then run
+  `devin mcp login signoz` to complete OAuth.
+- Devin CLI (self-hosted or header-based): start a new session; no OAuth step
+  is expected.
 - Windsurf: reload and complete authentication when prompted.
 - Zed: reload after stdio config changes.
 - Antigravity: reload the agent window and complete OAuth. If auth is stuck,

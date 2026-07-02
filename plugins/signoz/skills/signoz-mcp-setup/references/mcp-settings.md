@@ -17,15 +17,27 @@ Antigravity, or OpenCode, read
 
 ## State Check
 
-Silently determine `signoz-server-state`:
+Silently determine `signoz-server-state`, **only after the client is known**
+(see `SKILL.md` Step 1 — identify the client before checking state):
 
 1. If `signoz_*` MCP tools are available, try a lightweight read-only
    call such as `signoz_search_docs` for `mcp setup` or
    `signoz_list_services` with a small lookback.
 2. If the call returns SigNoz-specific content, state is **working**.
-3. If the call fails, returns no tools, or only generic/empty content, read the
-   plugin registration files below.
-4. If any registration file contains `not-setup`, state is **not-setup**.
+3. If the call fails, returns no tools, or only generic/empty content:
+   - **Claude Code, Codex, or Cursor bundled plugin install** — read the
+     plugin registration files below.
+   - **Any other client** — do not read or file-search for the bundled
+     registration files below. They belong to a different client's plugin
+     distribution and can exist on disk for unrelated reasons — most
+     notably, if this skill is running from a local checkout of the
+     `agent-skills` source repo itself (e.g. a Devin CLI local-path plugin
+     install), the bundled files genuinely exist a few directories up
+     because that's where the *source* repo keeps them, not because they
+     configure the current client. Check that client's own native config
+     location from `client-configs.md` instead.
+4. If any registration file consulted in step 3 contains `not-setup`, state is
+   **not-setup**.
 5. Otherwise state is **configured-but-not-working**.
 
 Do not tell the user which checks ran or what file contents were found. Explain
@@ -33,21 +45,28 @@ only the plain outcome: working, not set up, or configured but not connected.
 
 ## Registration Files
 
-The SigNoz plugin may ship these bundled registration files in the plugin root:
+These bundled registration files exist only for the Claude Code, Codex, and
+Cursor plugin installs — never read or edit them for any other client, even if
+a file search finds them:
 
 - `.signoz_claude_mcp.json` for Claude Code
 - `.mcp.json` for Codex
 - `.signoz_cursor_mcp.json` for Cursor
 
 This reference file lives at `skills/signoz-mcp-setup/references/mcp-settings.md`,
-so the plugin root is two directories up from `skills/signoz-mcp-setup/`.
+so the plugin root is two directories up from `skills/signoz-mcp-setup/`. That
+relative path also happens to resolve inside the `agent-skills` source repo
+itself (this plugin's own monorepo), which ships all three files side by side
+for their respective bundled installs — resolving to a real file there does
+not mean it is the active client's configuration.
 
-Update every registration file that exists. Replace only the `url` value and
-preserve each file's existing server key and `type`: the Claude Code file
-(`.signoz_claude_mcp.json`) ships the server key `mcp`, while the Codex and
-Cursor files ship `signoz`. Do not create duplicate MCP server entries, and do
-not rename the existing server — renaming the Claude Code key changes the tool
-namespace (`plugin:signoz:mcp`) and forces re-authentication.
+Update every registration file that exists **for the identified client only**.
+Replace only the `url` value and preserve each file's existing server key and
+`type`: the Claude Code file (`.signoz_claude_mcp.json`) ships the server key
+`mcp`, while the Codex and Cursor files ship `signoz`. Do not create duplicate
+MCP server entries, and do not rename the existing server — renaming the
+Claude Code key changes the tool namespace (`plugin:signoz:mcp`) and forces
+re-authentication.
 
 ## Editing Rules
 

@@ -57,7 +57,7 @@ Users of Claude Code, Codex, and Cursor receive updates based on these versions.
 
 ### Auto-bump workflow
 
-A GitHub Actions workflow (`.github/workflows/auto-version-bump.yml`) automatically bumps all three manifests on push to `main`. It detects which plugins have changed files and sets the version to today's date (or appends a micro suffix for multiple bumps in the same day).
+A GitHub Actions workflow (`.github/workflows/auto-version-bump.yml`) automatically bumps all three manifests on push to `main`. It detects which plugins have changed files and sets the version to today's date (or appends a micro suffix for multiple bumps in the same day). The root `gemini-extension.json` and `.devin-plugin/plugin.json` manifests mirror the `signoz` plugin and are bumped in lockstep with it.
 
 **You do not need to manually bump versions** — the workflow handles it when your PR is merged to `main`.
 
