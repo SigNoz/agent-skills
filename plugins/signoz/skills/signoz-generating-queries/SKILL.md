@@ -172,14 +172,21 @@ from context (e.g., from a dashboard or @mention), skip redundant discovery.
   query into a recurring alert, redirect to `signoz-creating-alerts`.
 - **Emit `apply_filter` on the final message.** When the user asks you to
   write, build, generate, or show a query, include an `apply_filter` action
-  on your final assistant message with the resolved `compositeQuery` from
-  the tool result and the appropriate `signal` field (`metrics`, `logs`, or
-  `traces`). This signals to the SigNoz UI that the user wants to apply the
-  query to an explorer page. Only emit `apply_filter` when the user's primary
-  intent is to obtain a runnable query — not when the user is asking a
-  one-shot data question that the analysis text already answers. For a Cost
-  Meter query keep `signal: metrics` and ensure the resolved `compositeQuery`
-  spec carries `source: meter`.
+  on your final assistant message with the exact full v5 `query` object you
+  passed to a successful `signoz_execute_builder_query` call in this turn. The
+  chip carries the entire query-range envelope (`schemaVersion`, `start`,
+  `end`, `requestType`, `compositeQuery`), not just the inner
+  `compositeQuery`, and you must copy it verbatim rather than reconstructing
+  it. If you answered via simplified tools (`signoz_search_logs`,
+  `signoz_search_traces`, `signoz_aggregate_*`, `signoz_query_metrics`), run
+  one validating `signoz_execute_builder_query` with a small `limit` and copy
+  that exact query object, or skip the chip. Use the appropriate `signal`
+  field (`metrics`, `logs`, or `traces`). This signals to the SigNoz UI that
+  the user wants to apply the query to an explorer page. Only emit
+  `apply_filter` when the user's primary intent is to obtain a runnable query
+  — not when the user is asking a one-shot data question that the analysis text
+  already answers. For a Cost Meter query keep `signal: metrics` and ensure the
+  copied query spec carries `source: meter`.
 
 ## Examples
 
