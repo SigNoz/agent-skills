@@ -242,9 +242,17 @@ Edit `~/.codeium/windsurf/mcp_config.json`.
 }
 ```
 
-### Antigravity
+### Antigravity CLI
 
-Edit `mcp_config.json` from the agent panel's MCP server manager.
+Remote servers must use the `serverUrl` key — Antigravity does not support
+the legacy `url` or `httpUrl` fields.
+
+If the SigNoz plugin is installed (`agy plugin install https://github.com/SigNoz/agent-skills`),
+it already ships this `mcp_config.json` (default `us` Cloud endpoint), staged at
+`~/.gemini/antigravity-cli/plugins/signoz/`. To repoint it, edit the `serverUrl`
+value in that installed copy, then run `/mcp` to reload. Without the plugin, add
+the server directly to the global `~/.gemini/config/mcp_config.json` (or workspace
+`.agents/mcp_config.json`).
 
 ```json
 {
@@ -323,7 +331,7 @@ Avoid storing real API keys in tracked project files.
 
 ### JSON clients using `mcpServers`
 
-Cursor, Claude Desktop, Windsurf, Gemini CLI, Devin CLI, and Antigravity can
+Cursor, Claude Desktop, Windsurf, Gemini CLI, Devin CLI, and Antigravity CLI can
 use this basic stdio shape, with client-specific file locations from the HTTP
 section. For Devin CLI, prefer `.devin/config.local.json` and its
 `${env:VAR_NAME}` interpolation syntax over literal secrets.
@@ -459,7 +467,7 @@ Edit `opencode.json` or `opencode.jsonc`.
   is expected.
 - Windsurf: reload and complete authentication when prompted.
 - Zed: reload after stdio config changes.
-- Antigravity: reload the agent window and complete OAuth. If auth is stuck,
+- Antigravity CLI: run `/mcp` to reload and complete OAuth. If auth is stuck,
   clear dynamic authentication providers and retry.
 - OpenCode: run `opencode mcp auth signoz` if auth does not start
   automatically, then verify with `opencode mcp list`.

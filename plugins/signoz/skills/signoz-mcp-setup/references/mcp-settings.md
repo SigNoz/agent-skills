@@ -5,7 +5,7 @@ registration files, editing the endpoint default, or mapping user input to a
 hosted SigNoz Cloud MCP URL.
 
 For native client config shapes such as VS Code, Gemini CLI, Windsurf, Zed,
-Antigravity, or OpenCode, read
+Antigravity CLI, or OpenCode, read
 [client-configs.md](client-configs.md) after resolving the endpoint.
 
 ## Contents

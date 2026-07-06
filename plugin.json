@@ -1,0 +1,5 @@
+{
+  "$schema": "https://antigravity.google/schemas/v1/plugin.json",
+  "name": "signoz",
+  "description": "Official SigNoz plugin for MCP setup, docs, queries, dashboards, and alerts"
+}

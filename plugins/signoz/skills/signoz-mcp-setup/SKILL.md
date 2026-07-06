@@ -3,7 +3,7 @@ name: signoz-mcp-setup
 description: >
   Initialize or repair SigNoz MCP server configuration for Claude Code, Codex,
   Cursor, VS Code/GitHub Copilot, Claude Desktop, Gemini CLI, Devin CLI,
-  Windsurf, Zed, Antigravity, OpenCode, or another MCP client. Use this skill before any
+  Windsurf, Zed, Antigravity CLI, OpenCode, or another MCP client. Use this skill before any
   SigNoz docs, query, dashboard, alert, or view workflow when
   `signoz_*` tools are unavailable, or when the user says "setup SigNoz
   MCP", "configure SigNoz plugin", "wrong region", "change SigNoz region",
@@ -45,7 +45,7 @@ on disk):
 - Claude Code, Codex, or Cursor plugin install: use the bundled plugin
   registration files.
 - VS Code / GitHub Copilot, Claude Desktop, Gemini CLI, Devin CLI, Windsurf,
-  Zed, Antigravity, or OpenCode: use the matching native client recipe in
+  Zed, Antigravity CLI, or OpenCode: use the matching native client recipe in
   `client-configs.md`.
 - Unknown or unsupported client: use the generic HTTP MCP recipe and point the
   user to the SigNoz MCP Server docs for their client's exact config surface.
@@ -197,8 +197,10 @@ client-specific authentication step:
 - **Windsurf** — reload Windsurf and complete authentication when prompted.
 - **Zed** — reload Zed after config changes; self-hosted stdio mode reads the
   configured environment from the context server entry.
-- **Antigravity** — reload the agent window and complete OAuth when prompted.
-  If authentication is stuck, clear cached dynamic auth providers and retry.
+- **Antigravity CLI** — run `/mcp` to reload the server. For SigNoz Cloud,
+  complete OAuth when prompted. Self-hosted endpoints need no OAuth unless the
+  server runs with `OAUTH_ENABLED=true`. If authentication is stuck, clear cached
+  dynamic auth providers and retry.
 - **OpenCode** — run `opencode mcp auth signoz` if authentication does not
   start automatically, then verify with `opencode mcp list`.
 
