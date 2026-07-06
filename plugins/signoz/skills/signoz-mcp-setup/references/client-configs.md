@@ -467,8 +467,9 @@ Edit `opencode.json` or `opencode.jsonc`.
   is expected.
 - Windsurf: reload and complete authentication when prompted.
 - Zed: reload after stdio config changes.
-- Antigravity CLI: run `/mcp` to reload and complete OAuth. If auth is stuck,
-  clear dynamic authentication providers and retry.
+- Antigravity CLI: type `/mcp`, select the `signoz` server, and choose
+  **Authenticate** to start the OAuth flow. If auth is stuck, clear dynamic
+  authentication providers and retry.
 - OpenCode: run `opencode mcp auth signoz` if auth does not start
   automatically, then verify with `opencode mcp list`.
 - Header-based auth: no OAuth step is expected; verify the `signoz` tools after

@@ -197,10 +197,10 @@ client-specific authentication step:
 - **Windsurf** — reload Windsurf and complete authentication when prompted.
 - **Zed** — reload Zed after config changes; self-hosted stdio mode reads the
   configured environment from the context server entry.
-- **Antigravity CLI** — run `/mcp` to reload the server. For SigNoz Cloud,
-  complete OAuth when prompted. Self-hosted endpoints need no OAuth unless the
-  server runs with `OAUTH_ENABLED=true`. If authentication is stuck, clear cached
-  dynamic auth providers and retry.
+- **Antigravity CLI** — type `/mcp`, select the `signoz` server, and choose
+  **Authenticate** to start the OAuth flow (complete it in the browser). Self-hosted
+  endpoints need no OAuth unless the server runs with `OAUTH_ENABLED=true`. If
+  authentication is stuck, clear cached dynamic auth providers and retry.
 - **OpenCode** — run `opencode mcp auth signoz` if authentication does not
   start automatically, then verify with `opencode mcp list`.
 

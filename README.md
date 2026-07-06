@@ -195,12 +195,20 @@ MCP server (default SigNoz Cloud `us` endpoint, `https://mcp.us.signoz.cloud/mcp
 and the SigNoz skills automatically. The installed plugin is staged at
 `~/.gemini/antigravity-cli/plugins/signoz/`.
 
+**Authenticate (SigNoz Cloud).** In the `agy` prompt, type `/mcp`, select the
+`signoz` server, and choose **Authenticate** to start the OAuth flow. Complete
+it in the browser (over SSH, `agy` prints an authorization URL to paste in and a
+code to paste back). Self-hosted endpoints need no OAuth unless the server runs
+with `OAUTH_ENABLED=true`.
+
+**Change the endpoint.**
+
 - **SigNoz Cloud:** for a non-`us` region, edit the `<region>` segment of
   `serverUrl` (`us`, `us2`, `eu`, `eu2`, `in`, `in2`) in the installed
-  `mcp_config.json`, then run `/mcp` to reload and complete OAuth when prompted.
+  `mcp_config.json`, then run `/mcp` to reload and re-authenticate.
 - **Self-hosted SigNoz:** set `serverUrl` to your own HTTP `/mcp` URL (for
-  example `http://localhost:8000/mcp`). No OAuth unless the server runs with
-  `OAUTH_ENABLED=true`. You can also run `signoz-mcp-setup` to repoint it.
+  example `http://localhost:8000/mcp`). You can also run `signoz-mcp-setup` to
+  repoint it.
 
 ### Other MCP Clients
 
