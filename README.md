@@ -201,14 +201,17 @@ it in the browser (over SSH, `agy` prints an authorization URL to paste in and a
 code to paste back). Self-hosted endpoints need no OAuth unless the server runs
 with `OAUTH_ENABLED=true`.
 
-**Change the endpoint.**
+**Change the endpoint.** In the `agy` prompt, run the setup skill with your
+target — a SigNoz Cloud region or a self-hosted MCP URL:
 
-- **SigNoz Cloud:** for a non-`us` region, edit the `<region>` segment of
-  `serverUrl` (`us`, `us2`, `eu`, `eu2`, `in`, `in2`) in the installed
-  `mcp_config.json`, then run `/mcp` to reload and re-authenticate.
-- **Self-hosted SigNoz:** set `serverUrl` to your own HTTP `/mcp` URL (for
-  example `http://localhost:8000/mcp`). You can also run `signoz-mcp-setup` to
-  repoint it.
+```
+/signoz:signoz-mcp-setup <region>        # e.g. us, us2, eu, eu2, in, in2
+/signoz:signoz-mcp-setup <mcp-url>       # e.g. http://localhost:8000/mcp
+```
+
+This rewrites `serverUrl` in the installed `mcp_config.json`. Then run `/mcp` to
+reload and re-authenticate (self-hosted needs no OAuth unless the server runs
+with `OAUTH_ENABLED=true`). You can also edit the `serverUrl` value directly.
 
 ### Other MCP Clients
 
