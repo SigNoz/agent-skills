@@ -90,6 +90,20 @@
         {"id": "no_action_skill_handoff", "text": "Agent does NOT delegate to signoz-generating-queries; treats this as a docs lookup."},
         {"id": "cites_canonical_url", "text": "Answer cites at least one canonical https://signoz.io/docs/... URL."}
       ]
+    },
+    {
+      "id": 6,
+      "eval_name": "no-guessed-cost-meter-url",
+      "prompt": "Find the SigNoz docs for the Cost Meter meter explorer query guide and summarize how to use it.",
+      "expected_output": "Agent calls signoz:signoz_search_docs before calling signoz:signoz_fetch_doc, chooses the canonical Cost Meter meter explorer query guide URL returned by search, and fetches that URL. It must not construct or fetch a plausible `/docs/cost-meter/user-guides/meter-explorer-query-guide/` path from memory.",
+      "files": [],
+      "assertions": [
+        {"id": "search_before_fetch", "text": "Agent calls signoz_search_docs before the first signoz_fetch_doc call."},
+        {"id": "fetches_search_result_url", "text": "Agent calls signoz_fetch_doc only with a URL returned by signoz_search_docs."},
+        {"id": "no_guessed_user_guides_url", "text": "Agent does not fetch or cite `/docs/cost-meter/user-guides/meter-explorer-query-guide/`."},
+        {"id": "fetches_canonical_cost_meter_page", "text": "Agent fetches the canonical Cost Meter meter explorer query guide page."},
+        {"id": "cites_canonical_url", "text": "Answer cites the canonical https://signoz.io/docs/... URL."}
+      ]
     }
   ]
 }
