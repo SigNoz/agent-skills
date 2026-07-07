@@ -22,6 +22,7 @@ MCP clients.
 | [signoz-searching-docs](plugins/signoz/skills/signoz-searching-docs/SKILL.md) | SigNoz docs guidance for instrumentation, setup, querying, alerts, and APIs. |
 | [signoz-managing-views](plugins/signoz/skills/signoz-managing-views/SKILL.md) | Create, list, inspect, update, or delete SigNoz saved Explorer views (logs, traces, metrics) via the SigNoz MCP server. |
 | [signoz-setting-up-observability](plugins/signoz/skills/signoz-setting-up-observability/SKILL.md) | Orchestrate the full post-ingestion observability setup for a service — SLI/SLO capture, RED/USE exploration, focused dashboards, saved views, burn-rate and absent-data alerts, and a tuning loop — sequencing the single-artifact skills into one SLO-aware workflow. |
+| [signoz-optimising-telemetry](plugins/signoz/skills/signoz-optimising-telemetry/SKILL.md) | Investigate and reduce SigNoz telemetry ingestion cost and metric cardinality across metrics, logs, and traces — via the Cost Meter, with dashboard-, alert-, and Infra-page-aware drop/sampling recommendations. |
 
 ## Installation
 
