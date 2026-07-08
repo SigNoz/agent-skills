@@ -93,8 +93,12 @@ is the volume-ranked worklist. Histogram metrics (`.bucket` suffix) are usually 
 contributors — each bucket boundary is a separate sample per scrape.
 
 **2b. Check usage — `signoz_check_metric_usage`.** Pass the top metric names (batch of ≤ 50 per
-call). Returns `{ dashboards: [...], alerts: [...] }` per metric. A metric with **both lists
-empty** is a drop candidate — except the guard below.
+call). Returns `{ dashboards, alerts, error }` per metric. A metric is a drop candidate only when
+its `error` is empty **and** both `dashboards` and `alerts` are empty. If `error` is non-empty the
+lookup is incomplete (a timeout, or an older SigNoz that lacks the endpoint) and the returned
+lists are unreliable — never treat that metric as unused; mark it **Needs one check first** (verify
+its usage manually). A clean lookup with both lists empty is a drop candidate — except the guard
+below.
 
 > **Do-not-drop guard (mandatory).** Before calling any empty-usage metric a "safe drop", check
 > it against `references/infra-do-not-drop.md`. The Infrastructure page (Hosts / Kubernetes)
@@ -150,7 +154,8 @@ For each top service by GB:
   a real problem — flag it separately, do not recommend filtering it away.
 
 > **Service severity guard.** Before any "filter INFO/DEBUG" recommendation, compute
-> high-signal % = (ERROR + WARN + FATAL + CRITICAL) ÷ service total. **If it is > 1% (or a
+> high-signal % = (all HIGH-SIGNAL severities — ERROR, FATAL, CRITICAL, WARN, **and WARNING** —
+> matched case-insensitively, so `WARNING`/`Warning` count too) ÷ service total. **If it is > 1% (or a
 > non-trivial absolute ERROR/WARN count), do not blanket-filter the service.** Scope the filter
 > to the specific INFO/DEBUG pattern or component, preserve ERROR/WARN, and flag the errors as a
 > real signal. The `LOG_LEVEL=WARN` / `severity_text` recommendations apply cleanly only when a
@@ -166,7 +171,8 @@ For each top service by GB:
 - Samples: `signoz_search_logs`, `filter: "k8s.namespace.name = '<ns>'"`, small limit; read
   `body`, `severity_text`, `scope_name`.
 
-> **Namespace severity guard.** high-signal % = (ERROR + WARN + FATAL + CRITICAL) ÷ namespace
+> **Namespace severity guard.** high-signal % = (all HIGH-SIGNAL severities — ERROR, FATAL,
+> CRITICAL, WARN, **and WARNING** — matched case-insensitively) ÷ namespace
 > total. **If it is > 1% (or a non-trivial absolute count), do not recommend dropping or
 > filtering the whole namespace.** Scope the filter to the specific noisy pattern (a log
 > category, a `severity_text` match, or a component). Never drop a namespace that carries active
@@ -177,8 +183,10 @@ For each top service by GB:
   impossible).
 - `k8s.event.*` logs are often high-volume / low-value → droppable if not alerted on.
 
-**3c. Log alerts — check before any filter recommendation.** `signoz_list_alert_rules`, keep
-`alertType == "LOGS_BASED_ALERT"`. For each, `signoz_get_alert(id)` and read
+**3c. Log alerts — check before any filter recommendation.** `signoz_list_alert_rules`,
+**paginating through every page** (follow `pagination.nextOffset` until `pagination.hasMore` is
+false — do not stop at the first page, or an alert on a later page is missed and a filter looks
+safe when it isn't). Keep `alertType == "LOGS_BASED_ALERT"`. For each, `signoz_get_alert(id)` and read
 `condition.compositeQuery.queries[].spec.filter.expression` + `groupBy` to see which service /
 severity / namespace it guards. If a filter would blind an alert, mark it **Will break alert
 coverage** and name the alert. Docs: https://signoz.io/docs/logs-management/guides/drop-logs/
@@ -203,9 +211,10 @@ service you consider reducing.
 **4c. Error rate per service.** `signoz_aggregate_traces`, `count`, `groupBy: "service.name"`
 (total), then again with `error: true`. Error rate = errors ÷ total, per service.
 
-**4d. Trace alerts.** `signoz_list_alert_rules`, keep `alertType == "TRACES_BASED_ALERT"`;
-`signoz_get_alert(id)` for what each guards. Name any trace-based alert before suggesting
-sampling.
+**4d. Trace alerts.** `signoz_list_alert_rules`, **paginating through every page** (follow
+`pagination.nextOffset` until `pagination.hasMore` is false). Keep
+`alertType == "TRACES_BASED_ALERT"`; `signoz_get_alert(id)` for what each guards. Name any
+trace-based alert before suggesting sampling.
 
 **Classify the dominant operations.**
 - Known-safe to pre-filter (near-zero diagnostic value): health/liveness (`/health`, `/ping`,
@@ -267,6 +276,10 @@ much, and ask whether to look at that one too.
 
 ## Guardrails
 
+- **Never declare a drop or filter "safe" on a partial check.** Paginate
+  `signoz_list_alert_rules` fully (through `pagination.hasMore`) before ruling out alert impact,
+  and treat a non-empty `error` from `signoz_check_metric_usage` as *unknown* usage (needs a
+  manual check) — not as "unused." An incomplete lookup is not a green light.
 - **Volume = GB from the Cost Meter** (`signoz.meter.span.size`, `signoz.meter.log.size`) or
   samples (`signoz.meter.metric.datapoint.count`). Never cite span/log record counts as volume.
 - **Cost totals via `signoz_execute_builder_query`** with `timeAggregation: sum` — never
