@@ -1,0 +1,20 @@
+{
+  "mode": "offline_mcp_fixture",
+  "instructions": "Use these ordered responses to produce an offline simulated tool trace; do not query a live tenant.",
+  "responses": [
+    {
+      "request": {"limit": 50, "offset": 0},
+      "response": {
+        "data": [{"uuid": "33333333-3333-4333-8333-333333333333", "name": "Platform API"}],
+        "pagination": {"total": 51, "offset": 0, "limit": 50, "hasMore": true, "nextOffset": 50}
+      }
+    },
+    {
+      "request": {"limit": 50, "offset": 50},
+      "response": {
+        "data": [{"uuid": "44444444-4444-4444-8444-444444444444", "name": "Payments API"}],
+        "pagination": {"total": 51, "offset": 50, "limit": 50, "hasMore": false, "nextOffset": -1}
+      }
+    }
+  ]
+}

@@ -138,12 +138,12 @@
       "id": 12,
       "eval_name": "shape-check-no-stringify",
       "prompt": "Create a dashboard with one timeseries panel showing service request rate for the checkout service. Walk me through the create call.",
-      "expected_output": "Agent walks the standard custom-build path: list_dashboards, list_dashboard_templates (no exact 'request rate one panel' template), discovery via list_metrics + get_field_keys, reads dashboard MCP resources. Builds the JSON, dry-runs the panel via signoz_execute_builder_query, then emits a plain-language summary and calls signoz_create_dashboard. CRITICAL: the payload sent to signoz_create_dashboard must have layout, widgets, and variables as native JSON arrays/objects — NOT as JSON.stringify'd strings. Required top-level fields are title, layout (array of {x,y,w,h,i}), widgets (array). Each widget must include id, panelTypes, title, query (with builder/promql/clickhouse_sql sub-keys), selectedLogFields, selectedTracesFields, thresholds, contextLinks. Agent must NOT wrap any of these in a JSON string.",
+      "expected_output": "Agent walks the standard custom-build path: list_dashboards, list_dashboard_templates (no exact 'request rate one panel' template), discovery via list_metrics + get_field_keys, reads dashboard MCP resources. Builds the JSON, dry-runs the panel via signoz_execute_builder_query, then emits a plain-language summary and calls signoz_create_dashboard. CRITICAL: the payload sent to signoz_create_dashboard must have layout, widgets, and variables as native JSON arrays/objects — NOT as JSON.stringify'd strings. Required top-level fields are title, layout (array of {x,y,w,h,i}), widgets (array). Each widget must include id, panelTypes, title, query with queryType and its active payload, selectedLogFields, selectedTracesFields, thresholds, and contextLinks. Agent must NOT wrap any of these in a JSON string.",
       "expectations": [
         "Payload sent to signoz_create_dashboard has layout as an array of objects (not a stringified JSON string)",
         "Payload sent to signoz_create_dashboard has widgets as an array of objects (not a stringified JSON string)",
         "Each widget in the payload includes id, panelTypes, title, query, selectedLogFields, selectedTracesFields, thresholds, and contextLinks",
-        "The widget's query object includes queryType, builder, promql, and clickhouse_sql sub-keys (with promql and clickhouse_sql passed as empty arrays for builder-mode widgets)",
+        "The widget's query object includes queryType and the complete active Builder payload; inactive PromQL and ClickHouse payloads need not be authored",
         "Agent runs signoz_execute_builder_query as a dry-run for the panel before signoz_create_dashboard"
       ],
       "files": []
@@ -183,11 +183,12 @@
       "id": 14,
       "eval_name": "custom-build-logs-signal-volume-and-errors",
       "prompt": "Create a dashboard for our application log analytics — I want a timeseries of log volume per service, a value panel showing total ERROR/WARN count in the last hour, and a table of top 10 services by log volume broken down by severity. Use logs as the data source.",
-      "expected_output": "Logs-signal dashboard with NO catalog template — must custom build on the LOGS signal, not metrics or traces. Agent paginates signoz_list_dashboards (no log-analytics dashboard). signoz_list_dashboard_templates returns no match. Falls through to custom build. CRITICAL: agent must recognise the signal is LOGS (dataSource=logs in queryData), not metrics. Calls signoz_get_field_keys with signal=logs to discover available log attributes (severity_text, service.name as resource attr, body, severity_number). Optionally calls signoz_aggregate_logs at discovery time to gauge log volume. The mandatory per-panel dry-run before save goes through signoz_execute_builder_query (signal=logs in each builder_query.spec), not signoz_aggregate_logs. Reads signoz://dashboard/widgets-instructions, signoz://dashboard/widgets-examples, AND signoz://dashboard/clickhouse-logs-example or query-builder-example for log-specific patterns. Builds three panels: (a) timeseries panel with dataSource=logs, aggregation count(), groupBy service.name, legend {{service.name}}; (b) value panel with dataSource=logs, aggregation count(), filter severity_text IN ('ERROR','WARN','FATAL') — NO groupBy on value panels; (c) table panel with dataSource=logs, aggregation count() as 'Log Count', groupBy service.name AND severity_text (both with isColumn:true on at least one). Each widget includes the required selectedLogFields array (timestamp, body) per the widgets-examples shape. Variables use service.name (DYNAMIC type, source=Logs or 'All telemetry'). Emits plain-language summary (no JSON dump) before signoz_create_dashboard.",
+      "expected_output": "Logs-signal dashboard with NO catalog template — must custom build on the LOGS signal, not metrics or traces. Agent paginates signoz_list_dashboards (no log-analytics dashboard). signoz_list_dashboard_templates returns no match. Falls through to custom build. CRITICAL: agent must recognise the signal is LOGS (dataSource=logs in queryData), not metrics. Calls signoz_get_field_keys with signal=logs to discover available log attributes (severity_text, service.name as resource attr, body, severity_number). Optionally calls signoz_aggregate_logs at discovery time to gauge log volume. The mandatory per-panel dry-run before save goes through signoz_execute_builder_query (signal=logs in each builder_query.spec), not signoz_aggregate_logs. Reads signoz://dashboard/widgets-instructions, signoz://dashboard/widgets-examples, signoz://dashboard/query-builder-example, and signoz://logs/query-builder-guide. Builds three panels: (a) timeseries panel with dataSource=logs, aggregation count(), groupBy service.name, legend {{service.name}}; (b) value panel with dataSource=logs, aggregation count(), filter severity_text IN ('ERROR','WARN','FATAL') — NO groupBy on value panels; (c) table panel with dataSource=logs, aggregation count() as 'Log Count', groupBy service.name AND severity_text (both with isColumn:true on at least one). Each widget includes the required selectedLogFields array (timestamp, body) per the widgets-examples shape. Variables use service.name (DYNAMIC type, source=Logs or 'All telemetry'). Emits plain-language summary (no JSON dump) before signoz_create_dashboard.",
       "expectations": [
         "Agent calls signoz_list_dashboard_templates and finds no matching log-analytics template before custom build",
         "Agent uses dataSource='logs' in queryData (not 'metrics' or 'traces') for the log panels",
         "Agent calls signoz_get_field_keys with signal=logs to discover log attributes before authoring",
+        "Agent reads signoz://logs/query-builder-guide before authoring Builder log queries",
         "Agent uses severity_text in a filter for the ERROR/WARN value panel (not a guessed key like 'severity' or 'level')",
         "Value panel does NOT include groupBy (would produce multiple values instead of one)",
         "Table panel includes groupBy with at least 'service.name' AND 'severity_text' to satisfy the per-service / per-severity breakdown",
@@ -219,9 +220,9 @@
       "id": 16,
       "eval_name": "custom-build-multi-panel-types-mixed",
       "prompt": "Create an APM-style dashboard for the checkoutservice with: (1) a row section called 'Overview', (2) three value panels in a KPI row (total requests, error rate %, p99 latency), (3) a row section called 'Breakdowns', (4) a pie panel showing request distribution by operation, (5) a bar panel showing error count by status code, and (6) a table panel with operation, request count, and avg latency.",
-      "expected_output": "Multi-panel-type dashboard exercises all six non-graph panel types (row, value, pie, bar, table) PLUS the standard graph type if any timeseries is added. No catalog template — custom build on traces signal. Agent paginates signoz_list_dashboards (none — no checkout APM dashboard with this exact layout). signoz_list_dashboard_templates returns the apm category but the user asked for a specific layout, so falls through to custom build. CRITICAL panel-shape rules per widgets-examples: (a) row panels have panelTypes='row' and a title, no query needed; (b) value panels MUST NOT have groupBy (causes multiple values instead of one); (c) pie panels MUST have groupBy AND legend matching the groupBy key; (d) bar panels behave like graph and need groupBy+legend when grouped; (e) table panels need groupBy and SHOULD use 'as' aliases on aggregations (e.g. count() as 'Requests' avg(duration_nano) as 'Latency'); (f) error rate must use A*100/B formula with disabled:true on base queries. Reads signoz://dashboard/widgets-examples for each panel-type shape. Discovers the operation attribute (likely 'name' span column or rpc.method/http.route) via signoz_get_field_keys with signal=traces. Emits a plain-language summary (no JSON dump) before signoz_create_dashboard, after running a per-panel signoz_execute_builder_query dry-run for every authored panel. Layout must place the two row sections at full width (w=12) with appropriate Y progression, and the KPI value panels in a single horizontal row (e.g. three w=4 panels at the same Y).",
+      "expected_output": "Multi-panel-type dashboard exercises the five requested non-graph panel types (row, value, pie, bar, table). No catalog template — custom build on traces signal. Agent paginates signoz_list_dashboards (none — no checkout APM dashboard with this exact layout). signoz_list_dashboard_templates returns the apm category but the user asked for a specific layout, so falls through to custom build. CRITICAL panel-shape rules per widgets-examples: (a) row panels have panelTypes='row' and a title, no query needed; (b) value panels MUST NOT have groupBy (causes multiple values instead of one); (c) pie panels MUST have groupBy AND legend matching the groupBy key; (d) bar panels behave like graph and need groupBy+legend when grouped; (e) table panels need groupBy and SHOULD use 'as' aliases on aggregations (e.g. count() as 'Requests' avg(duration_nano) as 'Latency'); (f) error rate must use A*100/B formula with disabled:true on base queries. Reads signoz://dashboard/widgets-examples for each panel-type shape. Discovers the operation attribute (likely 'name' span column or rpc.method/http.route) via signoz_get_field_keys with signal=traces. Emits a plain-language summary (no JSON dump) before signoz_create_dashboard, after running a per-panel signoz_execute_builder_query dry-run for every authored panel. Layout must place the two row sections at full width (w=12) with appropriate Y progression, and the KPI value panels in a single horizontal row (e.g. three w=4 panels at the same Y).",
       "expectations": [
-        "Dashboard payload includes at least one row panel (panelTypes='row') for section headers",
+        "Dashboard payload includes exactly the two requested row panels titled Overview and Breakdowns",
         "Value panels do NOT include groupBy in queryData",
         "Pie panel includes groupBy AND legend with {{<key>}} matching the groupBy key",
         "Bar panel uses panelTypes='bar' (not 'graph') and includes groupBy on status_code or equivalent",
@@ -229,6 +230,8 @@
         "Error-rate value panel uses an A*100/B formula with disabled:true on base queries (per widgets-examples error-rate pattern)",
         "Agent reads signoz://dashboard/widgets-examples before authoring (panel shapes vary per type)",
         "Layout places row panels at full width (w=12) and KPI value panels side-by-side at consistent y",
+        "Every layout item satisfies 0 <= x < 12, 1 <= w <= 12, and x+w <= 12",
+        "panelMap has exactly the Overview and Breakdowns row entries; Overview contains only the three KPI widget IDs, Breakdowns only the pie, bar, and table widget IDs, and every child's x, y, w, h matches its top-level layout entry",
         "Agent emits a plain-language summary (no JSON dump) before signoz_create_dashboard",
         "Agent runs signoz_execute_builder_query as a per-panel dry-run for every authored panel (rows excluded — they have no query) before signoz_create_dashboard"
       ],
@@ -238,17 +241,42 @@
       "id": 17,
       "eval_name": "custom-build-variable-application-prompt",
       "prompt": "Create a dashboard for our backend services with three panels: (1) request rate timeseries grouped by service, (2) p99 latency timeseries grouped by service, and (3) a global system health panel showing total error count across all services. I want a service.name dropdown variable to filter the dashboard.",
-      "expected_output": "Custom-build dashboard with a DYNAMIC variable. The user has explicitly asked for a service.name dropdown. Agent's standard custom-build flow applies (duplicate check, list_templates no match, discovery, MCP resource read, build JSON). CRITICAL guardrail per signoz://dashboard/instructions ('Applying Variables to Panels'): before wiring the service.name variable into panel queries, the agent MUST present the panel list (id+title) and ASK the user which panels the variable should apply to — offering (a) all panels, or (b) a subset. The agent must NOT silently inject $service_name into every panel. In this case the third panel is intentionally a 'global' health panel that should NOT carry the service.name filter (over-filtering would hide the global view). The agent should detect this from the user's wording or, at minimum, ask. Variable is DYNAMIC type, DynamicVariablesAttribute='service.name', DynamicVariablesSource='Traces' or 'All telemetry'. Runs per-panel signoz_execute_builder_query dry-runs, then emits a plain-language summary (no JSON dump) before signoz_create_dashboard, calling out which panels the variable applies to.",
+      "expected_output": "Agent follows the custom-build discovery and resource-read flow, proposes a DYNAMIC service_name variable, lists all three planned panels, and asks whether the variable should apply to all or a subset. It stops before wiring $service_name, dry-running, or creating the dashboard.",
       "expectations": [
-        "Agent creates the variable with type='DYNAMIC' (not CUSTOM/TEXTBOX/QUERY) and DynamicVariablesAttribute='service.name'",
-        "Agent either explicitly asks the user which panels the service.name variable should apply to, OR justifies in the preview which panels it applies to and which it intentionally skips (specifically the 'global system health' panel)",
-        "Variable reference $service_name appears in the filter expression of the per-service request-rate AND latency panels",
-        "Variable reference $service_name does NOT appear in the filter expression of the global error-count panel (over-filtering would defeat the 'across all services' intent)",
-        "Variable references use the $-prefix syntax in filter expressions (e.g. 'service.name in $service_name'), not bare 'service_name'",
-        "Agent emits a plain-language summary (no JSON dump) before signoz_create_dashboard",
-        "Agent runs signoz_execute_builder_query as a per-panel dry-run for every authored panel before signoz_create_dashboard"
+        "Agent proposes type='DYNAMIC' with DynamicVariablesAttribute='service.name'",
+        "Agent explicitly lists the panels and asks which the service.name variable should apply to before wiring any query",
+        "Agent does not wire $service_name into any panel before the user answers",
+        "Agent does not call signoz_execute_builder_query or signoz_create_dashboard before the user answers"
       ],
       "files": []
+    },
+    {
+      "id": 18,
+      "eval_name": "duplicate-dashboard-on-second-page",
+      "prompt": "Create a PostgreSQL dashboard for prod.",
+      "expected_output": "In an offline simulated tool trace using the attached fixture, the first list response has hasMore=true and no PostgreSQL match. Agent follows pagination.nextOffset, finds the existing dashboard on page two, and presents modify / create new / stop before any template lookup or write.",
+      "expectations": [
+        "The simulated trace invokes signoz_list_dashboards again with offset equal to pagination.nextOffset using an accepted integer or string value",
+        "Agent surfaces the second-page PostgreSQL dashboard as a duplicate",
+        "Agent presents modify / create new / stop before signoz_list_dashboard_templates, signoz_import_dashboard, or signoz_create_dashboard",
+        "Agent performs no dashboard write before the user chooses"
+      ],
+      "files": ["evals/files/duplicate-on-second-page.json"]
+    },
+    {
+      "id": 19,
+      "eval_name": "custom-build-variable-application-selected-panels",
+      "prompt": "Apply it to Request Rate by Service and P99 Latency by Service, but keep Global System Health unfiltered.",
+      "expected_output": "Using the prior-turn fixture, agent wires $service_name only into the two selected per-service panel drafts, leaves Global System Health global, and produces an offline simulated dry-run trace for all three complete active queries with the representative variable value. It prepares the plain-language summary but does not create a live dashboard in this offline eval.",
+      "expectations": [
+        "Variable reference $service_name appears in the Request Rate by Service and P99 Latency by Service filters",
+        "Variable reference $service_name does not appear in the Global System Health filter",
+        "Variable references use $service_name in filter expressions rather than bare service_name",
+        "The simulated trace runs signoz_execute_builder_query for every complete active query with service_name=checkoutservice",
+        "Agent prepares a plain-language summary that states which panels the variable filters",
+        "Agent does not call signoz_create_dashboard in the offline eval"
+      ],
+      "files": ["evals/files/service-variable-scope-context.json"]
     }
   ]
 }

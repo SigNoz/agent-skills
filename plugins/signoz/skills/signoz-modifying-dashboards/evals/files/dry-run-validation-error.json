@@ -1,0 +1,9 @@
+{
+  "mode": "offline_mcp_fixture",
+  "instructions": "Use this response to produce an offline simulated tool trace; do not query a live tenant.",
+  "response": {
+    "isError": true,
+    "code": "VALIDATION_FAILED",
+    "message": "query validation error: compositeQuery.queries[0].spec.filter.expression is invalid"
+  }
+}

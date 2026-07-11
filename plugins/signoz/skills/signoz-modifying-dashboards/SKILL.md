@@ -18,7 +18,9 @@ description: >
 ## Prerequisites
 
 This skill calls SigNoz MCP server tools (`signoz_get_dashboard`,
-`signoz_update_dashboard`, `signoz_list_dashboards`, `signoz_list_metrics`).
+`signoz_update_dashboard`, `signoz_list_dashboards`, `signoz_list_metrics`,
+`signoz_get_field_keys`, `signoz_get_field_values`,
+`signoz_execute_builder_query`).
 Before running the workflow, confirm the `signoz_*` tools are available.
 If they are not, the SigNoz MCP server is not installed or configured —
 run `signoz-mcp-setup` first to initialize or repair the MCP connection. Do not
@@ -38,21 +40,16 @@ Use this skill when the user asks to:
 
 Do NOT use when:
 - User wants to understand what a dashboard shows → `signoz-explaining-dashboards`
+- User wants to create a new dashboard → `signoz-creating-dashboards`
 
 ## Instructions
 
 ### Step 1: Identify the target dashboard
 
-Determine which dashboard the user wants to modify. If the user provides a
-dashboard name, UUID, or it is clear from context (e.g., an @mention or auto-context
-providing a dashboard resource), use that.
-
-If the target dashboard is ambiguous:
-1. Call `signoz_list_dashboards` to list existing dashboards. **Paginate through
-   all pages** — check `pagination.hasMore` in the response. If `hasMore` is true,
-   call again with `offset` set to `pagination.nextOffset` and repeat until all
-   pages are exhausted. Never stop at the first page.
-2. Present matching candidates to the user and ask which one to modify.
+Use a UUID supplied directly or by dashboard resource context. A name is not an
+ID: resolve every name-only request with `signoz_list_dashboards`, paginating via
+`pagination.nextOffset` while `pagination.hasMore` is true. If multiple dashboards
+match, present them and ask which one to modify; if one matches, use its UUID.
 
 ### Step 2: Fetch the current dashboard state
 
@@ -84,9 +81,9 @@ Based on the user's request, plan the changes.
 permanently — OK?") takes seconds and prevents irreversible mistakes. User urgency
 does not override this guardrail.
 
-**Non-destructive changes proceed directly:** renaming, adding a single panel,
-changing a unit, adding a variable, changing panel type (the query is preserved),
-adjusting layout, adding thresholds.
+**Non-destructive changes need no destructive confirmation:** renaming, adding a
+panel or variable, changing a unit or panel type, adjusting layout, and adding
+thresholds. Variable additions still require the panel-applicability prompt below.
 
 **Compound modifications:** When a request involves multiple changes (e.g., remove a
 panel + add a panel + rename), plan all changes against the fetched state and apply
@@ -98,34 +95,34 @@ Merge the planned changes into the full dashboard JSON from Step 2.
 
 **Modification rules:**
 
-- **Preserve everything you are not changing.** Copy the entire dashboard object
-  and only modify the specific fields the user asked about. Do not drop widgets,
-  variables, layout items, or panelMap entries that are not part of the change.
+- **Preserve supported mutable state.** Copy the fetched dashboard, change only
+  what the user requested, and compare semantics after MCP normalization. Do not
+  drop unrelated widgets, variables, layout items, or panelMap entries.
+
+- **Read schemas before every update.** Read all required and applicable
+  conditional resources named by `signoz_update_dashboard`. For Query Builder,
+  also read `signoz://metrics-aggregation-guide`,
+  `signoz://traces/query-builder-guide`, or
+  `signoz://logs/query-builder-guide` for the signal. MCP is the source of truth.
 
 - **Adding a panel:**
-  1. Create a new widget with a UUID for its `id` (use `crypto.randomUUID()` format).
-  2. Include **all** required widget fields: `id`, `title`, `description`,
-     `panelTypes`, `query`, `opacity` ("1"), `nullZeroValues` ("zero"),
-     `timePreferance` ("GLOBAL_TIME" — note the deliberate misspelling),
-     `stepSize` (60), `yAxisUnit`, `isStacked` (false), `fillSpans` (false),
-     `isLogScale` (false), `mergeAllActiveQueries` (false), `thresholds` ([]),
-     `softMin` (0), `softMax` (0), `legendPosition` ("bottom"), `columnUnits` ({}),
-     `customLegendColors` ({}), `selectedLogFields` ([]), `selectedTracesFields`
-     ([]), `contextLinks` ({"linksData": []}).
-  3. Add a layout entry with `i` matching the widget ID, and appropriate `x`, `y`,
-     `w`, `h` values in the 12-column grid.
-  4. If the dashboard uses rows, add the panel's layout to the appropriate row's
-     `panelMap[rowId].widgets` array. If the dashboard has no rows (empty
-     `panelMap`), skip panelMap — the panel lives at the top level.
-  5. For query construction, read the `signoz://dashboard/query-builder-example`
-     MCP resource for the v5 builder query format. Use the signal-specific
-     resources as needed (`signoz://dashboard/promql-example`,
-     `signoz://dashboard/clickhouse-*`, `signoz://traces/query-builder-guide`).
-  6. All modified panels are validated below as a hard requirement —
+  1. Build the widget from `signoz://dashboard/widgets-examples`, with a UUID for
+     its `id`.
+  2. Detect rows from `widgets[].panelTypes == "row"`. Unless side-by-side
+     placement is explicit, append at `x: 0`, `y: max(y + h)` only when rowless
+     or targeting the final row. For an earlier row, insert the widget and layout
+     before the next row at `x: 0`, `y: <next row's old y>` (the target row's
+     current bottom), then shift that row and all later top-level and `panelMap`
+     `y` positions down by the new panel's height.
+  3. Add a layout entry whose `i` matches the widget ID and obeys the bounds below.
+     If rows exist, add it to the intended row's `panelMap[rowId].widgets`,
+     creating that entry when absent. An empty `panelMap` does not prove the
+     dashboard is rowless.
+  4. All modified panels are validated below as a hard requirement —
      see the "Dry-run modified panels" step before
      `signoz_update_dashboard` and the "Mandatory dry-run
-     before update" guardrail. Author the JSON here as you intend to
-     save it — the dry-run uses the exact shape from `queryData`.
+     before update" guardrail. Author the saved query semantics first, then use
+     the lossless dry-run translation below.
 
 - **Removing a panel:** Remove the widget from `widgets`, its entry from `layout`,
   and its entry from the parent row's `panelMap.widgets` (if it exists in panelMap).
@@ -142,22 +139,24 @@ Merge the planned changes into the full dashboard JSON from Step 2.
   change the user will only notice after the panel goes empty.
 
 - **Changing panel type:** Update `panelTypes` and handle type-specific fields:
-  - `graph` → `table`: add `columnUnits` ({}) and `columnWidths` ({}) if missing.
-    Graph-only fields like `isStacked`, `fillSpans`, `isLogScale` become inert but
-    are harmless to leave.
-  - `graph`/`table` → `histogram`: add `bucketCount` (30) and `bucketWidth` (0).
-  - Any → `list` (logs): add `selectedLogFields` array.
-  - Any → `list` (traces): add `selectedTracesFields` array.
-  - Keep the existing query intact — the data source and query are independent of
-    the visualization type.
+  follow the target type's complete shape in `widgets-examples`. Preserve the
+  existing query and data source; change only visualization-specific fields.
 
-- **Adding/editing variables:** Add or update entries in the `variables` map. Use
-  OTel attribute names for the underlying attribute (e.g., `service.name`,
-  `deployment.environment.name`). Use DYNAMIC type when the values come from a
-  standard telemetry attribute. Each variable needs a UUID for `id` and `key`.
+- **Adding/editing variables:**
+  1. For ambiguous or version-sensitive attributes, call `signoz_get_field_keys`
+     and optionally `signoz_get_field_values` with the relevant signal and
+     `fieldContext=resource`. Trust the discovered key (for example,
+     `deployment.environment` versus `deployment.environment.name`).
+  2. Show the panel list and ask whether the variable applies to all panels or a
+     selected subset.
+  3. Use a DYNAMIC variable for an attribute-backed dropdown, with a UUID `id`.
+     Keep its human-readable variables-map key and `name` identical.
+  4. Add `$<key>` only to the selected panel filters, preserve unselected panels,
+     and dry-run every query changed by the variable.
 
 - **Rearranging layout / side-by-side placement:**
-  - Dashboard uses a **12-column grid**. `x` ranges 0–11, `w` ranges 1–12.
+  - SigNoz uses a **12-column grid**, never 24: every entry must satisfy
+    `0 <= x < 12`, `1 <= w <= 12`, and `x + w <= 12`.
   - Two panels side-by-side: each gets `w: 6`, first at `x: 0`, second at `x: 6`,
     same `y` and `h`.
   - Three panels in a row: `w: 4` at `x: 0`, `x: 4`, `x: 8`.
@@ -169,21 +168,14 @@ Merge the planned changes into the full dashboard JSON from Step 2.
     top-level `layout` array, apply the same change to the matching entry in
     `panelMap[rowId].widgets`. These are duplicated and must stay consistent.
 
-**Dry-run modified panels (mandatory).** Before
-`signoz_update_dashboard`, call
-`signoz_execute_builder_query` for each modified panel.
-Translate the widget's `builder.queryData[]` / `queryFormulas[]` into
-the endpoint's `queries[].{type, spec}` envelope: each `queryData[i]`
-→ `{ type: "builder_query", spec: { name, signal, filter:
-{expression}, groupBy, aggregations } }`; each `queryFormulas[i]` →
-`{ type: "builder_formula", spec: { name, expression } }`. **Preserve
-the original `name`** (`A`, `B`, …) on every `builder_query.spec` —
-formula expressions reference inputs by that name (e.g., `A * 100 /
-B`), and dropping it makes the dry-run diverge from the saved panel.
-The endpoint cannot consume widget JSON directly. See the "Mandatory
-dry-run before update" guardrail for the conditions, the bool-filter
-footgun, and why this catches what the JSON diff cannot. Server
-error or unexpected empty result = fix the panel JSON before update.
+**Dry-run modified panels (mandatory).** Before `signoz_update_dashboard`, call
+`signoz_execute_builder_query` for each modified query-bearing panel. Build its
+complete payload from the current tool schema; do not pass widget JSON. Translate
+the active Builder, PromQL, or ClickHouse query losslessly into its matching
+envelope, preserving every semantic field and query name (`A`, `B`, `F1`, etc.).
+Supply representative values for referenced dashboard variables. A server error
+or unexpected empty result must be fixed before update, unless the user explicitly
+accepted confirmed missing telemetry.
 
 Call `signoz_update_dashboard` with the dashboard UUID and the **complete** modified
 dashboard JSON.
@@ -199,9 +191,9 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
   to get the current state, merge your changes into that full object, and pass
   the result to `signoz_update_dashboard`. Never construct an update payload from
   scratch.
-- **Preserve what you don't change**: Never drop or overwrite widgets, variables,
-  layout items, or panelMap entries that are outside the scope of the user's request.
-  Diff-and-merge, do not rebuild.
+- **Preserve what you don't change**: Preserve supported mutable semantics for
+  widgets, variables, layout, and panelMap outside the request. Diff-and-merge;
+  do not rebuild or promise byte-for-byte equality after MCP normalization.
 - **Confirm destructive changes**: Before removing panels, replacing queries, or
   deleting variables, confirm with the user — even if they say "just do it" or
   express urgency. Additions, renames, type changes, and variable additions do not
@@ -217,24 +209,22 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
   attribute swap is the worst failure mode for this skill.
 - **Valid JSON only**: Follow the v5 schema documented in the
   `signoz://dashboard/*` MCP resources (`instructions`, `widgets-instructions`,
-  `widgets-examples`, `query-builder-example`). Include all required widget
-  fields (see "Adding a panel" above). Never generate malformed queries or
-  layouts.
-- **OTel attribute names**: Always use OpenTelemetry semantic conventions for
-  attribute names in filters, groupBy, and variables. Use `service.name` not
-  `service`, `host.name` not `host`, `deployment.environment.name` not `env`.
+  `widgets-examples`, `query-builder-example`). Never generate malformed queries
+  or layouts.
+- **OTel attribute names**: Use `service.name` not `service` and `host.name` not
+  `host`, but discover version-sensitive keys such as `deployment.environment`
+  versus `deployment.environment.name` instead of forcing one form.
 - **No metric guessing**: If adding or changing queries and you are not sure what
   metrics are available, ask the user or call `signoz_list_metrics` to discover
   available metrics. Wrong metric names produce empty panels.
 - **Paginate dashboard listing**: When searching for a dashboard by name, always
   paginate through all pages of `signoz_list_dashboards` before concluding a
   dashboard does not exist.
-- **UUIDs for new objects**: Every new widget, layout item, variable, and query
-  needs a unique UUID (`crypto.randomUUID()` format). Never use sequential IDs
-  or short strings.
-- **Scope boundary**: This skill modifies existing dashboards. To create a new
-  dashboard from scratch, point the user at the SigNoz dashboard editor in the
-  UI — there is no creation skill in this plugin yet.
+- **Identifiers**: Use UUIDs for new widget and variable IDs. Reuse the widget ID
+  as `layout.i`; keep each variable map key identical to its human-readable `name`,
+  and keep query names such as `A`, `B`, and `F1` stable.
+- **Scope boundary**: This skill modifies existing dashboards. Hand new-dashboard
+  requests to `signoz-creating-dashboards`.
 
 ## Examples
 
@@ -247,10 +237,12 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
    8 existing panels.
 3. Calls `signoz_list_metrics` to find available Redis error metrics.
 4. Creates a new graph widget (with UUID, all required fields, and a formula query
-   for error rate), adds a layout entry at the next available `y` position, and
-   adds it to the appropriate row's `panelMap`.
-5. Calls `signoz_update_dashboard` with the full modified JSON (all 9 panels).
-6. Reports: "Added an 'Error Rate' graph panel to your Redis Overview dashboard
+   for error rate), appends it below the current layout, and adds it to the
+   appropriate row's `panelMap`.
+5. Dry-runs the new panel with `signoz_execute_builder_query`; fixes any error or
+   unexpected empty result.
+6. Calls `signoz_update_dashboard` with the full modified JSON (all 9 panels).
+7. Reports: "Added an 'Error Rate' graph panel to your Redis Overview dashboard
    under the Overview section. Want me to adjust anything?"
 
 ---
@@ -258,11 +250,12 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
 **User:** "Change the latency panel from a graph to a table on my API dashboard"
 
 **Agent:**
-1. Identifies "API Monitoring" dashboard from context, calls `signoz_get_dashboard`.
+1. Resolves "API Monitoring" through paginated `signoz_list_dashboards`, then calls
+   `signoz_get_dashboard` with its UUID.
 2. Finds the panel titled "Request Latency" — if multiple panels could match,
    confirms with user: "I found 'Request Latency'. Convert that one to a table?"
-3. Changes `panelTypes` from `"graph"` to `"table"`, adds `columnUnits` and
-   `columnWidths` if missing, keeps the query intact.
+3. Changes `panelTypes` from `"graph"` to `"table"`, matches the table shape in
+   `widgets-examples`, and keeps the query intact.
 4. Calls `signoz_update_dashboard` with the full modified JSON (all panels
    preserved).
 5. Reports: "Changed 'Request Latency' from a graph to a table. Want me to adjust
@@ -280,7 +273,7 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
 3. User confirms.
 4. Removes the widget from `widgets`, its layout entry, and its panelMap reference.
    Leaves all other panel positions unchanged (the frontend grid closes gaps
-   automatically). Updates `title` and `name` to "Service Health".
+   automatically). Updates `title` to "Service Health".
 5. Calls `signoz_update_dashboard` with the full modified JSON.
 6. Reports: "Removed the 'CPU Usage' panel and renamed the dashboard to 'Service
    Health'. Anything else to adjust?"

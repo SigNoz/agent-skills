@@ -1,0 +1,43 @@
+{
+  "mode": "offline_conversation_fixture",
+  "instructions": "Treat the eval prompt as the user's reply to the prior applicability question.",
+  "dashboard": {
+    "uuid": "55555555-5555-4555-8555-555555555555",
+    "title": "Kafka",
+    "variables": {},
+    "panels": [
+      {
+        "id": "consumer-lag",
+        "title": "Consumer Lag",
+        "query": {"queryType": "builder", "builder": {"queryData": [{"queryName": "A", "dataSource": "metrics", "expression": "A", "aggregations": [{"metricName": "kafka.consumer_group.lag", "timeAggregation": "latest", "spaceAggregation": "max"}], "filter": {"expression": ""}, "groupBy": []}], "queryFormulas": []}}
+      },
+      {
+        "id": "throughput",
+        "title": "Throughput",
+        "query": {"queryType": "builder", "builder": {"queryData": [{"queryName": "A", "dataSource": "metrics", "expression": "A", "aggregations": [{"metricName": "kafka.consumer_group.messages", "timeAggregation": "rate", "spaceAggregation": "sum"}], "filter": {"expression": ""}, "groupBy": []}], "queryFormulas": []}}
+      },
+      {
+        "id": "broker-health",
+        "title": "Broker Health",
+        "query": {"queryType": "builder", "builder": {"queryData": [{"queryName": "A", "dataSource": "metrics", "expression": "A", "aggregations": [{"metricName": "kafka.broker.active", "timeAggregation": "latest", "spaceAggregation": "sum"}], "filter": {"expression": ""}, "groupBy": []}], "queryFormulas": []}}
+      }
+    ],
+    "layout": [
+      {"i": "consumer-lag", "x": 0, "y": 0, "w": 6, "h": 6},
+      {"i": "throughput", "x": 6, "y": 0, "w": 6, "h": 6},
+      {"i": "broker-health", "x": 0, "y": 6, "w": 12, "h": 3}
+    ],
+    "panelMap": {}
+  },
+  "discovery": {
+    "signal": "metrics",
+    "fieldContext": "resource",
+    "attribute": "deployment.environment",
+    "representativeValue": "prod"
+  },
+  "dryRunResponses": [
+    {"panelId": "consumer-lag", "response": {"isError": false, "rows": 1}},
+    {"panelId": "throughput", "response": {"isError": false, "rows": 1}}
+  ],
+  "priorAgentQuestion": "Apply the environment variable to all panels, or choose a subset: Consumer Lag, Throughput, Broker Health?"
+}

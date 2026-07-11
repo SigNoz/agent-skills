@@ -1,0 +1,55 @@
+{
+  "mode": "offline_conversation_fixture",
+  "instructions": "Treat the eval prompt as the user's reply to the prior applicability question.",
+  "representativeVariables": {"service_name": "checkoutservice"},
+  "draft": {
+    "variable": {
+      "mapKey": "service_name",
+      "name": "service_name",
+      "type": "DYNAMIC",
+      "dynamicVariablesAttribute": "service.name",
+      "dynamicVariablesSource": "Traces"
+    },
+    "panels": [
+      {
+        "id": "request-rate",
+        "title": "Request Rate by Service",
+        "query": {
+          "queryType": "builder",
+          "builder": {
+            "queryData": [{"queryName": "A", "dataSource": "traces", "expression": "A", "aggregations": [{"expression": "count()"}], "filter": {"expression": ""}, "groupBy": [{"key": "service.name", "type": "resource", "dataType": "string"}]}],
+            "queryFormulas": []
+          }
+        }
+      },
+      {
+        "id": "p99-latency",
+        "title": "P99 Latency by Service",
+        "query": {
+          "queryType": "builder",
+          "builder": {
+            "queryData": [{"queryName": "A", "dataSource": "traces", "expression": "A", "aggregations": [{"expression": "p99(duration_nano)"}], "filter": {"expression": ""}, "groupBy": [{"key": "service.name", "type": "resource", "dataType": "string"}]}],
+            "queryFormulas": []
+          }
+        }
+      },
+      {
+        "id": "global-health",
+        "title": "Global System Health",
+        "query": {
+          "queryType": "builder",
+          "builder": {
+            "queryData": [{"queryName": "A", "dataSource": "traces", "expression": "A", "aggregations": [{"expression": "count()"}], "filter": {"expression": "has_error = true"}, "groupBy": []}],
+            "queryFormulas": []
+          }
+        }
+      }
+    ]
+  },
+  "dryRunResponses": [
+    {"panelId": "request-rate", "response": {"isError": false, "rows": 2}},
+    {"panelId": "p99-latency", "response": {"isError": false, "rows": 2}},
+    {"panelId": "global-health", "response": {"isError": false, "rows": 1}}
+  ],
+  "priorAgentQuestion": "Apply service_name to all panels, or choose a subset?"
+}

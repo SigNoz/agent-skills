@@ -107,8 +107,8 @@ create a new one.
 
 Call `signoz_list_dashboards`. Most installs fit in the default
 page (`limit=50`); only paginate when `pagination.hasMore=true`. Use
-string values for `limit` / `offset` (e.g. `"50"`, `"0"`) — the schema
-expects strings, not integers.
+`pagination.nextOffset` directly for the next page; the schema accepts
+integer or string `limit` / `offset` values.
 
 **Match by relevance** Compare each existing
 dashboard's lowercased `name`, `description`, and `tags` against the
@@ -329,6 +329,7 @@ Add signal-specific resources as needed:
   `signoz://metrics-aggregation-guide` — required for picking valid
   `timeAggregation` / `spaceAggregation` per metric type.
 - Traces (Query Builder): `signoz://traces/query-builder-guide`.
+- Logs (Query Builder): `signoz://logs/query-builder-guide`.
 - Traces (ClickHouse): `signoz://dashboard/clickhouse-schema-for-traces`
   + `signoz://dashboard/clickhouse-traces-example`.
 - Logs (ClickHouse): `signoz://dashboard/clickhouse-schema-for-logs`
@@ -341,8 +342,8 @@ semantic attribute names (not shorthand) in filters, groupBy, and
 variables. Apply the defaults below unless the user specified otherwise.
 
 All panels are validated in Step 3b-ii.6 via the mandatory dry-run
-before save. Author the JSON here as you intend to save it — the
-dry-run uses the exact shape from `queryData`.
+before save. Author the saved query semantics first, then use the
+lossless dry-run translation below.
 
 **Defaults the skill applies (and surfaces in the preview):**
 
@@ -357,7 +358,7 @@ dry-run uses the exact shape from `queryData`.
 | Counter render unit (rate vs. count) | per-second rate | per-interval **increase** count over a wider window (24h–7d) for any low-volume / bursty / human-paced counter — requests, **error counts**, restarts, OOM kills — where `/sec` renders as tiny decimals (e.g. `0.03/s`); gauges (CPU/mem/queue depth) are already absolute and unaffected; note `increase` rescales its y-axis with the selected range, so prefer it deliberately, not by reflex |
 | Variables (services) | `service.name`, `deployment.environment` (or `deployment.environment.name` — verify which exists via `signoz_get_field_keys`) | add `k8s.cluster.name` / `k8s.namespace.name` when k8s-flavored |
 | Variables (k8s/infra) | `k8s.cluster.name`, `k8s.namespace.name` (or `host.name` for hostmetrics) | drop `service.name` — it is rarely populated on infra signals |
-| Layout | 2-column grid (`w: 6`), 12 columns wide | full-width (`w: 12`) for tables and time-series with many series |
+| Layout | 2-column grid (`w: 6`), 12 columns wide; every item has `0 <= x < 12`, `1 <= w <= 12`, `x + w <= 12` | full-width (`x: 0, w: 12`) for tables and time-series with many series |
 | GroupBy on per-service panels | `service.name` resource attribute | drop when filtering to a single service |
 
 **Sections and `panelMap`** A section is a `panelTypes: "row"` widget
@@ -365,7 +366,8 @@ followed in `widgets[]` by the panels under it. Mirror that grouping in
 `panelMap`: one entry per row, keyed by the row id, listing only the
 panels that follow it up to the next row. Do not put every panel under
 a single row id — that renders on load but collapses the whole
-dashboard when one section is toggled.
+dashboard when one section is toggled. Each child must match its top-level
+layout entry's `x`, `y`, `w`, and `h` and satisfy the same horizontal bounds.
 
 **Title and description** The dashboard title should name the
 technology and the scope clearly: "PostgreSQL — prod-us-east-1", not
@@ -391,22 +393,14 @@ Call `signoz_execute_builder_query` per panel. The dry-run
 validates the query is well-formed *and* confirms data flows under
 that filter — the per-panel data probe folds in here.
 
-**Envelope translation** Widget JSON wraps queries in
-`compositeQuery.builder.queryData[]` and `queryFormulas[]`, but
-`signoz_execute_builder_query` takes
-`compositeQuery.queries[].{type, spec}`. Translate per panel: each
-`queryData[i]` → `{ type: "builder_query", spec: { name, signal,
-filter: {expression}, groupBy, aggregations } }`; each
-`queryFormulas[i]` → `{ type: "builder_formula", spec: { name,
-expression } }`. **Preserve the original `name`** (`A`, `B`, …) on
-every `builder_query.spec` — formula expressions reference inputs
-by that name (e.g., `A * 100 / B`), and dropping it makes the
-dry-run shape diverge from the saved panel so formulas can't
-resolve their inputs. The endpoint cannot consume widget JSON
-directly.
+Build the complete payload from the current tool schema; do not pass
+widget JSON. Translate the active Builder, PromQL, or ClickHouse query
+losslessly into its matching envelope, preserving every semantic field
+and query name (`A`, `B`, `F1`, etc.). Supply representative values for
+referenced dashboard variables.
 
-Non-empty response = pass; server error, "filter type mismatch", or
-unexpected zero rows = fail (fix the panel JSON before save).
+Server or validation error = fail. Unexpected zero rows also fail,
+unless the user already chose to build despite confirmed missing telemetry.
 
 Coverage: dry-run **every query-bearing panel**, regardless of count
 or shape. Trivial panels fail silently too (wrong severity filter,
@@ -421,13 +415,13 @@ instead and skip them here.
 1. **Preview** Emit a one-paragraph plain-language summary of what
    will be created — no JSON dump. A 20–30 widget payload is hundreds
    of lines the user cannot meaningfully review in chat, and the
-   dry-run has already validated every query-bearing panel against
-   live data.
+   dry-run has already validated every query-bearing panel; data was
+   confirmed except where the user accepted missing telemetry.
 
    > **Summary**: This dashboard tracks [signals] for [scope], with
    > sections [list]. Variables: [list]. Time range default 1h.
-   > Dry-run: all [N] query-bearing panels validated against live
-   > data (any failures have been fixed pre-save).
+   > Dry-run: all [N] query-bearing panels passed validation. Data:
+   > [confirmed / pending ingestion by explicit user choice].
 
 2. **Save** Call `signoz_create_dashboard` with the payload.
 
@@ -462,10 +456,9 @@ instead and skip them here.
   explicitly opted out for this request.
 - **Mandatory dry-run before save on custom builds** Before
   `signoz_create_dashboard`, run
-  `signoz_execute_builder_query` per Step 3b-ii.6 — translate
-  each panel's `builder.queryData[]` / `queryFormulas[]` into the
-  endpoint's `queries[].{type, spec}` envelope (mapping in Step
-  3b-ii.6). Skipping is equivalent to skipping the duplicate check.
+  `signoz_execute_builder_query` per Step 3b-ii.6 using the current
+  tool schema and lossless active-query translation. Skipping is
+  equivalent to skipping the duplicate check.
   The create-dashboard schema accepts queries that 500 at query time
   — a `groupBy` on a numeric attribute, an
   aggregation incompatible with the metric type — and the result

@@ -1,0 +1,40 @@
+{
+  "mode": "offline_mcp_fixture",
+  "instructions": "Treat this as the relevant fetched layout excerpt and simulate the transformation offline; do not assemble or call a live update.",
+  "dashboard": {
+    "uuid": "66666666-6666-4666-8666-666666666666",
+    "title": "Service Health",
+    "widgets": [
+      {"id": "row-overview", "panelTypes": "row", "title": "Overview"},
+      {"id": "request-rate", "panelTypes": "graph", "title": "Request Rate"},
+      {"id": "row-capacity", "panelTypes": "row", "title": "Capacity"},
+      {"id": "cpu", "panelTypes": "graph", "title": "CPU"}
+    ],
+    "layout": [
+      {"i": "row-overview", "x": 0, "y": 0, "w": 12, "h": 1},
+      {"i": "request-rate", "x": 0, "y": 1, "w": 12, "h": 6},
+      {"i": "row-capacity", "x": 0, "y": 7, "w": 12, "h": 1},
+      {"i": "cpu", "x": 0, "y": 8, "w": 12, "h": 6}
+    ],
+    "panelMap": {
+      "row-overview": {"widgets": [{"i": "request-rate", "x": 0, "y": 1, "w": 12, "h": 6}]},
+      "row-capacity": {"widgets": [{"i": "cpu", "x": 0, "y": 8, "w": 12, "h": 6}]}
+    }
+  },
+  "proposedPanel": {
+    "id": "77777777-7777-4777-8777-777777777777",
+    "panelTypes": "graph",
+    "title": "Error Rate",
+    "query": {
+      "queryType": "builder",
+      "builder": {
+        "queryData": [
+          {"queryName": "A", "dataSource": "traces", "expression": "A", "disabled": true, "aggregations": [{"expression": "count()"}], "filter": {"expression": "has_error = true"}, "groupBy": []},
+          {"queryName": "B", "dataSource": "traces", "expression": "B", "disabled": true, "aggregations": [{"expression": "count()"}], "filter": {"expression": ""}, "groupBy": []}
+        ],
+        "queryFormulas": [{"queryName": "F1", "expression": "A / B * 100"}]
+      }
+    }
+  },
+  "dryRunResponse": {"isError": false, "rows": 1}
+}

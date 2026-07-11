@@ -3,27 +3,31 @@
   "evals": [
     {
       "id": 0,
-      "name": "add-panel-to-existing-dashboard",
-      "prompt": "Add a panel showing p99 latency by service to my 'API Monitoring' dashboard. Group by service.name.",
-      "expected_output": "Agent paginates list_dashboards to find 'API Monitoring', fetches it, builds a new graph widget with all required fields and a UUID, places it in the layout (and panelMap if rows exist), preserves all existing panels/variables, and calls update_dashboard with the full state.",
+      "eval_name": "add-panel-to-existing-dashboard",
+      "prompt": "Add a traces panel showing p99 latency by service to my 'API Monitoring' dashboard. Group by service.name.",
+      "expected_output": "Agent resolves 'API Monitoring' to a UUID by paginating dashboard results, fetches it, reads the required dashboard and traces query resources, builds a complete graph widget with a UUID, appends it within the 12-column layout, preserves supported non-target state, and dry-runs the exact query before preparing the full update.",
       "files": [],
-      "assertions": [
+      "expectations": [
         "Updated dashboard has exactly one more widget than original",
-        "New widget has all required v5 fields",
+        "Agent reads the three required dashboard resources plus signoz://dashboard/query-builder-example and signoz://traces/query-builder-guide before authoring the widget",
+        "New widget includes id, panelTypes, title, query, selectedLogFields, selectedTracesFields, thresholds, and contextLinks",
+        "New widget query includes queryType and the complete active Builder payload required by the MCP resources; inactive query payloads need not be authored",
         "New widget's id is a valid UUID",
         "New widget's query uses 'service.name' (OTel naming) in groupBy, not 'service'",
         "Layout has one new entry whose 'i' matches the new widget's id",
-        "All original widgets and variables remain present and unchanged",
+        "When rows exist, the new widget appears exactly once in the intended panelMap row and its x, y, w, h match the top-level layout entry",
+        "All supported non-target widget and variable semantics remain present",
+        "Agent calls signoz_execute_builder_query for the new panel before preparing or calling signoz_update_dashboard, and the translated builder query retains its name A",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
       ]
     },
     {
       "id": 1,
-      "name": "remove-panel-destructive-confirm",
+      "eval_name": "remove-panel-destructive-confirm",
       "prompt": "Get rid of the memory fragmentation widget on my Redis dashboard, just do it quickly.",
       "expected_output": "Despite 'just do it quickly', agent confirms the deletion before applying. On confirmation, removes widget from widgets[], layout entry, and panelMap entry. Leaves other y positions untouched.",
       "files": [],
-      "assertions": [
+      "expectations": [
         "Transcript contains an explicit confirmation question before deletion (despite user's 'just do it quickly')",
         "Updated dashboard has exactly one fewer widget than original",
         "Removed widget's id is absent from widgets[], layout[], and panelMap[*].widgets",
@@ -33,14 +37,15 @@
     },
     {
       "id": 2,
-      "name": "panel-type-graph-to-table",
+      "eval_name": "panel-type-graph-to-table",
       "prompt": "Change the 'Request Latency' panel on my API dashboard from a graph to a table.",
-      "expected_output": "Non-destructive: proceeds without confirmation. Updates panelTypes from 'graph' to 'table', adds columnUnits ({}) and columnWidths ({}) if missing, keeps the query and other widget fields intact, preserves all other panels.",
+      "expected_output": "Non-destructive: proceeds without confirmation. Updates panelTypes from 'graph' to 'table', matches the complete table shape in widgets-examples, keeps the query intact, and preserves all other panels.",
       "files": [],
-      "assertions": [
+      "expectations": [
+        "Agent reads signoz://dashboard/widgets-examples for the target table shape",
         "Target widget's panelTypes is 'table' in updated, was 'graph' in original",
-        "Target widget retains the same query object (deep-equal to original)",
-        "Target widget has both columnUnits and columnWidths keys present",
+        "Target widget retains semantically equivalent active query data, filters, groupings, and query names after normalization",
+        "Target widget matches the complete table shape from signoz://dashboard/widgets-examples",
         "Widget count is identical between original and updated (no add/remove)",
         "Transcript shows no confirmation prompt — non-destructive change proceeded directly",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
@@ -48,28 +53,29 @@
     },
     {
       "id": 3,
-      "name": "compound-add-rename-remove",
+      "eval_name": "compound-add-rename-remove",
       "prompt": "On my 'Service Health' dashboard: rename it to 'Service Health (Production)', remove the CPU Usage panel, and add an Error Rate panel grouped by service.name. Use OTel attribute names.",
       "expected_output": "Agent fetches the dashboard once, plans all three changes against that single state, confirms the destructive removal, and applies all three as a single update. Uses service.name. Preserves untouched widgets/variables/panelMap entries.",
       "files": [],
-      "assertions": [
+      "expectations": [
         "Transcript shows a single confirmation prompt covering the destructive removal of CPU Usage",
-        "Dashboard title (or name) is updated to 'Service Health (Production)'",
+        "Dashboard title is updated to 'Service Health (Production)'",
         "CPU Usage widget is absent from widgets[], layout[], and panelMap",
         "A new Error Rate widget is present with all required v5 fields and groupBy contains 'service.name'",
         "Net widget count equals original count (one removed, one added)",
+        "Agent dry-runs the new Error Rate panel with a lossless full payload that preserves query names A, B, and F1 before preparing the update",
         "Transcript indicates a single planned update_dashboard call (changes batched, not iterative)",
-        "All non-target widgets, variables, and panelMap entries preserved unchanged",
+        "All supported non-target widget, variable, and panelMap semantics are preserved",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
       ]
     },
     {
       "id": 4,
-      "name": "side-by-side-layout",
+      "eval_name": "side-by-side-layout",
       "prompt": "Put the 'CPU' and 'Memory' panels on my host overview dashboard side by side at the top.",
       "expected_output": "Agent moves both panels to same y, w:6 each, x:0 and x:6, equal h. Updates panelMap[rowId].widgets entries to match layout. Preserves rest of dashboard.",
       "files": [],
-      "assertions": [
+      "expectations": [
         "CPU and Memory widgets in layout[] both have w == 6",
         "Their x values are {0, 6} (one each, in some order)",
         "Their y values are equal",
@@ -81,16 +87,100 @@
     },
     {
       "id": 5,
-      "name": "add-environment-variable",
-      "prompt": "Add a deployment environment dropdown variable to my Kafka dashboard so I can filter by env.",
-      "expected_output": "Agent adds a DYNAMIC variable for deployment.environment.name with UUID id and key, valid v5 structure, preserves existing variables, panels, and layout.",
+      "eval_name": "add-environment-variable",
+      "prompt": "Add a deployment environment dropdown to my Kafka dashboard so I can filter it by environment.",
+      "expected_output": "Agent fetches the dashboard, discovers whether the live attribute is deployment.environment or deployment.environment.name, optionally confirms values, lists the current panels, and asks whether the variable should apply to all or a subset. It stops before wiring filters or preparing an update.",
       "files": [],
-      "assertions": [
+      "expectations": [
+        "Agent calls signoz_get_field_keys with the relevant signal and fieldContext=resource and may confirm the chosen key with signoz_get_field_values using the same context",
+        "Agent lists the dashboard panels and asks which should use the variable before changing panel filters",
+        "Agent does not add a variable reference to any panel or call signoz_execute_builder_query before the user answers",
+        "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
+      ]
+    },
+    {
+      "id": 6,
+      "eval_name": "add-panel-below-full-width-grid-regression",
+      "prompt": "My 'API Monitoring' dashboard has an Overview section with exactly one panel: a full-width Overview panel at x:0, y:0, w:12, h:6. Add a p99 latency panel to that section without rearranging the existing panel.",
+      "expected_output": "Agent fetches the complete row-bearing dashboard, leaves the full-width panel unchanged, and adds the p99 panel below it at x:0 and y equal to the maximum y+h from the fetched layout, with a width that keeps x+w within the 12-column grid. It adds the matching layout object to the Overview panelMap row and never assumes a 24-column grid.",
+      "files": [],
+      "expectations": [
+        "Existing Overview panel remains at x:0, y:0, w:12, h:6",
+        "New panel is placed at x:0 and y equals max(y+h) from the fetched layout before the new entry is added",
+        "Every entry in layout[] satisfies 0 <= x < 12, 1 <= w <= 12, and x+w <= 12",
+        "The new panel appears exactly once in the Overview panelMap row and its x, y, w, h matches its top-level layout entry",
+        "Every duplicated panelMap layout entry satisfies the same horizontal bounds and matches its top-level x, y, w, h",
+        "Agent successfully dry-runs the new p99 panel with signoz_execute_builder_query before preparing the update",
+        "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
+      ]
+    },
+    {
+      "id": 7,
+      "eval_name": "target-dashboard-on-second-page",
+      "prompt": "Add an error-rate panel to my 'Payments API' dashboard.",
+      "expected_output": "In an offline simulated tool trace using the attached fixture, the first signoz_list_dashboards response has hasMore=true and no match. Agent follows pagination.nextOffset, finds Payments API there, fetches it, and only then plans the modification.",
+      "files": ["evals/files/target-on-second-page.json"],
+      "expectations": [
+        "Agent does not conclude Payments API is missing after the first page",
+        "The simulated trace invokes signoz_list_dashboards again with offset equal to pagination.nextOffset using an accepted integer or string value",
+        "The simulated trace invokes signoz_get_dashboard only for the second-page Payments API match",
+        "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
+      ]
+    },
+    {
+      "id": 8,
+      "eval_name": "creation-request-handoff",
+      "prompt": "Actually, do not change this dashboard. Create a fresh dashboard for the payments service instead.",
+      "expected_output": "Agent hands the request to signoz-creating-dashboards with the user's intent and does not direct the user to the UI or call update_dashboard.",
+      "files": [],
+      "expectations": [
+        "Agent routes to signoz-creating-dashboards",
+        "Agent does not claim that dashboard creation is unavailable in the plugin",
+        "Agent does not call signoz_update_dashboard"
+      ]
+    },
+    {
+      "id": 9,
+      "eval_name": "dry-run-failure-blocks-update",
+      "prompt": "Add an Error Rate panel to my Service Health dashboard.",
+      "expected_output": "In an offline simulated tool trace using the attached fixture, agent treats the dry-run validation failure as blocking, fixes and re-runs the query when possible or reports it, and never prepares or executes update_dashboard with the failed panel.",
+      "files": ["evals/files/dry-run-validation-error.json"],
+      "expectations": [
+        "Agent does not ignore or downplay the dry-run error",
+        "Agent either corrects and successfully re-runs the exact panel query or stops with the failure explained",
+        "Agent does not call signoz_update_dashboard with a panel whose dry-run failed"
+      ]
+    },
+    {
+      "id": 10,
+      "eval_name": "apply-environment-variable-to-selected-panels",
+      "prompt": "Apply it to Consumer Lag and Throughput, but leave Broker Health global.",
+      "expected_output": "Using the prior-turn fixture, agent reads the required dashboard and metrics-query resources, adds a DYNAMIC deployment_environment variable whose UUID id is distinct from its human-readable map key/name, wires $deployment_environment only into Consumer Lag and Throughput, and produces offline simulated dry-runs with the representative value. It prepares the full supported state but does not update a live dashboard.",
+      "files": ["evals/files/environment-variable-scope-context.json"],
+      "expectations": [
+        "Agent reads the required dashboard resources plus signoz://dashboard/query-builder-example and signoz://metrics-aggregation-guide",
         "variables map in updated has exactly one more entry than original",
-        "New variable's type is 'DYNAMIC'",
-        "New variable's underlying attribute is 'deployment.environment.name' (not 'env', 'environment', or 'deployment.environment')",
-        "New variable has UUID-shaped id and key",
-        "Existing variables, widgets, and layout are untouched",
+        "New variable is DYNAMIC and uses the discovered deployment.environment attribute",
+        "New variable has a UUID-shaped id and its map key and name are both deployment_environment",
+        "Consumer Lag and Throughput filters reference $deployment_environment, while Broker Health does not",
+        "The simulated trace successfully dry-runs both complete changed queries with deployment_environment=prod",
+        "Existing variables, layout, Broker Health, and all unrelated supported state remain semantically unchanged",
+        "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
+      ]
+    },
+    {
+      "id": 11,
+      "eval_name": "add-panel-to-non-final-row",
+      "prompt": "Add an Error Rate panel to the Overview section of my Service Health dashboard.",
+      "expected_output": "Using the fetched-layout fixture, agent reads the required widget and traces query resources, simulates inserting the supplied six-row-high panel before Capacity at x:0,y:7, shifts Capacity and later content down by six, updates panelMap membership/coordinates, and produces the offline simulated dry-run without assembling a live update.",
+      "files": ["evals/files/non-final-row-dashboard.json"],
+      "expectations": [
+        "Agent reads the required dashboard resources plus signoz://dashboard/query-builder-example and signoz://traces/query-builder-guide",
+        "The new widget and layout entry occur after Request Rate and before the Capacity row rather than at the end",
+        "The new layout is x:0,y:7,h:6 and satisfies x+w <= 12",
+        "Capacity moves from y:7 to y:13 in top-level layout; CPU moves from y:8 to y:14 in both top-level layout and panelMap",
+        "Overview panelMap contains Request Rate and the new Error Rate panel only; Capacity panelMap still contains CPU only",
+        "The simulated trace successfully dry-runs the supplied complete Error Rate query before accepting the mutation plan",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
       ]
     }
