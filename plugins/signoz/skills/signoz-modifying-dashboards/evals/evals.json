@@ -118,12 +118,13 @@
       "id": 7,
       "eval_name": "target-dashboard-on-second-page",
       "prompt": "Add an error-rate panel to my 'Payments API' dashboard.",
-      "expected_output": "In an offline simulated tool trace using the attached fixture, the first signoz_list_dashboards response has hasMore=true and no match. Agent follows pagination.nextOffset, finds Payments API there, fetches it, and only then plans the modification.",
+      "expected_output": "In an offline simulated tool trace using the attached fixture, the first signoz_list_dashboards response has hasMore=true and no match. Agent follows pagination.nextOffset, finds Payments API, fetches it, and plans the new panel while preserving Request Rate.",
       "files": ["evals/files/target-on-second-page.json"],
       "expectations": [
         "Agent does not conclude Payments API is missing after the first page",
         "The simulated trace invokes signoz_list_dashboards again with offset equal to pagination.nextOffset using an accepted integer or string value",
         "The simulated trace invokes signoz_get_dashboard only for the second-page Payments API match",
+        "The modification plan preserves the fetched Request Rate widget",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
       ]
     },

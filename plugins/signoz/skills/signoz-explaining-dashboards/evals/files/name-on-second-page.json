@@ -1,6 +1,6 @@
 {
   "mode": "offline_mcp_fixture",
-  "instructions": "Simulate dashboard-name resolution from these paginated list responses before fetching details.",
+  "instructions": "Use these ordered responses to resolve the dashboard and explain the fetched payload offline; do not query a live tenant.",
   "responses": [
     {
       "request": {"limit": 50, "offset": 0},
@@ -14,6 +14,44 @@
       "response": {
         "data": [{"uuid": "22222222-2222-4222-8222-222222222222", "name": "Payments API"}],
         "pagination": {"total": 51, "offset": 50, "limit": 50, "hasMore": false, "nextOffset": -1}
+      }
+    },
+    {
+      "request": {"id": "22222222-2222-4222-8222-222222222222"},
+      "response": {
+        "status": "success",
+        "data": {
+          "uuid": "22222222-2222-4222-8222-222222222222",
+          "title": "Payments API",
+          "description": "Payments API failure monitoring",
+          "tags": ["payments"],
+          "variables": {},
+          "widgets": [
+            {
+              "id": "33333333-3333-4333-8333-333333333333",
+              "panelTypes": "graph",
+              "title": "Failed Payment Spans",
+              "query": {
+                "queryType": "builder",
+                "builder": {
+                  "queryData": [
+                    {
+                      "queryName": "A",
+                      "dataSource": "traces",
+                      "expression": "A",
+                      "aggregations": [{"expression": "count()"}],
+                      "filter": {"expression": "service.name = 'payments' AND has_error = true"},
+                      "groupBy": []
+                    }
+                  ],
+                  "queryFormulas": []
+                }
+              }
+            }
+          ],
+          "layout": [{"i": "33333333-3333-4333-8333-333333333333", "x": 0, "y": 0, "w": 12, "h": 6}],
+          "panelMap": {}
+        }
       }
     }
   ]

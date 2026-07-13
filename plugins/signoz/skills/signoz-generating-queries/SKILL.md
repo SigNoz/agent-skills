@@ -129,9 +129,9 @@ from context (e.g., from a dashboard or @mention), skip redundant discovery.
 - For `signoz_query_metrics`, pass `metricType`, `temporality`, and `isMonotonic`
   from the `signoz_list_metrics` response to avoid an extra auto-fetch round trip.
 - For **Cost Meter**, carry `source=meter` on `signoz_query_metrics` too (signal
-  stays `metrics`); meter data is bucketed hourly, so set `stepInterval: 3600`
-  over a window of at least a few hours. Use `timeAggregation: increase` for
-  ingested volume/count and `rate` only when the user asks for a per-second rate.
+  stays `metrics`). For time series, use `stepInterval: 3600` because meter data
+  is hourly; omit it for scalar totals. Use `timeAggregation: increase` for
+  volume/count and `rate` only for a per-second rate.
 
 ### Step 5: Handle results
 
@@ -250,7 +250,7 @@ from context (e.g., from a dashboard or @mention), skip redundant discovery.
    source: "meter")` finds `signoz.meter.log.size`.
 2. Calls `signoz_query_metrics(metricName: "signoz.meter.log.size",
    source: "meter", timeAggregation: "increase", spaceAggregation: "sum",
-   groupBy: "service.name", stepInterval: 3600, timeRange: "24h",
-   requestType: "scalar", reduceTo: "sum")`.
+   groupBy: "service.name", timeRange: "24h", requestType: "scalar",
+   reduceTo: "sum")`.
 3. Presents per-service ingestion bytes. (Bytes live only in the meter; to slice
    by an attribute it lacks, fall back to a direct count.)

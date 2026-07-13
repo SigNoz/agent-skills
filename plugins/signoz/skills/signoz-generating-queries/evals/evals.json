@@ -40,7 +40,7 @@
       "id": 5,
       "eval_name": "metrics-cost-meter-ingestion-by-service",
       "prompt": "How much log data is each service ingesting?",
-      "expected_output": "Agent recognizes ingestion bytes live only in the Cost Meter store, discovers the metric with signoz_list_metrics source=meter, then calls signoz_query_metrics with source=meter, timeAggregation=increase, spaceAggregation=sum, groupBy=service.name, stepInterval=3600, requestType=scalar, and reduceTo=sum. It reports total ingested bytes rather than hourly buckets or the default per-second rate. If the meter lacks a requested attribute, it falls back to a direct count aggregation and clearly notes that bytes remain meter-only.",
+      "expected_output": "Agent recognizes ingestion bytes live only in the Cost Meter store, discovers the metric with signoz_list_metrics source=meter, then calls signoz_query_metrics with source=meter, timeAggregation=increase, spaceAggregation=sum, groupBy=service.name, requestType=scalar, and reduceTo=sum without stepInterval. It reports total ingested bytes rather than hourly buckets or the default per-second rate. If the meter lacks a requested attribute, it falls back to a direct count aggregation and clearly notes that bytes remain meter-only.",
       "files": []
     }
   ]

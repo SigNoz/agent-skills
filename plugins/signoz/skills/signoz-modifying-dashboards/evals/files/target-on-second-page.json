@@ -15,6 +15,42 @@
         "data": [{"uuid": "44444444-4444-4444-8444-444444444444", "name": "Payments API"}],
         "pagination": {"total": 51, "offset": 50, "limit": 50, "hasMore": false, "nextOffset": -1}
       }
+    },
+    {
+      "request": {"id": "44444444-4444-4444-8444-444444444444"},
+      "response": {
+        "status": "success",
+        "data": {
+          "uuid": "44444444-4444-4444-8444-444444444444",
+          "title": "Payments API",
+          "variables": {},
+          "widgets": [
+            {
+              "id": "55555555-5555-4555-8555-555555555555",
+              "panelTypes": "graph",
+              "title": "Request Rate",
+              "query": {
+                "queryType": "builder",
+                "builder": {
+                  "queryData": [
+                    {
+                      "queryName": "A",
+                      "dataSource": "traces",
+                      "expression": "A",
+                      "aggregations": [{"expression": "rate()"}],
+                      "filter": {"expression": "service.name = 'payments'"},
+                      "groupBy": []
+                    }
+                  ],
+                  "queryFormulas": []
+                }
+              }
+            }
+          ],
+          "layout": [{"i": "55555555-5555-4555-8555-555555555555", "x": 0, "y": 0, "w": 12, "h": 6}],
+          "panelMap": {}
+        }
+      }
     }
   ]
 }

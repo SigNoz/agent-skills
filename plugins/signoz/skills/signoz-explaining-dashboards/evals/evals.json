@@ -58,12 +58,13 @@
       "id": 4,
       "name": "name-resolution-on-second-page",
       "prompt": "Explain my Payments API dashboard.",
-      "expected_output": "Using the offline list fixture, the agent follows pagination.nextOffset after page one, resolves Payments API to its UUID on page two, calls signoz_get_dashboard with that UUID, and only then explains it.",
+      "expected_output": "Using the offline fixture, the agent follows pagination.nextOffset after page one, resolves Payments API to its UUID on page two, calls signoz_get_dashboard with that UUID, and explains the fetched Failed Payment Spans panel.",
       "files": ["evals/files/name-on-second-page.json"],
       "assertions": [
         {"id": "a1", "text": "Agent follows pagination.nextOffset when the first signoz_list_dashboards page has no match"},
         {"id": "a2", "text": "Agent calls signoz_get_dashboard with UUID 22222222-2222-4222-8222-222222222222, never with the name Payments API"},
-        {"id": "a3", "text": "Agent does not explain the dashboard from list metadata alone"}
+        {"id": "a3", "text": "Agent does not explain the dashboard from list metadata alone"},
+        {"id": "a4", "text": "Output explains that Failed Payment Spans counts errored traces for service.name=payments"}
       ]
     }
   ]

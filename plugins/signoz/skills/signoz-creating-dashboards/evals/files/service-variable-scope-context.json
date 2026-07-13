@@ -20,7 +20,7 @@
         "query": {
           "queryType": "builder",
           "builder": {
-            "queryData": [{"queryName": "A", "dataSource": "traces", "expression": "A", "aggregations": [{"expression": "count()"}], "filter": {"expression": ""}, "groupBy": [{"key": "service.name", "type": "resource", "dataType": "string"}]}],
+            "queryData": [{"queryName": "A", "dataSource": "traces", "expression": "A", "aggregations": [{"expression": "count()"}], "filter": {"expression": ""}, "groupBy": [{"key": "service.name", "type": "resource", "dataType": "string"}], "legend": "{{service.name}}"}],
             "queryFormulas": []
           }
         }
@@ -32,7 +32,7 @@
         "query": {
           "queryType": "builder",
           "builder": {
-            "queryData": [{"queryName": "A", "dataSource": "traces", "expression": "A", "aggregations": [{"expression": "p99(duration_nano)"}], "filter": {"expression": ""}, "groupBy": [{"key": "service.name", "type": "resource", "dataType": "string"}]}],
+            "queryData": [{"queryName": "A", "dataSource": "traces", "expression": "A", "aggregations": [{"expression": "p99(duration_nano)"}], "filter": {"expression": ""}, "groupBy": [{"key": "service.name", "type": "resource", "dataType": "string"}], "legend": "{{service.name}}"}],
             "queryFormulas": []
           }
         }
