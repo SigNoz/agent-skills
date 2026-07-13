@@ -1,5 +1,5 @@
 ---
-name: signoz-optimising-telemetry
+name: signoz-reducing-telemetry-cost
 description: >
   Investigate and reduce SigNoz telemetry ingestion cost and metric
   cardinality across metrics, logs, and traces. Find what drives SigNoz
@@ -10,12 +10,12 @@ description: >
   "reduce telemetry volume", "which metrics cost the most", "cardinality
   health check", or "what can I safely drop" — or otherwise asks about
   telemetry spend, ingestion volume, or metric cardinality, even if they
-  don't say "cost" or "optimise" explicitly. Do NOT use for building
+  don't say "cost" or "optimize" explicitly. Do NOT use for building
   dashboards or ad-hoc data queries — use signoz-generating-queries.
 argument-hint: [investigation focus, e.g. "metrics cost" or "cardinality health"]
 ---
 
-# Telemetry Optimise
+# Reduce Telemetry Cost
 
 Find what is driving SigNoz ingestion cost and cardinality, and return safe, specific ways to
 reduce it. The skill reads the Cost Meter to identify the primary cost driver across metrics,
@@ -32,7 +32,7 @@ This skill calls SigNoz MCP server tools heavily (`signoz_execute_builder_query`
 `signoz_list_alert_rules`, `signoz_get_alert`, `signoz_get_service_top_operations`). Before
 running the workflow, confirm the `signoz_*` tools are available. If they are not, the SigNoz
 MCP server is not installed or configured — run `signoz-mcp-setup` first. The whole
-investigation is grounded in these queries; without the server there is nothing to analyse.
+investigation is grounded in these queries; without the server there is nothing to analyze.
 
 Read both reference files before drawing conclusions:
 - `references/otel-attribute-cardinality.md` — classify any metric label you encounter.
@@ -121,9 +121,11 @@ sorted highest-cardinality first, each with `valueCount` and sample `values`. Cl
 - **HIGH but bounded** (`valueCount` ≳ 100) — check whether dashboards/alerts actually filter on
   that label before recommending aggregation.
 
-To reduce cardinality use the `metricstransform` processor (merges series — real reduction), not
-`delete_key` (leaves phantom series, cardinality unchanged). For histograms, reducing bucket
-boundaries cuts samples with little P99 impact. Docs:
+To reduce cardinality use the `metricstransform` processor's `aggregate_labels` action to *merge*
+series (samples are the billable cost, so merging is what actually cuts it) — not the `transform`
+processor's `delete_key`, which leaves the same sample count and creates colliding series. If a
+label is essential to the metric's identity, drop the whole metric or fix it at the SDK instead.
+For histograms, reducing bucket boundaries cuts samples with little P99 impact. Docs:
 https://signoz.io/docs/userguide/drop-metrics/ ·
 https://signoz.io/docs/metrics-management/dropping-metric-labels/
 
@@ -132,11 +134,17 @@ https://signoz.io/docs/metrics-management/dropping-metric-labels/
 Run when logs are the primary driver, or when the user asks about log cost.
 
 **3a. Total + attribution decides the path.**
-- Total log GB: `signoz_execute_builder_query`, `source: "meter"`, `signoz.meter.log.size`, sum
-  (as in Step 1).
-- Service-attributed GB: the same query with `groupBy: [{ "name": "service.name" }]`; sum per
-  service.
-- **Attribution % = attributed ÷ total.** This is a hard branch:
+- Total log GB (the absolute cost figure): `signoz_execute_builder_query`, `source: "meter"`,
+  `signoz.meter.log.size`, sum (as in Step 1).
+- Attribution: run the **same meter query grouped by `service.name`**. This returns one group per
+  service plus an unset/empty-`service.name` group for logs with no attribution. Compute the ratio
+  entirely from THIS grouped result so numerator and denominator share one basis — a grouped sum can
+  differ from the ungrouped total by ~5%, so never divide the grouped attributed sum by the
+  ungrouped total:
+  - attributed GB = sum of the groups with a non-empty `service.name`.
+  - grouped total = sum of *all* groups (including the empty one).
+  - **Attribution % = attributed ÷ grouped total.**
+- This is a hard branch:
   - **≥ 10% → Path A (service mode).**
   - **< 10% → Path B (namespace mode).** Logs come from an infra forwarder (Fluent Bit /
     Fluentd / Vector), not OTel SDKs, so `service.name` isn't set. Path B is a less common
@@ -149,17 +157,20 @@ For each top service by GB:
 - Reducible-dominant + own service code → set `LOG_LEVEL=WARN` (stops generation at source).
 - Reducible-dominant + third-party library → Collector filter on `instrumentation_scope.name`
   (read the scope from a `signoz_search_logs` sample's `scope_name`).
-- No source access → Collector filter on `severity_text`.
+- No source access → Collector filter on `severity_text` matching **only the reducible set**
+  (INFO/DEBUG/TRACE) — never a range that also catches WARN+.
 - High-signal-dominant (WARN/ERROR > 50%) → the logs are worth keeping; a high error rate may be
   a real problem — flag it separately, do not recommend filtering it away.
 
-> **Service severity guard.** Before any "filter INFO/DEBUG" recommendation, compute
-> high-signal % = (all HIGH-SIGNAL severities — ERROR, FATAL, CRITICAL, WARN, **and WARNING** —
-> matched case-insensitively, so `WARNING`/`Warning` count too) ÷ service total. **If it is > 1% (or a
-> non-trivial absolute ERROR/WARN count), do not blanket-filter the service.** Scope the filter
-> to the specific INFO/DEBUG pattern or component, preserve ERROR/WARN, and flag the errors as a
-> real signal. The `LOG_LEVEL=WARN` / `severity_text` recommendations apply cleanly only when a
-> service is essentially all reducible.
+> **Service severity guard.** The fixes above (`LOG_LEVEL=WARN`, or a Collector filter scoped to
+> INFO/DEBUG only) preserve WARN+ by construction, so they are safe first-line actions **regardless
+> of the service's error rate** — recommend them freely. The guard applies only to actions that
+> would *also* drop high-signal logs: a **blanket service drop**, or a `severity_text` filter whose
+> range includes WARN/ERROR/FATAL/CRITICAL. Before recommending one of those, compute high-signal %
+> = (all HIGH-SIGNAL severities — ERROR, FATAL, CRITICAL, WARN, **and WARNING** — matched
+> case-insensitively) ÷ service total. **If it is > 1% (or a non-trivial absolute count), do not
+> take the blanket action** — keep the reduction scoped to INFO/DEBUG and flag the errors as a real
+> signal.
 
 **Path B — namespace mode (< 10%).**
 - Top namespaces: `signoz_aggregate_logs`, `count`,
@@ -202,7 +213,9 @@ all services at once.
 
 **4b. Cost per service + ops per service.** Span GB by service: `signoz_execute_builder_query`,
 `source: "meter"`, `signoz.meter.span.size`, sum, `groupBy: [{ "name": "service.name" }]`.
-Compute the % against the **ungrouped total (all services)**, not a top-N sum. For each top-3
+Compute each service's % against the **grouped total (sum of all service groups from this same
+query)**, not a top-N sum and not the separately-fetched ungrouped total — keep numerator and
+denominator on one grouped basis. For each top-3
 service by GB, get its dominant operations with `signoz_get_service_top_operations` (or
 `signoz_aggregate_traces` with `service: "<svc>"` + `groupBy: "name"`). The op breakdown is
 top-3 for brevity, but the error-rate gate (4c) and the APM guard below apply to **every**

@@ -220,12 +220,18 @@ When uncertain — report the attribute name, its observed cardinality, and the 
 |---------|-----|-------|
 | UNBOUNDED label on existing metric | `metricstransform` processor — aggregate the label away (merges series) | OTel Collector |
 | ACCUMULATING label | Same — `metricstransform` aggregate | OTel Collector |
-| IDENTIFIER label (span.id, trace.id, user.id) | `metricstransform` delete or aggregate | OTel Collector |
+| IDENTIFIER label (span.id, trace.id, user.id) | `metricstransform` `aggregate_labels` to merge series — or stop emitting it as a metric label | OTel Collector / SDK |
 | Raw SQL / stack traces as labels | Instrument correctly — use `db.operation` not `db.query.text` | SDK / instrumentation config |
-| Client port (net.peer.port, client.port) | Drop with `transform` processor `delete_key` — no diagnostic value | OTel Collector |
+| Client port (net.peer.port, client.port) | `metricstransform` `aggregate_labels` to merge series — or stop emitting it at the SDK | OTel Collector / SDK |
 | Too many service instances | `service.instance.id` is expected to be high — only a problem if it contains timestamps/UUIDs that don't reflect real instance count | Check format |
 
-**Important distinction:** Use `metricstransform` (merges series, correct cardinality reduction) not `delete_key` (removes label but leaves phantom series behind — cardinality stays the same).
+**Important — cardinality reduction means fewer samples, and samples are the billable cost.**
+Use the `metricstransform` processor's `aggregate_labels` (or `combine`) action to *merge* the
+series that share the remaining labels — that is what actually cuts the series and sample count.
+Do **not** use the `transform` processor's `delete_key`: removing a label key without merging
+leaves the same number of samples and produces colliding series (SigNoz sums them), so cost does
+not drop. If a label is essential to the metric's identity, drop the whole metric or stop
+emitting the label at the SDK instead.
 
 Docs: https://signoz.io/docs/metrics-management/dropping-metric-labels/
 Docs: https://signoz.io/docs/logs-management/guides/remove-resource-attributes/

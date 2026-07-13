@@ -14,7 +14,7 @@ Cost Meter data lives in the metrics store under `source: "meter"`. Query it wit
 
 Do **not** use `signoz_query_metrics` for Cost Meter totals: it auto-classifies the meter
 metrics (sum / delta / monotonic) and applies an `increase` aggregation, which undercounts the
-true billing total by roughly 6%. `signoz_execute_builder_query` honours the raw builder spec,
+true billing total by roughly 6%. `signoz_execute_builder_query` honors the raw builder spec,
 so `sum` is respected and the figure matches billing.
 
 ## Meter metrics
@@ -64,5 +64,5 @@ or
 
 - GB divisor = 1073741824. "M samples" divisor = 1,000,000.
 - A grouped sum can differ from the ungrouped total by up to ~5% (a known SigNoz aggregation
-  behaviour). Use the ungrouped total for absolute cost figures; use grouped values only for
+  behavior). Use the ungrouped total for absolute cost figures; use grouped values only for
   percentages and ranking.
