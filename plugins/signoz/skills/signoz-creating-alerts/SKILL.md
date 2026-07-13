@@ -210,16 +210,16 @@ For most user intents, the config is one of a small number of patterns:
 **Threshold `op` and `matchType` values.** v2alpha1 accepts the
 human-readable strings (`"above"`, `"on_average"`); the legacy numeric
 codes (`"1"`, `"3"`) are also accepted but harder to read in the UI. Prefer
-the words. **Anomaly rules only support `op: "above"`** — the engine
-already treats z-score breaches as two-sided when the threshold is
-positive, so `"above_or_below"` is rejected and unnecessary.
+the words. Use `op: "above"` for anomaly rules: the anomaly score is already
+an absolute deviation, so this detects both spikes and drops without an
+unsupported `"above_or_below"` operator.
 
 | Comparison | `op` | Evaluation behavior | `matchType` |
 |---|---|---|---|
 | above / exceeds / > | `"above"` | breach at any point | `"at_least_once"` |
 | below / under / < | `"below"` | breach for entire window | `"all_the_times"` |
-| equal / = | `"equals"` | average breaches | `"on_average"` |
-| not equal / != | `"not_equals"` | sum breaches | `"in_total"` |
+| equal / = | `"equal"` | average breaches | `"on_average"` |
+| not equal / != | `"not_equal"` | sum breaches | `"in_total"` |
 |  |  | last value breaches | `"last"` |
 
 **Defaults the skill applies (and surfaces in the preview):**
@@ -283,8 +283,13 @@ schema:
   and notification. The raw counts are intermediate, not the alert
   signal — forgetting this clutters the preview with three series and
   confuses the on-call engineer reading the notification.
-- **p99 latency:** threshold target is in **nanoseconds** (2s →
-  2000000000), `targetUnit: "ns"`.
+- **p99 latency:** the query emits nanoseconds, but express the threshold in
+  the user's unit (for example `target: 2`, `targetUnit: "s"`); SigNoz converts
+  it during evaluation.
+- **Low-traffic percentile guard:** put `count() > N` in the percentile
+  query's `having.expression` and set `stepInterval` to the requested bucket
+  size (for example, `60` for “per minute”). Do not invent comparison operators
+  inside a formula such as `A * (B >= N)`.
 - **Log volume spike:** prefer `groupBy: service.name` over a hard
   filter when the user said "any service" — groupBy provides the
   scoping AND keeps the notification useful per-service.
@@ -356,7 +361,8 @@ the dry-run so any threshold-driven severity changes (warning → critical)
 are settled before the user is asked to pick routing, and so we never
 create a notification channel inline for an alert that fails validation.
 
-1. Call `signoz_list_notification_channels` to enumerate existing channels.
+1. Call `signoz_list_notification_channels` and follow
+   `pagination.nextOffset` while `pagination.hasMore` is true.
 2. If the user named a channel ("send to slack-infra"), use it if it exists;
    if not, fall through.
 3. Otherwise present the user with two options:
@@ -438,7 +444,7 @@ does).
   `signoz_create_alert`. A never-firing alert is *worse* than no
   alert: it provides a false sense of safety.
 - **Threshold operators use canonical words** Prefer `op: "above"` /
-  `"below"` / `"equals"` / `"not_equals"`. Numeric codes (`"1"`–`"7"`)
+  `"below"` / `"equal"` / `"not_equal"`. Numeric codes (`"1"`–`"7"`)
   are accepted but discouraged — same goes for `matchType`
   (`"on_average"` / `"at_least_once"`, not `"3"` / `"1"`).
 - **Signal must match alertType** `signal: "logs"` requires

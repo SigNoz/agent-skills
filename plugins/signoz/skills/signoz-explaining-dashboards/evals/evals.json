@@ -14,8 +14,9 @@
         {"id": "a4", "text": "Output explains the cache hit-rate formula (A / (A + B)) * 100 in plain language"},
         {"id": "a5", "text": "Output gives 'what to watch for' guidance specific to Redis (mentions at least one of: evictions, fragmentation ratio, replication lag, blocked clients, slowlog)"},
         {"id": "a6", "text": "Output flags at least one structural issue: disabled queries on multiple panels, duplicate Cache hit rate panels, or 'Hit rate'/'Cache hit rate' shown as 'value' panel-type instead of graph"},
-        {"id": "a7", "text": "Output does NOT dump raw dashboard JSON or large query objects"},
-        {"id": "a8", "text": "Output ends with concrete next-step offers (e.g., run queries, add panels/thresholds, modify dashboard)"}
+        {"id": "a7", "text": "Agent resolves the dashboard name through paginated signoz_list_dashboards and calls signoz_get_dashboard with the returned UUID, never the name"},
+        {"id": "a8", "text": "Output does NOT dump raw dashboard JSON or large query objects"},
+        {"id": "a9", "text": "Output ends with concrete next-step offers (e.g., run queries, add panels/thresholds, modify dashboard)"}
       ]
     },
     {
@@ -32,7 +33,8 @@
         {"id": "a5", "text": "Output walks through the four value panels (heap used, threads, CPU, classes)"},
         {"id": "a6", "text": "Output mentions the Memory Pool Details table groups by jvm_memory_type and jvm_memory_pool_name"},
         {"id": "a7", "text": "Output mentions that GC Duration uses a rate aggregation (not raw counter)"},
-        {"id": "a8", "text": "Output does NOT dump raw dashboard JSON or large query objects"}
+        {"id": "a8", "text": "Agent resolves the dashboard name through paginated signoz_list_dashboards and calls signoz_get_dashboard with the returned UUID, never the name"},
+        {"id": "a9", "text": "Output does NOT dump raw dashboard JSON or large query objects"}
       ]
     },
     {
@@ -48,7 +50,20 @@
         {"id": "a4", "text": "Output mentions both variables on the dashboard"},
         {"id": "a5", "text": "Output does NOT dump raw dashboard JSON or large query objects"},
         {"id": "a6", "text": "Output is well-organized despite the 65 widgets — does not enumerate every panel as a flat list with no grouping"},
-        {"id": "a7", "text": "Output addresses both parts of the prompt: what to watch AND structural problems/gaps"}
+        {"id": "a7", "text": "Agent resolves the dashboard name through paginated signoz_list_dashboards and calls signoz_get_dashboard with the returned UUID, never the name"},
+        {"id": "a8", "text": "Output addresses both parts of the prompt: what to watch AND structural problems/gaps"}
+      ]
+    },
+    {
+      "id": 4,
+      "name": "name-resolution-on-second-page",
+      "prompt": "Explain my Payments API dashboard.",
+      "expected_output": "Using the offline list fixture, the agent follows pagination.nextOffset after page one, resolves Payments API to its UUID on page two, calls signoz_get_dashboard with that UUID, and only then explains it.",
+      "files": ["evals/files/name-on-second-page.json"],
+      "assertions": [
+        {"id": "a1", "text": "Agent follows pagination.nextOffset when the first signoz_list_dashboards page has no match"},
+        {"id": "a2", "text": "Agent calls signoz_get_dashboard with UUID 22222222-2222-4222-8222-222222222222, never with the name Payments API"},
+        {"id": "a3", "text": "Agent does not explain the dashboard from list metadata alone"}
       ]
     }
   ]

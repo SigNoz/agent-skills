@@ -84,7 +84,7 @@ In the Tier 2 output for each signal, present:
 
 ```
 - p99 latency: 4.1s vs 320ms baseline (+1180%)
-  query: signoz_execute_builder_query — p99(durationNano) on
+  query: signoz_execute_builder_query — p99(duration_nano) on
          service.name = checkout, fire window 14:32-14:40 UTC vs
          baseline 14:32-14:40 UTC (24h prior)
 ```
@@ -114,7 +114,7 @@ Skip baseline comparison and call out the limitation if:
 Tier 3 does not require a baseline — the question is "what happened",
 not "what changed". Run a single fire-window query for each:
 
-- `signoz_search_traces` with the resource filter + `hasError = true`.
+- `signoz_search_traces` with the resource filter + `has_error = true`.
   Cap at 20. Group by `name` (operation) and surface the top 3 by
   count with one representative `trace_id` each.
 - `signoz_search_logs` with the resource filter +

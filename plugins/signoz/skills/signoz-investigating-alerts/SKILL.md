@@ -63,7 +63,7 @@ If the alert name is fuzzy, this skill is **best-effort** (read-only):
    fire, tell me."
 3. Proceed.
 
-If the alert has never fired in the lookback window, **stop**: there is
+If no firing transition exists in the queried lookback window, **stop**: there is
 nothing to investigate. Respond with:
 > "Alert '[name]' has not fired in the last 7d, so there is no fire
 > window to investigate. Use `signoz-explaining-alerts` to walk through
@@ -83,7 +83,10 @@ alerts.
    not given.
 2. Call `signoz_get_alert` for the full rule config — needed to know
    what query, threshold, and resource scope the alert evaluated.
-3. Call `signoz_get_alert_history` with a 7d lookback. From the
+3. Call `signoz_get_alert_history` with a 7d lookback and `order: "desc"`.
+   Paginate with `offset` while a page is full or its completeness note reports
+   `hasMore: true`; stop when the note reports `hasMore: false` or the page is short.
+   pattern analysis needs the full firing/inactive transition set. From the
    response:
    - **Pick the fire window**. Default to the most recent fire. If the
      user passed an explicit time window via `$ARGUMENTS[1]`, honor it.
@@ -101,8 +104,8 @@ threshold tickle or flap) and quantifies the magnitude.
 
 1. Re-run the alert's primary query over a window centered on the fire
    start: `[fire_start - 30m, fire_start + 30m]`.
-   - Use `signoz_execute_builder_query` for builder/formula alerts.
-   - Use `signoz_query_metrics` for PromQL alerts.
+   - Use `signoz_execute_builder_query` for the alert's stored builder,
+     formula, PromQL, or ClickHouse query envelope.
 2. Compute:
    - **Peak value** during the fire window.
    - **Threshold breach magnitude**: `(peak - threshold) / threshold *
@@ -157,7 +160,7 @@ specific failing operations.
 1. **Traces** (if the alert is service-scoped and traces are
    available):
    - Call `signoz_search_traces` for the fire window with filter:
-     `service.name = <scope>` AND `hasError = true`. Cap at top 20.
+     `service.name = <scope>` AND `has_error = true`. Cap at top 20.
    - Group results by `name` (operation) and `error_message`. Surface
      the top 3 by frequency with a representative trace ID for each.
    - Optionally call `signoz_get_trace_details` on one representative
@@ -338,7 +341,7 @@ the full picture. The chip surface is capped; the prose is not.
    - Throughput: -42% (drop).
    - Downstream `payments` error rate: 18% vs 0.2% baseline (+8900%).
    - CPU/memory: flat (no resource pressure).
-5. **Tier 3**: traces for `service.name = checkout, hasError = true`
+5. **Tier 3**: traces for `service.name = checkout, has_error = true`
    in the fire window — top operation `POST /checkout/submit`, top
    error message "context deadline exceeded calling payments-api".
    30 traces, all hitting the same downstream URL. Logs show

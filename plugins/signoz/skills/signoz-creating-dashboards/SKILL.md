@@ -63,7 +63,7 @@ sensible defaults, but a few cannot be guessed:
 | Modify-or-create choice when duplicates exist | yes | ask the user (Step 2) |
 | Resource scope for custom builds (service / namespace / cluster) | yes for custom builds | discover via `signoz_get_field_keys` + `signoz_get_field_values`; fall back to a dashboard variable |
 | Specific metrics / signals for custom builds | inferred | derive from technology + MCP `signoz://dashboard/*` resources; surface in preview |
-| Default time range, refresh, layout | inferred | apply defaults (see "Defaults" below) |
+| Layout | inferred | apply defaults (see "Defaults" below) |
 
 If a required input is missing and cannot be discovered, **stop before
 calling any write tool** and ask the user. The host application decides
@@ -341,6 +341,12 @@ Follow the v5 schema as documented in the resources above. Use OTel
 semantic attribute names (not shorthand) in filters, groupBy, and
 variables. Apply the defaults below unless the user specified otherwise.
 
+Dashboard create/update payloads do not persist a default time range or
+refresh interval. Panels follow the viewer-selected global range. If the user
+asks for a specific window, mention that range in the final handoff instead of
+inventing `timeRange`, `defaultTimeRange`, or `refresh` fields. Do not encode a
+PromQL range selector inside a Builder query.
+
 All panels are validated in Step 3b-ii.6 via the mandatory dry-run
 before save. Author the saved query semantics first, then use the
 lossless dry-run translation below.
@@ -349,8 +355,6 @@ lossless dry-run translation below.
 
 | Field | Default | When to override |
 |---|---|---|
-| Time range | last 1h | longer for capacity planning, shorter for live debugging |
-| Refresh | manual (no auto-refresh) | set 30s–1m only when the user explicitly wants live updates |
 | Section structure (APM/services) | Overview / Latency / Errors / Throughput | domain-specific (e.g. DB: Overview / Connections / Throughput / Slow Queries) |
 | Section structure (infra/runtime) | Overview / Saturation / Errors / Latency | domain-specific |
 | Headline panels (services) | request rate, error rate, p50/p95/p99 latency, throughput | omit those that don't apply |
@@ -419,7 +423,7 @@ instead and skip them here.
    confirmed except where the user accepted missing telemetry.
 
    > **Summary**: This dashboard tracks [signals] for [scope], with
-   > sections [list]. Variables: [list]. Time range default 1h.
+   > sections [list]. Variables: [list].
    > Dry-run: all [N] query-bearing panels passed validation. Data:
    > [confirmed / pending ingestion by explicit user choice].
 

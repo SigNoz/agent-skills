@@ -5,19 +5,22 @@
     "uuid": "55555555-5555-4555-8555-555555555555",
     "title": "Kafka",
     "variables": {},
-    "panels": [
+    "widgets": [
       {
         "id": "consumer-lag",
+        "panelTypes": "graph",
         "title": "Consumer Lag",
         "query": {"queryType": "builder", "builder": {"queryData": [{"queryName": "A", "dataSource": "metrics", "expression": "A", "aggregations": [{"metricName": "kafka.consumer_group.lag", "timeAggregation": "latest", "spaceAggregation": "max"}], "filter": {"expression": ""}, "groupBy": []}], "queryFormulas": []}}
       },
       {
         "id": "throughput",
+        "panelTypes": "graph",
         "title": "Throughput",
         "query": {"queryType": "builder", "builder": {"queryData": [{"queryName": "A", "dataSource": "metrics", "expression": "A", "aggregations": [{"metricName": "kafka.consumer_group.messages", "timeAggregation": "rate", "spaceAggregation": "sum"}], "filter": {"expression": ""}, "groupBy": []}], "queryFormulas": []}}
       },
       {
         "id": "broker-health",
+        "panelTypes": "graph",
         "title": "Broker Health",
         "query": {"queryType": "builder", "builder": {"queryData": [{"queryName": "A", "dataSource": "metrics", "expression": "A", "aggregations": [{"metricName": "kafka.broker.active", "timeAggregation": "latest", "spaceAggregation": "sum"}], "filter": {"expression": ""}, "groupBy": []}], "queryFormulas": []}}
       }

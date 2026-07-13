@@ -121,6 +121,10 @@ instead of hitting collisions mid-build:
   `signoz-explaining-alerts` summarize anything you're inheriting.
 - **Is there a notification channel to reuse?** (Carried into Phase 5.)
 
+Paginate every inventory list until a match is found or all pages are
+exhausted. When a view's `sourcePage` is unknown, search traces, logs, metrics,
+and meter separately.
+
 Learn just enough to decide extend-vs-create per artifact; leave the
 exhaustive listing to the sub-skills.
 
@@ -137,8 +141,8 @@ Collect:
 - **SLO target** — e.g. 99.5% over a 30-day rolling window.
 - **Exclusions** — what doesn't count as a valid event (synthetic
   probes, scanner traffic, streaming endpoints).
-- **Error budget remaining** — derived from target. Drives burn-rate
-  alert math.
+- **Error budget allowance** — `1 - SLO`, derived from the target. Remaining
+  budget additionally requires observed bad/valid events over the SLO window.
 
 Carry these forward — they feed Phase 8 directly. (SLO/burn-rate
 background: `signoz-searching-docs`.)
@@ -205,10 +209,10 @@ rather than guessing.
 **Discover downstream topology from traces, not the human's memory**
 (Phase 1 Q1). The gotcha worth carrying: client spans are
 `kind_string = 'Client'` in the SigNoz v5 schema — *not* `kind`, *not*
-`SPAN_KIND_CLIENT` — so verify the field/value, then group by the
-populated dependency attribute (`external_http_url` / `http_host` for
-HTTP, `db_name` / `db_operation` for databases) to surface every
-downstream the service actually calls, including ones the human forgot.
+`SPAN_KIND_CLIENT` — so verify the field/value, then discover the populated
+dependency attributes with `signoz_get_field_keys`. Current examples include
+`http_url`, `server.address`, `db.system`, and `db.operation`; use only fields
+the tenant actually returns.
 
 **Multi-tenant note** — if the service serves multiple tenants/regions,
 look for a stable non-PII tenant/region attribute (e.g. `tenant.id`,
@@ -318,8 +322,7 @@ category/audience and invoking the sub-skill once per board:
   `k8s`) imported as its own board.
 - **Downstream dependencies:** client-span p99 + error rate per
   dependency — only if the service has external deps (Phase 1 Q1),
-  grouped by the attribute found in Phase 3 (`external_http_url` /
-  `db_name`).
+  grouped by the dependency attribute discovered in Phase 3.
 - **Business / SLO:** the SLI ratio and error budget, with a per-tenant
   breakdown if multi-tenant (Phase 3) — aggregate-only panels hide
   single-tenant outages.

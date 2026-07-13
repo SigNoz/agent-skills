@@ -163,6 +163,7 @@
         "New variable is DYNAMIC and uses the discovered deployment.environment attribute",
         "New variable has a UUID-shaped id and its map key and name are both deployment_environment",
         "Consumer Lag and Throughput filters reference $deployment_environment, while Broker Health does not",
+        "The prepared dashboard mutates widgets and contains no legacy panels field",
         "The simulated trace successfully dry-runs both complete changed queries with deployment_environment=prod",
         "Existing variables, layout, Broker Health, and all unrelated supported state remain semantically unchanged",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
@@ -182,6 +183,17 @@
         "Overview panelMap contains Request Rate and the new Error Rate panel only; Capacity panelMap still contains CPU only",
         "The simulated trace successfully dry-runs the supplied complete Error Rate query before accepting the mutation plan",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
+      ]
+    },
+    {
+      "id": 12,
+      "eval_name": "unsupported-default-range-and-refresh",
+      "prompt": "Set my API Monitoring dashboard's default range to 7 days and auto-refresh it every 30 seconds.",
+      "expected_output": "Agent explains that dashboard update payloads do not persist default time range or refresh settings and that panels follow the viewer-selected global range. It does not add timeRange, defaultTimeRange, or refresh fields and does not call signoz_update_dashboard.",
+      "files": [],
+      "expectations": [
+        "Agent explains that time range and refresh are viewer controls rather than persisted dashboard fields",
+        "Agent does not call signoz_update_dashboard or invent timeRange, defaultTimeRange, or refresh fields"
       ]
     }
   ]

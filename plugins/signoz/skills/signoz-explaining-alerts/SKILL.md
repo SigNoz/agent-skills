@@ -64,7 +64,8 @@ strict — read-only operations are cheap to recover from):
 
 ### Step 1: Resolve the alert
 
-If the user provided a numeric id, skip to Step 2. Otherwise:
+If the user provided a rule ID (UUID or legacy numeric ID), skip to Step 2.
+Otherwise:
 
 1. Call `signoz_list_alert_rules` and **paginate every page** —
    `pagination.hasMore` is true until the full list is walked.
@@ -81,14 +82,17 @@ guesses.
 
 ### Step 3: Pull a one-line fire-frequency summary
 
-Call `signoz_get_alert_history` for the rule with a 7-day lookback. From
-the response, derive a single line:
+Call `signoz_get_alert_history` with a 7-day lookback, `state: "firing"`,
+`order: "desc"`, and a large limit. If a page is full or the response includes
+a completeness note with `hasMore: true`, continue with `offset`; stop when the
+note reports `hasMore: false` or the page is short.
+Derive a single line from the complete set:
 
 > Fired N times in the last 7d (last fire: <relative-time>).
 
 If the alert never fired in the window, say so explicitly:
 "Has not fired in the last 7d." If the alert is disabled, mention that
-and skip the history line.
+separately; disabled rules can still have earlier fires in the lookback.
 
 This single line grounds the explanation. Do **not** drill into specific
 fires here — that's `signoz-investigating-alerts`.
@@ -152,14 +156,17 @@ verify them. Name each `groupBy` dimension and its practical effect
 For **anomaly rules** (`ruleType: anomaly_rule`), explicitly state that
 the threshold is in **standard deviations from the learned pattern, not
 the raw value** — this is the most common point of confusion. Include
-`algorithm` (zscore), `seasonality` (hourly / daily / weekly), and how
+`algorithm` (`standard`, which is z-score based), `seasonality` (hourly /
+daily / weekly), and how
 lower/higher targets shift sensitivity (lower → more noise, higher →
 only extreme deviations).
 
 **2. When it fires** — one paragraph covering threshold + timing.
 Decode the threshold spec into plain English using these mappings:
 
-- `op` codes: `1` above, `2` below, `3` equal, `4` not equal.
+- `op` codes: `1` above, `2` below, `3` equal, `4` not equal, `5`
+  above-or-equal, `6` below-or-equal, `7` outside-bounds
+  (`outside_bounds` in payloads).
 - `matchType` codes: `1` at_least_once (any point in window), `2`
   all_the_times (entire window), `3` on_average (window average), `4`
   in_total (window sum), `5` last (most recent point).
@@ -173,8 +180,8 @@ Describe timing as "checks every `<frequency>` over the last
 `<evalWindow>`", and mention that with `at_least_once` a single-point
 breach triggers, while `all_the_times` requires the full window.
 
-**3. Where it notifies** — channels per tier (resolved by name from
-`signoz_list_notification_channels` if needed), `notificationSettings.groupBy`
+**3. Where it notifies** — channels per tier (resolved by name from the fully
+paginated `signoz_list_notification_channels` result if needed), `notificationSettings.groupBy`
 (how notifications are bundled), `renotify` (interval + which states),
 `usePolicy` (label-based routing). Skip this section entirely if
 notification settings are vanilla and the user already saw the channel
@@ -301,7 +308,7 @@ wrong chips.
    > `pagerduty-oncall`. Fired 3 times in the last 7d (last 2h ago).
    >
    > **What it watches** — traces from `service.name = 'checkout'`.
-   > Query A counts spans with `hasError = true`, query B counts all
+   > Query A counts spans with `has_error = true`, query B counts all
    > spans, F1 = A × 100 / B is the error percentage; the alert
    > triggers on F1.
    >
@@ -355,7 +362,7 @@ wrong chips.
 
 **Agent:**
 1. `signoz_get_alert id=88` → `ruleType: anomaly_rule`,
-   `algorithm=zscore`, `seasonality=daily`, target 3, metric
+   `algorithm=standard` (z-score based), `seasonality=daily`, target 3, metric
    `http.server.request.duration`, scope `service.name = 'api-gateway'`.
 2. History: fired 1 time in last 7d.
 3. Replies:

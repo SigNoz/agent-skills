@@ -17,11 +17,11 @@ runtime.
 
 | Signal | Source | Aggregation | Why it matters |
 |---|---|---|---|
-| Error rate (traces) | traces | `count(hasError = true) * 100 / count()` grouped by service | A sympathetic move here usually points at downstream / upstream cascades. |
-| p95 latency | traces | `p95(durationNano)` filtered to entry spans | Latency moving with errors → resource saturation or downstream slowness. Latency without errors → queue/buffer fill. |
-| p99 latency | traces | `p99(durationNano)` | Catches tail-only regressions invisible to p95. |
-| Throughput (RPS) | traces | `rate(count())` | Drops mean upstream stopped sending. Spikes mean retry storms or load shifts. |
-| Dependency error rate | traces | `count(hasError = true)` filtered to outbound spans, grouped by `db.name` / `peer.service` / target host | Surfaces which downstream the service is failing on. |
+| Error rate (traces) | traces | A=`count()` filtered by `has_error = true`, B=`count()` for the same scope, F1=`A * 100 / B`; group by service | A sympathetic move here usually points at downstream / upstream cascades. |
+| p95 latency | traces | `p95(duration_nano)` filtered to entry spans | Latency moving with errors → resource saturation or downstream slowness. Latency without errors → queue/buffer fill. |
+| p99 latency | traces | `p99(duration_nano)` | Catches tail-only regressions invisible to p95. |
+| Throughput (RPS) | traces | `rate()` | Drops mean upstream stopped sending. Spikes mean retry storms or load shifts. |
+| Dependency error rate | traces | A=`count()` filtered to outbound errors, B=`count()` for all outbound spans, F1=`A * 100 / B`; group by a discovered dependency field | Surfaces which downstream the service is failing on. |
 | Container CPU (if available) | metrics | `system.cpu.utilization` or `container.cpu.utilization` filtered to the same service | Saturation explains latency/error correlation; flat CPU + errors implies a non-resource cause. |
 | Container memory | metrics | `system.memory.usage` / `container.memory.usage` | OOM context, leak detection. |
 | Pod restarts (if k8s) | metrics | `k8s.pod.phase` transitions or `kube_pod_container_status_restarts_total` rate | Restarts during the fire window strongly bias toward "infrastructure caused this". |
@@ -60,7 +60,7 @@ without groupBy), Tier 2 is weaker. Pull:
 
 | Signal | Source | Aggregation |
 |---|---|---|
-| Top services by error rate | traces | `count(hasError = true)` grouped by `service.name`, top 10 |
+| Top services by error rate | traces | A=`count()` filtered by `has_error = true`, B=`count()`, F1=`A * 100 / B`; group by `service.name`, top 10 |
 | Top services by error log volume | logs | `count()` filtered to `severity_text IN ('ERROR','FATAL')`, grouped by `service.name`, top 10 |
 
 This identifies which service drove the global signal, then re-run

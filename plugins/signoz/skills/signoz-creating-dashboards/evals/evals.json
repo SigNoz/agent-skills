@@ -73,17 +73,15 @@
     },
     {
       "id": 7,
-      "eval_name": "custom-build-kafka-consumer-pressure",
+      "eval_name": "template-kafka-consumer-pressure",
       "prompt": "Quick — just build me a Kafka consumer-health dashboard with fetch rate and commit latency, grouped by client. Don't ask a bunch of questions, I'm in the middle of an incident.",
-      "expected_output": "Kafka has NO catalog template (rabbitmq exists but is a different broker). The 'incident pressure + don't ask' phrasing tempts the agent to skip discovery and the no-data probe. Agent MUST still: paginate signoz_list_dashboards; call signoz_list_dashboard_templates (no Kafka match); fall through to custom build; call signoz_list_metrics with searchText='kafka' to discover real metric names (kafka.consumer.fetch_rate, kafka.consumer.commit_latency_avg, kafka.consumer.bytes_consumed_rate, etc.) before authoring; call signoz_get_field_keys with metricName scoped to a kafka.consumer metric to discover per-metric attributes (typically client-id and standard resource attrs like service.name, k8s.pod.name); run the mandatory per-panel dry-run via signoz_execute_builder_query (envelope-translated from the widget JSON, with name preserved on each builder_query.spec) so a no-data or malformed panel isn't shipped. The skill's dry-run-before-save guardrail is non-negotiable even under incident pressure. Must emit plain-language summary (no JSON dump) before signoz_create_dashboard. GroupBy uses the actual attribute the metric carries — accept either 'client-id' (kafkametricsreceiver-style) or 'service.name' resource attribute. Reject shorthand keys like 'client' or 'consumer'.",
+      "expected_output": "Agent still paginates signoz_list_dashboards under incident pressure, then calls signoz_list_dashboard_templates and finds the Kafka Server Monitoring template at kafka/kafka-dashboard.json. It probes kafka metric ingestion, previews the template, and imports it with signoz_import_dashboard rather than custom-building a parallel dashboard. Because the user requested specific consumer panels/grouping, it reports the imported dashboard UUID and hands those customizations to signoz-modifying-dashboards; it does not update inline from the creation skill.",
       "expectations": [
-        "Agent calls signoz_list_dashboard_templates and finds no matching kafka template before custom build",
-        "Agent does NOT skip metric discovery — calls signoz_list_metrics with a kafka-related searchText before authoring panels",
-        "Agent calls signoz_get_field_keys (with signal=metrics and a kafka metric name) or signoz_get_field_values to discover the actual attribute keys carried by the kafka.consumer.* metrics before grouping",
-        "Agent does NOT skip the per-panel dry-run — calls signoz_execute_builder_query for every authored panel before signoz_create_dashboard",
-        "Agent uses the actual attribute key carried by the metric (e.g. 'client-id') or a real resource attribute (e.g. 'service.name', 'k8s.pod.name') for groupBy — not invented shorthand like 'consumer_group' or 'topic'",
-        "Agent emits a plain-language summary (no JSON dump) before calling signoz_create_dashboard",
-        "Agent either calls signoz_create_dashboard with the custom-built payload or produces a complete, ready-to-send JSON payload that contains the discovered metric names, groupBy attribute, and formula panels (acceptable if harness is in simulation mode)",
+        "Agent finds the Kafka Server Monitoring catalog entry with path kafka/kafka-dashboard.json",
+        "Agent probes ingestion with signoz_list_metrics using a kafka-related searchText before import",
+        "Agent calls signoz_import_dashboard with kafka/kafka-dashboard.json and does not call signoz_create_dashboard",
+        "Agent hands the requested fetch-rate, commit-latency, and client-grouping changes to signoz-modifying-dashboards using the imported dashboard UUID",
+        "Agent does not call signoz_update_dashboard inline from the creation skill",
         "Agent does NOT bypass the duplicate check or skip signoz_list_dashboards under the incident-pressure framing"
       ],
       "files": []
@@ -109,16 +107,16 @@
       "id": 9,
       "eval_name": "custom-build-slo-error-budget-formula",
       "prompt": "Build me an SLO dashboard for the checkout service — 99.9% availability target, 28-day rolling window, show error-budget burn rate and remaining budget.",
-      "expected_output": "SLO/error-budget dashboard has no catalog template. Agent paginates signoz_list_dashboards (none). signoz_list_dashboard_templates returns no match. Falls through to custom build. Discovers signoz_calls_total / signoz_latency_bucket span metrics via signoz_list_metrics. Calls signoz_get_field_values for service.name to confirm 'checkoutservice' (or whichever exists). Reads signoz://dashboard/* resources. Builds the dashboard in BUILDER MODE ONLY — never PromQL or ClickHouse-SQL. Panels: (a) availability using formula A*100/B or (1-A/B)*100 where A=signoz_calls_total filtered to status_code='STATUS_CODE_ERROR' and B=signoz_calls_total total; (b) error-budget-remaining as (availability - 99.9) / (1 - 0.999) * 100; (c) burn-rate panels with the MWMB pattern (1h and 6h windows; thresholds ≥14.4x / ≥6x). Time range default overridden to 28d (NOT the default 1h) since SLO windows are long. Filter and groupBy use 'service.name' (dotted, type=resource), NOT 'service_name' (underscore — that's PromQL syntax which this skill forbids). Emits plain-language summary (no JSON dump) before signoz_create_dashboard with the explicit time range, SLO target, error budget in minutes, and formula calls in the summary.",
+      "expected_output": "SLO/error-budget dashboard has no catalog template. Agent paginates signoz_list_dashboards, checks signoz_list_dashboard_templates, discovers span metrics and the checkout service, then builds in Builder mode. With A=error requests and B=total requests, availability is (1-A/B)*100, remaining error budget is ((1-A/B)-0.999)/(1-0.999)*100, and burn rate is (A/B)/(1-0.999). The dashboard payload does not invent timeRange, defaultTimeRange, or refresh fields: panels follow the viewer-selected global range, so the summary tells the user to select 28d after creation. Filters use service.name, and every panel is dry-run before signoz_create_dashboard.",
       "expectations": [
         "Agent calls signoz_list_dashboard_templates and finds no matching SLO/error-budget template before custom build",
         "Agent calls signoz_list_metrics to discover signoz_calls_total or signoz_latency_bucket span metrics (or equivalent) before authoring",
-        "Agent uses a formula combining good and total event counts (e.g. A*100/B, (B-A)/B, or a similar ratio) for the availability or error-budget panel",
-        "Agent overrides the default 1h time range to a longer SLO-appropriate window (28d, 30d, or similarly explicit long range) — acceptable either as a dashboard-level timeRange field or as a query-window (e.g. rate[28d]) override with the preview explicitly noting the non-default window",
+        "Agent computes availability from error and total request counts and uses the 0.1% error-budget allowance consistently in remaining-budget and burn-rate formulas",
+        "Agent does not add timeRange, defaultTimeRange, or refresh fields to the dashboard payload and does not smuggle a PromQL range selector into a Builder query",
         "Agent uses service.name (dotted, OTel resource attribute) in builder-mode filters and variables — not the underscored span-metric label 'service_name' (this skill builds in builder mode only, never PromQL) and not the bare shorthand 'service'",
-        "Agent emits a plain-language summary (no JSON dump) before calling signoz_create_dashboard, surfacing the non-default time range and the formula(s)",
+        "Agent emits a plain-language summary before creation that explains the formulas and tells the user to select the 28d global viewer range",
         "Agent runs signoz_execute_builder_query as a per-panel dry-run for every authored panel before signoz_create_dashboard",
-        "Agent either calls signoz_create_dashboard with the custom-built payload or produces a complete, ready-to-send JSON payload that contains the formula panels, the non-default time range, and the service filter (acceptable if harness is in simulation mode)"
+        "Agent calls signoz_create_dashboard with a complete payload containing the formula panels and service filter"
       ],
       "files": []
     },
@@ -243,7 +241,7 @@
       "prompt": "Create a dashboard for our backend services with three panels: (1) request rate timeseries grouped by service, (2) p99 latency timeseries grouped by service, and (3) a global system health panel showing total error count across all services. I want a service.name dropdown variable to filter the dashboard.",
       "expected_output": "Agent follows the custom-build discovery and resource-read flow, proposes a DYNAMIC service_name variable, lists all three planned panels, and asks whether the variable should apply to all or a subset. It stops before wiring $service_name, dry-running, or creating the dashboard.",
       "expectations": [
-        "Agent proposes type='DYNAMIC' with DynamicVariablesAttribute='service.name'",
+        "Agent proposes type='DYNAMIC' with dynamicVariablesAttribute='service.name'",
         "Agent explicitly lists the panels and asks which the service.name variable should apply to before wiring any query",
         "Agent does not wire $service_name into any panel before the user answers",
         "Agent does not call signoz_execute_builder_query or signoz_create_dashboard before the user answers"
@@ -269,8 +267,9 @@
       "prompt": "Apply it to Request Rate by Service and P99 Latency by Service, but keep Global System Health unfiltered.",
       "expected_output": "Using the prior-turn fixture, agent wires $service_name only into the two selected per-service panel drafts, leaves Global System Health global, and produces an offline simulated dry-run trace for all three complete active queries with the representative variable value. It prepares the plain-language summary but does not create a live dashboard in this offline eval.",
       "expectations": [
-        "Variable reference $service_name appears in the Request Rate by Service and P99 Latency by Service filters",
-        "Variable reference $service_name does not appear in the Global System Health filter",
+        "Variable reference $service_name appears in the Request Rate by Service and P99 Latency by Service filters under draft.widgets",
+        "Variable reference $service_name does not appear in the Global System Health filter under draft.widgets",
+        "The prepared draft uses variables and widgets and contains no singular variable or legacy panels field",
         "Variable references use $service_name in filter expressions rather than bare service_name",
         "The simulated trace runs signoz_execute_builder_query for every complete active query with service_name=checkoutservice",
         "Agent prepares a plain-language summary that states which panels the variable filters",

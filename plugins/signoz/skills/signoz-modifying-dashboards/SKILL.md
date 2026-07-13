@@ -95,6 +95,11 @@ Merge the planned changes into the full dashboard JSON from Step 2.
 
 **Modification rules:**
 
+- **Time range and refresh are viewer controls.** Dashboard update payloads do
+  not persist a default time range or refresh interval. If asked to change one,
+  explain that panels follow the viewer-selected global range; do not invent
+  `timeRange`, `defaultTimeRange`, or `refresh` fields.
+
 - **Preserve supported mutable state.** Copy the fetched dashboard, change only
   what the user requested, and compare semantics after MCP normalization. Do not
   drop unrelated widgets, variables, layout items, or panelMap entries.

@@ -19,7 +19,7 @@
       "id": 2,
       "eval_name": "traces-p99-latency-by-operation",
       "prompt": "What's the p99 latency for cart-service broken down by operation in the last 30 minutes?",
-      "expected_output": "Agent uses signoz_aggregate_traces with aggregation=p99, aggregateOn=durationNano, service=cart-service, groupBy includes operation/name, requestType=scalar, timeRange=30m. Reports top operations by p99.",
+      "expected_output": "Agent uses signoz_aggregate_traces with aggregation=p99, aggregateOn=duration_nano, service=cart-service, groupBy=name, requestType=scalar, timeRange=30m. Reports top operations by p99.",
       "files": []
     },
     {
@@ -40,7 +40,7 @@
       "id": 5,
       "eval_name": "metrics-cost-meter-ingestion-by-service",
       "prompt": "How much log data is each service ingesting?",
-      "expected_output": "Agent recognizes ingestion *bytes* live only in the Cost Meter store, so it uses the metrics signal with source=meter. Discovers the metric via signoz_list_metrics with source=meter (e.g. signoz.meter.log.size) rather than assuming a fixed list, then signoz_query_metrics with source=meter, groupBy service.name, stepInterval 3600 (meter buckets hourly). groupBy works like a normal metric here because service is an attribute the meter retains. Does NOT omit source=meter (which would hit the empty default store). Reports per-service ingested bytes over the window. Understands that slicing by an attribute the meter does not retain would fall back to a direct count aggregation (signoz_aggregate_logs) — bytes are only in the meter.",
+      "expected_output": "Agent recognizes ingestion bytes live only in the Cost Meter store, discovers the metric with signoz_list_metrics source=meter, then calls signoz_query_metrics with source=meter, timeAggregation=increase, spaceAggregation=sum, groupBy=service.name, stepInterval=3600, requestType=scalar, and reduceTo=sum. It reports total ingested bytes rather than hourly buckets or the default per-second rate. If the meter lacks a requested attribute, it falls back to a direct count aggregation and clearly notes that bytes remain meter-only.",
       "files": []
     }
   ]

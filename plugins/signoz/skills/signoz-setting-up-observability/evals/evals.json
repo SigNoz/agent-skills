@@ -12,14 +12,14 @@
       "id": 1,
       "eval_name": "service-with-external-dependencies",
       "prompt": "payments service is fully instrumented and reporting to signoz now. it calls stripe and a postgres db. build me the whole observability setup for it — dashboards + alerts.",
-      "expected_output": "Phase 1 Q1 flags the Stripe + Postgres dependencies. Phase 3 discovers downstream topology FROM TRACES rather than trusting the description — filters client spans by kind_string='Client' (verifies it is not 'kind' / not 'SPAN_KIND_CLIENT') and groups by external_http_url / http_host for Stripe and db_name / db_operation for Postgres. Phase 6 dashboard includes a downstream-dependency row (client-span p99 + error rate per dependency). SLO/SLI captured before design; burn-rate alerts for the SLI; dependency error-rate/latency alerts proposed. Channel confirmed before any rule references it. Hands back IDs. No signoz-writing-clickhouse-queries reference.",
+      "expected_output": "Phase 1 flags Stripe and Postgres, then Phase 3 filters client spans with kind_string='Client' and discovers the tenant's actual dependency fields with signoz_get_field_keys/values. It may find http_url or server.address for Stripe and db.system/db.operation for Postgres, but never hardcodes legacy fields. The downstream dashboard and alerts group by the discovered fields. SLI/SLO and channels are confirmed before creation, and the handoff reports IDs.",
       "files": []
     },
     {
       "id": 2,
       "eval_name": "existing-dashboard-prefer-modify",
       "prompt": "We've got cartservice telemetry flowing. Set up full observability for it — I think there might already be a cart dashboard floating around.",
-      "expected_output": "Phase 1.5 inventory runs FIRST: signoz_list_dashboards (+ get_dashboard) finds the existing cart dashboard, signoz_list_alert_rules and signoz_list_views surface existing artifacts. Surfaces the existing dashboard and prefers extending/modifying it (hands off to signoz-modifying-dashboards) over standing up a parallel duplicate. Still captures SLI/SLO and runs exploration so additions are SLO-aware. Reuses an existing notification channel from signoz_list_notification_channels before creating a new one. Does not silently create a second cart dashboard.",
+      "expected_output": "Phase 1.5 inventory runs first and paginates signoz_list_dashboards, signoz_list_alert_rules, signoz_list_notification_channels, and all four signoz_list_views source pages until matched or exhausted. signoz_get_dashboard confirms the existing cart dashboard, so the workflow hands off to signoz-modifying-dashboards instead of creating a duplicate.",
       "files": []
     },
     {
@@ -33,7 +33,7 @@
       "id": 4,
       "eval_name": "infra-monitoring-join-verification",
       "prompt": "inventory-service runs on our own k8s cluster and is now sending traces + metrics to signoz. set up observability including the pod-level resource stuff (cpu, memory, restarts), full dashboard and alerts.",
-      "expected_output": "Phase 1 Q3 opts into infra monitoring. Phase 3 USE half VERIFIES the metric->service join before building — does not assume service.name is on infra metrics; checks whether host/pod metrics carry host.name / k8s.pod.name / k8s.deployment.name and that k8s.deployment.name matches service.name, via get_field_keys(signal='traces', fieldContext='resource') then get_field_keys(signal='metrics', metricName=...). Scopes the USE row by the CONFIRMED attribute, and asks the user for the workload selector if nothing joins rather than guessing. Dashboard gets both a RED row (service) and a USE row (pod CPU/memory/restarts/network). Cardinality classification (Phase 4) keeps high-card attrs off metric series. Dry-runs panels before save; burn-rate alerts for the SLI plus resource-layer alerts (OOM/restarts). Hands back IDs.",
+      "expected_output": "Phase 1 Q3 opts into infra monitoring. Phase 3 verifies the metric-to-service join with signoz_get_field_keys for traces and metrics, scopes USE panels by the confirmed host/pod/deployment attribute, and asks for a workload selector if nothing joins. The dashboard gets RED and USE coverage, panels are dry-run, and resource plus burn-rate alerts are created before IDs are handed back.",
       "files": []
     }
   ]

@@ -5,7 +5,7 @@
       "id": 0,
       "eval_name": "mcp-path-narrow-language",
       "prompt": "How do I configure the OTLP exporter for a Python application sending traces to SigNoz Cloud?",
-      "expected_output": "Agent calls signoz:signoz_search_docs with the user's natural-language query and section_slug='apm-distributed-tracing' (or similar). Trusts BM25 ranking — does not invent its own keyword scoring. Picks the Python-specific instrumentation guide from top results, calls signoz:signoz_fetch_doc on the canonical URL, and answers with the OTLP endpoint, headers (signoz-ingestion-key), protocol, and a Python code snippet. Cites the canonical https://signoz.io/docs/... URL. Does not fetch unrelated language guides.",
+      "expected_output": "Agent calls signoz_search_docs with the user's natural-language query and section_slug='apm-distributed-tracing' (or similar). Trusts BM25 ranking — does not invent its own keyword scoring. Picks the Python-specific instrumentation guide from top results, calls signoz_fetch_doc on the canonical URL, and answers with the OTLP endpoint, headers (signoz-ingestion-key), protocol, and a Python code snippet. Cites the canonical https://signoz.io/docs/... URL. Does not fetch unrelated language guides.",
       "files": [],
       "assertions": [
         {"id": "uses_mcp_search", "text": "Agent calls signoz_search_docs (MCP tool) rather than only HTTP fetching."},
@@ -35,7 +35,7 @@
       "id": 2,
       "eval_name": "multi-page-alerts-config-and-troubleshoot",
       "prompt": "How do I configure alert rules in SigNoz, and how do I troubleshoot when they fire unexpectedly?",
-      "expected_output": "Agent recognizes the task spans two needs: alert setup AND troubleshooting. Calls signoz:signoz_search_docs with section_slug='alerts' and fetches TWO pages — one on alert configuration, one on alert troubleshooting/debugging. Synthesizes both into a single answer: setup steps first, then debugging guidance. Cites both canonical URLs. Does not pad with loosely-related pages just because they share keywords.",
+      "expected_output": "Agent recognizes the task spans two needs: alert setup AND troubleshooting. Calls signoz_search_docs with section_slug='alerts' and fetches TWO pages — one on alert configuration, one on alert troubleshooting/debugging. Synthesizes both into a single answer: setup steps first, then debugging guidance. Cites both canonical URLs. Does not pad with loosely-related pages just because they share keywords.",
       "files": [],
       "assertions": [
         {"id": "fetches_multiple_pages", "text": "Agent fetches at least 2 distinct docs pages — one on alert configuration, one on troubleshooting."},
@@ -49,7 +49,7 @@
       "id": 3,
       "eval_name": "sub-section-heading-narrow",
       "prompt": "Which authentication header does the SigNoz Cloud ingestion endpoint require, and where do I get its value?",
-      "expected_output": "Agent calls signoz:signoz_search_docs with section_slug='setup' or 'signoz-apis' to find the SigNoz Cloud ingestion / auth page. Calls signoz:signoz_fetch_doc with a heading anchor scoped to the auth/ingestion-key sub-section rather than fetching the whole page. Answers with the canonical header name (signoz-ingestion-key) and where users obtain the value (SigNoz Cloud settings UI). Cites the canonical URL with the section anchor. Does not invent a header name from training memory without grounding in fetched docs.",
+      "expected_output": "Agent calls signoz_search_docs with section_slug='setup' or 'signoz-apis' to find the SigNoz Cloud ingestion / auth page. Calls signoz_fetch_doc with a heading anchor scoped to the auth/ingestion-key sub-section rather than fetching the whole page. Answers with the canonical header name (signoz-ingestion-key) and where users obtain the value (SigNoz Cloud settings UI). Cites the canonical URL with the section anchor. Does not invent a header name from training memory without grounding in fetched docs.",
       "files": [],
       "assertions": [
         {"id": "uses_mcp_search", "text": "Agent calls signoz_search_docs (MCP tool)."},
@@ -64,7 +64,7 @@
       "id": 4,
       "eval_name": "no-heuristic-topic-dashboards",
       "prompt": "How do I create a dashboard panel that shows p99 latency for my metrics?",
-      "expected_output": "Agent recognizes there is no heuristic row for dashboards. Goes directly to signoz:signoz_search_docs with the user's query and section_slug='dashboards'. Does NOT invent a heuristic claim or pretend to follow one. Picks the dashboard panel / metrics query guide from top BM25 results, fetches it, and answers with the panel-builder steps. Cites canonical URL.",
+      "expected_output": "Agent recognizes there is no heuristic row for dashboards. Goes directly to signoz_search_docs with the user's query and section_slug='dashboards'. Does NOT invent a heuristic claim or pretend to follow one. Picks the dashboard panel / metrics query guide from top BM25 results, fetches it, and answers with the panel-builder steps. Cites canonical URL.",
       "files": [],
       "assertions": [
         {"id": "no_false_heuristic", "text": "Agent does NOT claim to follow a heuristic for dashboards (none exists)."},
@@ -79,7 +79,7 @@
       "id": 5,
       "eval_name": "query-builder-howto",
       "prompt": "How do I use the SigNoz query builder to compute p95 latency grouped by service.name?",
-      "expected_output": "Agent calls signoz:signoz_search_docs with section_slug='querying' (no heuristic exists for querying — agent must not invent one). Picks the query builder docs page from BM25 results and fetches it. Answers with the concrete UI steps: choose traces signal, select duration metric, set aggregation to p95, set group-by to service.name. Grounds the answer in fetched docs content. Cites the canonical URL. Does NOT delegate to signoz-generating-queries — this is a docs lookup ('how do I use the query builder'), not query generation.",
+      "expected_output": "Agent calls signoz_search_docs with section_slug='querying' (no heuristic exists for querying — agent must not invent one). Picks the query builder docs page from BM25 results and fetches it. Answers with the concrete UI steps: choose traces signal, select duration metric, set aggregation to p95, set group-by to service.name. Grounds the answer in fetched docs content. Cites the canonical URL. Does NOT delegate to signoz-generating-queries — this is a docs lookup ('how do I use the query builder'), not query generation.",
       "files": [],
       "assertions": [
         {"id": "no_false_heuristic", "text": "Agent does NOT claim to follow a heuristic for querying (none exists)."},
@@ -95,7 +95,7 @@
       "id": 6,
       "eval_name": "no-guessed-cost-meter-url",
       "prompt": "Find the SigNoz docs for the Cost Meter meter explorer query guide and summarize how to use it.",
-      "expected_output": "Agent calls signoz:signoz_search_docs before calling signoz:signoz_fetch_doc, chooses the canonical Cost Meter meter explorer query guide URL returned by search, and fetches that URL. It must not construct or fetch a plausible `/docs/cost-meter/user-guides/meter-explorer-query-guide/` path from memory.",
+      "expected_output": "Agent calls signoz_search_docs before calling signoz_fetch_doc, chooses the canonical Cost Meter meter explorer query guide URL returned by search, and fetches that URL. It must not construct or fetch a plausible `/docs/cost-meter/user-guides/meter-explorer-query-guide/` path from memory.",
       "files": [],
       "assertions": [
         {"id": "search_before_fetch", "text": "Agent calls signoz_search_docs before the first signoz_fetch_doc call."},

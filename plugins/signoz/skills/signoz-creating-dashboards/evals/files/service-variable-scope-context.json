@@ -3,16 +3,19 @@
   "instructions": "Treat the eval prompt as the user's reply to the prior applicability question.",
   "representativeVariables": {"service_name": "checkoutservice"},
   "draft": {
-    "variable": {
-      "mapKey": "service_name",
-      "name": "service_name",
-      "type": "DYNAMIC",
-      "dynamicVariablesAttribute": "service.name",
-      "dynamicVariablesSource": "Traces"
+    "variables": {
+      "service_name": {
+        "id": "44444444-4444-4444-8444-444444444444",
+        "name": "service_name",
+        "type": "DYNAMIC",
+        "dynamicVariablesAttribute": "service.name",
+        "dynamicVariablesSource": "Traces"
+      }
     },
-    "panels": [
+    "widgets": [
       {
         "id": "request-rate",
+        "panelTypes": "graph",
         "title": "Request Rate by Service",
         "query": {
           "queryType": "builder",
@@ -24,6 +27,7 @@
       },
       {
         "id": "p99-latency",
+        "panelTypes": "graph",
         "title": "P99 Latency by Service",
         "query": {
           "queryType": "builder",
@@ -35,6 +39,7 @@
       },
       {
         "id": "global-health",
+        "panelTypes": "graph",
         "title": "Global System Health",
         "query": {
           "queryType": "builder",

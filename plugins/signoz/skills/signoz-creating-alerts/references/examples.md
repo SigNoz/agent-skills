@@ -35,7 +35,7 @@ log-volume groupBy, and anomaly detection.
 2. `signoz_get_field_keys fieldContext=resource signal=traces` confirms
    `service.name`. `signoz_get_field_values` confirms `payments` exists.
 3. No existing payments error-rate alert.
-4. Builds formula alert: query A counts spans with `hasError = true` for
+4. Builds formula alert: query A counts spans with `has_error = true` for
    `service.name = 'payments'`, query B counts all spans for the same
    service, formula F1 = `A * 100 / B`, `selectedQueryName: "F1"`,
    threshold target 5, `targetUnit: "percent"`,
@@ -76,7 +76,7 @@ log-volume groupBy, and anomaly detection.
    `METRIC_BASED_ALERT` + `anomaly_rule`.
 2. `signoz_list_metrics searchText=duration` → finds
    `http.server.request.duration`.
-3. Builds: `anomaly_rule`, `algorithm=zscore`, `seasonality=daily`,
+3. Builds: `anomaly_rule`, `algorithm=standard` (z-score based), `seasonality=daily`,
    threshold target 3 (3 standard deviations), `op: "above"`,
    `matchType: "at_least_once"`.
 4. Channel: user picks slack-api.

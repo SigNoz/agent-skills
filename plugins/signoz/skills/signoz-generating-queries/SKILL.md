@@ -47,7 +47,7 @@ Map the user's intent to the right signal:
 | User intent | Signal | Why |
 |---|---|---|
 | Error rate, latency, throughput, request count | **metrics** (preferred) or **traces** | Metrics are pre-aggregated and fastest. Use traces if the user needs per-request detail or no matching metric exists. |
-| p50/p75/p90/p95/p99 latency | **metrics** (histogram) or **traces** (aggregate on `durationNano`) | Prefer metrics if a histogram metric exists (e.g., `signoz_latency_bucket`). Fall back to trace aggregation. |
+| p50/p75/p90/p95/p99 latency | **metrics** (histogram) or **traces** (aggregate on `duration_nano`) | Prefer metrics if a histogram metric exists (e.g., `signoz_latency_bucket`). Fall back to trace aggregation. |
 | Find specific log entries, error messages, stack traces | **logs** | Text search, pattern matching, severity filtering. |
 | Find specific traces, slow requests, error spans | **traces** | Per-request detail, span attributes, duration filtering. |
 | Infrastructure metrics (CPU, memory, disk, network) | **metrics** | Always metrics for resource utilization. |
@@ -83,7 +83,9 @@ Run discovery calls in parallel where possible:
   For a cost question, query the volume metric (bytes for logs/traces, count
   for metric datapoints) and multiply by the per-unit price from Settings →
   Billing — ask the user for the price if you don't have it.
-- **For traces**: Call `signoz_list_services` to confirm the service name exists.
+- **For traces**: Call `signoz_list_services` to confirm the service name exists,
+  following `pagination.nextOffset` while `pagination.hasMore` is true before
+  declaring it missing.
   Optionally call `signoz_get_service_top_operations` for the service to find
   operation names. Call `signoz_get_field_keys(signal: "traces")` if you need
   to filter on a non-standard attribute.
@@ -105,7 +107,7 @@ from context (e.g., from a dashboard or @mention), skip redundant discovery.
 | Trace search (find matching spans) | `signoz_search_traces` | Finding specific traces/spans. Use `service`, `operation`, `error`, `minDuration`/`maxDuration` shortcuts plus `filter` for field filters. |
 | Log aggregation (count, avg, percentiles) | `signoz_aggregate_logs` | "How many errors?", "error count by service", "p99 response time from logs". Set `requestType` to `scalar` for totals or `time_series` for trends. |
 | Trace aggregation (count, avg, percentiles) | `signoz_aggregate_traces` | "p99 latency for checkout", "error count per operation", "request rate by endpoint". Set `requestType` to `scalar` for totals or `time_series` for trends. |
-| Complex multi-query or formula | `signoz_execute_builder_query` | Only when the simpler tools above cannot express the query — e.g., joining multiple data sources, complex filter expressions, or queries needing the full Query Builder v5 schema. Read `signoz://traces/query-builder-guide` before using. |
+| Complex multi-query or formula | `signoz_execute_builder_query` | Only when simpler tools cannot express it. Read the guide for the actual signal: traces or logs query-builder guide, metrics aggregation guide, or PromQL instructions. |
 
 **`requestType` decision for aggregations:**
 - `scalar` (default): "How many?", "What is the p99?", "Which service has the most?"
@@ -128,7 +130,8 @@ from context (e.g., from a dashboard or @mention), skip redundant discovery.
   from the `signoz_list_metrics` response to avoid an extra auto-fetch round trip.
 - For **Cost Meter**, carry `source=meter` on `signoz_query_metrics` too (signal
   stays `metrics`); meter data is bucketed hourly, so set `stepInterval: 3600`
-  over a window of at least a few hours.
+  over a window of at least a few hours. Use `timeAggregation: increase` for
+  ingested volume/count and `rate` only when the user asks for a per-second rate.
 
 ### Step 5: Handle results
 
@@ -222,7 +225,7 @@ from context (e.g., from a dashboard or @mention), skip redundant discovery.
 
 **Agent:**
 1. Calls `signoz_aggregate_traces(aggregation: "p99",
-   aggregateOn: "durationNano", service: "cart-service",
+   aggregateOn: "duration_nano", service: "cart-service",
    requestType: "scalar", timeRange: "1h")`.
 2. Presents: "p99 latency for cart-service: 1.2s over the last hour."
 3. Offers: "Want me to break this down by operation or show the trend over time?"
@@ -246,6 +249,8 @@ from context (e.g., from a dashboard or @mention), skip redundant discovery.
 1. Bytes by service → Cost Meter. `signoz_list_metrics(searchText: "log",
    source: "meter")` finds `signoz.meter.log.size`.
 2. Calls `signoz_query_metrics(metricName: "signoz.meter.log.size",
-   source: "meter", groupBy: "service.name", stepInterval: 3600, timeRange: "24h")`.
+   source: "meter", timeAggregation: "increase", spaceAggregation: "sum",
+   groupBy: "service.name", stepInterval: 3600, timeRange: "24h",
+   requestType: "scalar", reduceTo: "sum")`.
 3. Presents per-service ingestion bytes. (Bytes live only in the meter; to slice
    by an attribute it lacks, fall back to a direct count.)

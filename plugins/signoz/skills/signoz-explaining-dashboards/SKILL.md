@@ -38,16 +38,14 @@ Do NOT use when:
 
 ### Step 1: Identify the target dashboard
 
-Determine which dashboard the user wants explained. If the user provides a
-dashboard name, UUID, or it is clear from context (e.g., an @mention or
-auto-context providing a dashboard resource), use that.
+Use a supplied UUID or a dashboard resource that includes its UUID directly.
+For any name-only request, call `signoz_list_dashboards` and resolve the name to
+a UUID. **Paginate through all pages** — follow `pagination.nextOffset` while
+`pagination.hasMore` is true. Never pass a dashboard name to
+`signoz_get_dashboard` or conclude it is missing from the first page.
 
-If the target dashboard is ambiguous:
-1. Call `signoz_list_dashboards` to list existing dashboards. **Paginate through
-   all pages** — check `pagination.hasMore` in the response. If `hasMore` is true,
-   call again with `offset` set to `pagination.nextOffset` and repeat until all
-   pages are exhausted. Never stop at the first page.
-2. Present matching candidates to the user and ask which one to explain.
+If multiple dashboards match, present the candidates and ask which one to
+explain.
 
 ### Step 2: Fetch the full dashboard configuration
 

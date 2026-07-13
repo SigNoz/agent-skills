@@ -26,14 +26,14 @@
       "id": 3,
       "eval_name": "anomaly-frontend-request-rate",
       "prompt": "set up anomaly detection for frontend service request rate — alert me if traffic suddenly drops or spikes versus normal patterns. slack #staging-alerts is fine.",
-      "expected_output": "METRIC_BASED_ALERT with anomaly_rule, algorithm=zscore, seasonality=daily or hourly. Uses signoz_calls_total or http.server.request.count metric filtered by service.name='frontend'. Threshold target ~3 (standard deviations), op='above' (anomaly_rule only accepts 'above'; canonical word form preferred over numeric codes). Skips the 'would have fired N times' breach count for anomaly alerts (Z-scores aren't comparable to raw breach counts) but still runs the mandatory signoz_execute_builder_query dry-run to verify the underlying query returns data.",
+      "expected_output": "METRIC_BASED_ALERT with anomaly_rule, algorithm=standard (z-score based), seasonality=daily or hourly. Uses signoz_calls_total or http.server.request.count metric filtered by service.name='frontend'. Threshold target ~3 standard deviations and op='above' because the anomaly score is absolute. Skips the 'would have fired N times' breach count for anomaly alerts but still runs the mandatory signoz_execute_builder_query dry-run to verify the underlying query returns data.",
       "files": []
     },
     {
       "id": 4,
       "eval_name": "formula-gated-p99-with-count-guard",
       "prompt": "alert me when paymentservice p99 latency exceeds 1 second, but ONLY when request count is above 50 per minute — don't want to be paged on low-traffic noise. critical severity, send to both #staging-alerts slack AND 'test pager send resolved' pagerduty.",
-      "expected_output": "TRACES_BASED_ALERT with three queries: A = p99(durationNano) on service.name='paymentservice', B = count() on same filter, F1 = numeric formula that gates p99 by traffic (e.g. F1 = A * (B >= 50) or similar gating expression — exact form depends on alert engine, but skill must explain the gating choice). selectedQueryName='F1'. Threshold target 1000000000 (ns) or appropriate unit, op='above' (canonical word form preferred over numeric codes), critical severity, both channels attached. Runs the mandatory signoz_execute_builder_query dry-run (envelope passes the three queries with names A, B, F1 — name preserved so the formula resolves) before save. Surfaces the gating logic clearly in the plain-language summary.",
+      "expected_output": "TRACES_BASED_ALERT with query A = p99(duration_nano) on service.name='paymentservice', stepInterval=60, and having.expression='count() > 50' to suppress low-traffic one-minute buckets. selectedQueryName='A'. Threshold target 1 with targetUnit='s', op='above', critical severity, and both channels attached. It does not invent a comparison inside a numeric formula. Runs the exact guarded query through signoz_execute_builder_query before save and explains the count guard in the preview.",
       "files": []
     }
   ]
