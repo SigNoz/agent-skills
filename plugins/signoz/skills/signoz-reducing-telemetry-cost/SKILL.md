@@ -42,6 +42,9 @@ Establish the cross-signal cost picture first. Query the Cost Meter with
 `signoz_execute_builder_query` (`source: "meter"`, `timeAggregation: "sum"`) — see
 `references/cost-meter-queries.md` for the exact template, the meter metric names, and the
 unit divisors. Do **not** use `signoz_query_metrics` for Cost Meter totals.
+Report only values returned by successful queries. If a query fails or returns no usable values
+after the MCP tools are available, show the intended query and say that the total could not be
+computed; never invent a total. If the tools are unavailable, follow the prerequisite instead.
 
 For a rolling 7-day window (`end` = now, `start` = end − 7 days), get the per-signal totals
 (span size, log size, metric datapoints), then compute and report:
@@ -98,6 +101,12 @@ highest-cardinality first, each with `valueCount` and sample `values`. Classify 
 - **HIGH but bounded** (`valueCount` ≳ 100) — check whether dashboards/alerts actually filter on
   that label before recommending aggregation.
 
+> **Infra identity override (mandatory).** For a metric protected by
+> `references/infra-do-not-drop.md`, preserve the identity attributes and page metadata used by
+> that metric's Infra entity/view. Do not aggregate or remove entity UID/name attributes when they
+> resolve that entity. Keep `k8s.pod.start_time` on Pod metrics because the Pods page uses it for
+> Pod Age. This overrides the generic ACCUMULATING fixes in the cardinality reference.
+
 To reduce cardinality use the `metricstransform` processor's `aggregate_labels` action to *merge*
 series (samples are the billable cost, so merging is what actually cuts it) — not the `transform`
 processor's `delete_key`, which leaves the same sample count and creates colliding series. If a
@@ -137,23 +146,30 @@ explicitly asks about log cost.
     Fluentd / Vector), not OTel SDKs, so `service.name` isn't set. Path B is a less common
     setup — sanity-check its numbers.
 
+**3b. Analyze the selected attribution path and identify candidate fixes.** The fixes in this
+step are candidates only. Complete the alert check in Step 3c before recommending any log-volume
+reduction, including a source log-level change.
+
 **Path A — service mode (≥ 10%).** Get the severity mix with `signoz_aggregate_logs`,
 `aggregation: count`, `groupBy: "service.name,severity_text"`. Classify severities — REDUCIBLE =
 INFO, INFORMATION, DEBUG, TRACE, VERBOSE; HIGH-SIGNAL = ERROR, FATAL, CRITICAL, WARN, WARNING.
 For each top service by GB:
-- Reducible-dominant + own service code → set `LOG_LEVEL=WARN` (stops generation at source).
-- Reducible-dominant + third-party library → Collector filter on `instrumentation_scope.name`
+- Reducible-dominant + own service code → candidate: set `LOG_LEVEL=WARN` (stops generation at
+  source).
+- Reducible-dominant + third-party library → candidate: Collector filter on
+  `instrumentation_scope.name`
   (read the scope from a `signoz_search_logs` sample's `scope_name`).
-- No source access → Collector filter on `severity_text` matching **only the reducible set**
-  (INFO/DEBUG/TRACE) — never a range that also catches WARN+.
+- No source access → candidate: Collector filter on `severity_text` matching **only the reducible
+  set** (INFO/DEBUG/TRACE) — never a range that also catches WARN+.
 - High-signal-dominant (WARN/ERROR > 50%) → the logs are worth keeping; a high error rate may be
   a real problem — flag it separately, do not recommend filtering it away.
 
-> **Service severity guard.** The fixes above (`LOG_LEVEL=WARN`, or a Collector filter scoped to
-> INFO/DEBUG only) preserve WARN+ by construction, so they are safe first-line actions **regardless
-> of the service's error rate** — recommend them freely. The guard applies only to actions that
-> would *also* drop high-signal logs: a **blanket service drop**, or a `severity_text` filter whose
-> range includes WARN/ERROR/FATAL/CRITICAL. Before recommending one of those, compute high-signal %
+> **Service severity guard.** The candidate fixes above (`LOG_LEVEL=WARN`, or a Collector filter
+> scoped to INFO/DEBUG only) preserve WARN+ by construction, so the severity mix does not block
+> them; Step 3c still determines whether an alert depends on the records. The guard applies only
+> to actions that would *also* drop high-signal logs: a **blanket service drop**, or a
+> `severity_text` filter whose range includes WARN/ERROR/FATAL/CRITICAL. Before recommending one
+> of those, compute high-signal %
 > = (all HIGH-SIGNAL severities — ERROR, FATAL, CRITICAL, WARN, **and WARNING** — matched
 > case-insensitively) ÷ service total. **If it is > 1% (or a non-trivial absolute count), do not
 > take the blanket action** — keep the reduction scoped to INFO/DEBUG and flag the errors as a real
@@ -171,17 +187,18 @@ For each top service by GB:
 
 > **Namespace severity guard.** high-signal % = (all HIGH-SIGNAL severities — ERROR, FATAL,
 > CRITICAL, WARN, **and WARNING** — matched case-insensitively) ÷ namespace
-> total. **If it is > 1% (or a non-trivial absolute count), do not recommend dropping or
+> total. **If it is > 1% (or a non-trivial absolute count), do not consider dropping or
 > filtering the whole namespace.** Scope the filter to the specific noisy pattern (a log
 > category, a `severity_text` match, or a component). Never drop a namespace that carries active
-> errors. Only namespaces that are essentially all INFO/DEBUG are safe to filter wholesale.
+> errors. Only namespaces that are essentially all INFO/DEBUG are wholesale-filter candidates,
+> subject to Step 3c.
 
 - Empty `severity_text` on samples → the forwarder ships raw lines unparsed; the fix is a
   json/regex parser in the OTel Collector log pipeline (without it, severity filtering is
   impossible).
 - `k8s.event.*` logs are often high-volume / low-value → droppable if not alerted on.
 
-**3c. Log alerts — check before any filter recommendation.** `signoz_list_alert_rules`,
+**3c. Log alerts — check before any log-reduction recommendation.** `signoz_list_alert_rules`,
 **paginating through every page** (follow `pagination.nextOffset` until `pagination.hasMore` is
 false — do not stop at the first page, or an alert on a later page is missed and a filter looks
 safe when it isn't). Keep `alertType == "LOGS_BASED_ALERT"`. For each, `signoz_get_alert(id)` and read
@@ -225,14 +242,17 @@ service you consider reducing.
   (HMGET/GET/SET… → ioredis, redis-py, Jedis, go-redis…); unfamiliar gRPC methods. Search first;
   if still unidentified after searching, say so.
 
-**Fix layer.** For a confirmed noise operation, prefer SDK/env disable
-(`OTEL_INSTRUMENTATION_*_ENABLED=false`). This stops generation at source. If no SDK control
-exists, use a Collector filter on the operation name.
+**Fix layer.** For a confirmed noise operation, prefer the deployed SDK or instrumentation
+library's documented disable/exclusion control so generation stops at source. Identify the
+language and library before naming a setting; Java, Python, Node.js, and .NET use different
+controls. If no SDK control exists, use a Collector filter on the operation name.
 
 > **Span → APM guard (mandatory).** Never recommend or configure head, probabilistic, tail, or
-> any other trace sampling as a cost-reduction lever. Sampling changes the spans used to generate
-> the built-in APM/Services metrics and degrades request-rate, latency, and error data. Processor
-> placement does not provide a workaround.
+> any other trace sampling as a cost-reduction lever. When a user asks for sampling, state both
+> effects: the built-in APM/Services metrics cover only retained traces, so absolute request counts
+> and rates undercount real traffic; latency trends and error spikes may remain useful, but the APM
+> page no longer represents all requests. This limited usefulness does not make sampling an allowed
+> lever, and processor placement is not an exception.
 >
 > Use SDK exclusions and Collector filters for confirmed noise. State that the removed operation
 > will disappear from APM before giving a configuration.
@@ -275,8 +295,9 @@ a signal the workflow already analyzed.
   pattern. Fix order: at source (`LOG_LEVEL=WARN`) → Collector scope filter
   (`instrumentation_scope.name`) → `severity_text` filter.
 - **Logs attribution is a hard threshold:** ≥ 10% → Path A; < 10% → Path B. Compute it.
-- **Traces:** never recommend or configure head, probabilistic, tail, or any other sampling. It
-  degrades the built-in APM/Services data regardless of sampling strategy or processor placement.
+- **Traces:** never recommend or configure head, probabilistic, tail, or any other sampling.
+  Sampling limits the built-in APM/Services metrics to retained traces, so absolute request counts
+  and rates no longer represent all traffic.
 - **UNBOUNDED and IDENTIFIER labels are always worth flagging** — the problem is trajectory, not
   just current count.
 - **Never suggest changing retention. Never estimate dollar savings.** Never call a dashboard or

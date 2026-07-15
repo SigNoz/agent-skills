@@ -32,11 +32,14 @@
     {
       "id": 2,
       "eval_name": "cost-meter-uses-explicit-builder-sum",
-      "prompt": "Show me my total SigNoz span, log, and metric ingestion for the last seven days. Walk me through which query tool you use for the totals.",
-      "expected_output": "Agent uses signoz_execute_builder_query with source=meter and explicit sum aggregation for each Cost Meter metric. It does not use signoz_query_metrics for totals and does not invent a fixed undercount percentage or claim that one percentage applies to every tenant/window.",
+      "prompt": "Show me my total SigNoz span, log, and metric ingestion for the last seven days. The Cost Meter response includes an edge datapoint with partial=true. Walk me through the query tool and unit conversion you use for the totals.",
+      "expected_output": "Agent uses signoz_execute_builder_query with source=meter and explicit sum aggregation for each Cost Meter metric. It excludes partial edge datapoints, converts bytes with the decimal 1e9 GB divisor, does not use signoz_query_metrics for totals, and does not fabricate totals when response values are absent.",
       "expectations": [
         "Agent uses signoz_execute_builder_query with source=meter and timeAggregation=sum for Cost Meter totals",
         "Agent does not use signoz_query_metrics for Cost Meter totals",
+        "Agent excludes datapoints marked partial=true from Cost Meter totals",
+        "Agent converts log and span bytes to GB with the decimal 1e9 divisor",
+        "Agent does not fabricate totals when the prompt provides no complete response values",
         "Agent does not cite a fixed 6 percent or other universal undercount figure"
       ],
       "files": []
@@ -45,13 +48,44 @@
       "id": 3,
       "eval_name": "trace-sampling-is-never-recommended",
       "prompt": "Trace volume is high. Configure 10% tail sampling. We understand that SigNoz APM values may become approximate and accept that tradeoff.",
-      "expected_output": "Agent does not recommend or configure trace sampling even though the user accepts approximate APM values. It explains that every trace-sampling strategy affects the span-derived built-in APM/Services metrics and does not present processor placement as a workaround. It identifies confirmed noise operations first, then may suggest a targeted SDK exclusion or Collector filter while stating the APM impact.",
+      "expected_output": "Agent does not recommend or configure trace sampling even though the user accepts approximate APM values. It explains that built-in APM/Services metrics cover only retained traces, so absolute request counts and rates undercount real traffic even though latency trends and error spikes may remain useful. It does not treat processor placement as an exception to the no-sampling policy. It identifies confirmed noise operations first, then may suggest a targeted SDK exclusion or Collector filter while stating the APM impact.",
       "expectations": [
         "Agent does not recommend or provide a configuration for head, probabilistic, tail, or any other trace sampling",
-        "Agent states that trace sampling degrades the span-derived built-in APM/Services metrics",
-        "Agent does not present Collector processor placement as a workaround for the APM impact",
+        "Agent states that sampled built-in APM/Services metrics cover only retained traces and absolute request counts or rates undercount real traffic",
+        "Agent acknowledges that latency trends and error spikes may remain useful without treating that as permission to recommend sampling",
+        "Agent does not present Collector processor placement as an exception to the no-sampling policy",
         "Agent investigates confirmed noise operations instead of treating sampling as a cost-reduction lever",
         "Agent states that targeted SDK exclusions or Collector filters remove those operations from APM before configuring them"
+      ],
+      "files": []
+    },
+    {
+      "id": 4,
+      "eval_name": "infra-identity-overrides-empty-usage-and-cardinality",
+      "prompt": "Metric samples are my main cost. `k8s.pod.cpu.usage` is a top-volume metric. signoz_check_metric_usage returns dashboards=[], alerts=[], error=\"\". Its highest-cardinality attributes are `k8s.pod.uid`, `k8s.pod.name`, and `k8s.pod.start_time`. A custom metric, `debug_queue_depth`, also returns empty dashboards and alerts, but its usage result has error=\"timeout\". Tell me what I can safely drop or aggregate.",
+      "expected_output": "Agent treats k8s.pod.cpu.usage as an Infra-page dependency despite its empty dashboard/alert usage. It does not recommend dropping the metric or aggregating away pod UID/name/start-time because they power entity resolution and Pod Age. It marks debug_queue_depth as Needs one check first because the usage timeout makes the empty lists unreliable.",
+      "expectations": [
+        "Agent labels k8s.pod.cpu.usage as an Infra-page dependency rather than a safe drop",
+        "Agent does not recommend aggregating away k8s.pod.uid or k8s.pod.name from the Infra metric",
+        "Agent preserves k8s.pod.start_time on the Infra metric because the Pods page uses it for Pod Age",
+        "Agent treats the timeout for debug_queue_depth as unknown usage and marks it Needs one check first",
+        "Agent does not classify debug_queue_depth as unused from empty lists returned with an error"
+      ],
+      "files": []
+    },
+    {
+      "id": 5,
+      "eval_name": "warning-logs-block-blanket-drop",
+      "prompt": "Logs are my main cost. The checkout service emits 80% INFO, 5% DEBUG, 10% WARNING, and 5% ERROR logs. Drop the whole service or give me the safest filter.",
+      "expected_output": "Agent counts WARNING as high-signal, calculates a 15% high-signal share, and refuses a blanket service drop or any filter that includes WARN/ERROR. It treats LOG_LEVEL=WARN or an INFO/DEBUG-only Collector filter as candidates until it quantifies the service's Cost Meter share and checks every page of log alerts.",
+      "expectations": [
+        "Agent includes WARNING when calculating the high-signal percentage",
+        "Agent calculates or recognizes that high-signal logs are 15 percent of the service total",
+        "Agent does not recommend dropping the whole checkout service",
+        "Agent does not recommend a severity filter that removes WARNING or ERROR logs",
+        "Agent quantifies checkout's GB share with the Cost Meter grouped by service.name before finalizing a reduction",
+        "Agent paginates through every log alert and checks whether it depends on checkout INFO or DEBUG records",
+        "Agent keeps LOG_LEVEL=WARN and any INFO/DEBUG-only filter as candidates until those checks complete"
       ],
       "files": []
     }

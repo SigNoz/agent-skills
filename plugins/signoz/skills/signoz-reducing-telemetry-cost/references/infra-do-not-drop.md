@@ -5,7 +5,7 @@
 - Hosts view — families
 - Kubernetes view — enumerated names + workload/volume/namespace/cluster families
 - APM / Services page — span-derived `signoz_*` RED metrics
-- Required attributes (resolution / filtering)
+- Required attributes and page metadata (resolution / filtering)
 - Why the do-not-drop list matters
 - Caveat / discrepancy to keep in mind
 
@@ -42,7 +42,7 @@ Entity resolution (critical — missing = entities don't resolve / click errors)
 - `k8s.pod.cpu.usage`, `k8s.node.cpu.usage`
 Pods: `k8s.pod.cpu.usage`, `k8s.pod.cpu_request_utilization`, `k8s.pod.cpu_limit_utilization`,
   `k8s.pod.memory_request_utilization`, `k8s.pod.memory_limit_utilization`, `k8s.pod.memory.usage`,
-  `k8s.pod.uptime`, `k8s.pod.start_time`, `k8s.pod.status_reason`
+  `k8s.pod.uptime`, `k8s.pod.status_reason`
 Containers: `container.cpu.usage`, `container.uptime`,
   `k8s.container.cpu_request_utilization`, `k8s.container.cpu_limit_utilization`,
   `k8s.container.memory_request_utilization`, `k8s.container.memory_limit_utilization`
@@ -78,20 +78,25 @@ calls, external calls) query ONLY these span-derived metrics:
   them as ordinary metrics — normal usage-check applies; if unused and not in a dashboard/alert
   they are genuinely droppable (histograms: trim buckets rather than hard-drop). No special APM
   protection.
-- **Trace-layer dependency:** because these RED metrics are generated from spans, head,
-  probabilistic, tail, and other trace sampling degrades the built-in APM/Services data. Never
-  recommend trace sampling as a cost-reduction lever; processor placement is not a workaround.
+- **Trace-layer dependency:** because these RED metrics are generated from spans, trace sampling
+  limits the built-in APM/Services metrics to retained traces. Absolute request counts and rates
+  undercount real traffic; latency trends and error spikes may remain useful. Never recommend
+  trace sampling as a cost-reduction lever.
   Targeted SDK exclusions and Collector filters also remove those operations from APM, so state
   that impact before recommending them. Dropping the `signoz_*` metrics themselves breaks APM
   entirely. Treat that as a separate lever.
 
-## Required attributes (not metrics, but do-not-drop for resolution/filtering)
+## Required attributes and page metadata (not metrics)
 - Hosts: `host.name` (required — missing = host not clickable), `host.id` (fallback)
-- Kubernetes: each entity's `.uid` + `.name` — `k8s.pod.uid`/`k8s.pod.name`,
+- Kubernetes entity resolution: each entity's `.uid` + `.name` —
+  `k8s.pod.uid`/`k8s.pod.name`,
   `k8s.node.uid`/`k8s.node.name`, `k8s.deployment.name`, `k8s.namespace.name`,
   `k8s.statefulset.name`, `k8s.daemonset.name`, `k8s.job.name`, `k8s.cronjob.name`,
-  `k8s.container.name`, `k8s.pod.ip`, `k8s.volume.type`, `container.id`.
+  and `k8s.container.name`. Container rows use `k8s.pod.uid` + `k8s.container.name`, not
+  `container.id`.
   Missing UID → clicking the entity raises an internal error.
+- Kubernetes page metadata: keep `k8s.pod.start_time` (Pod Age) and `k8s.pod.ip` on Pod metrics;
+  keep `k8s.volume.type` on volume metrics.
 
 ## Why the do-not-drop list matters
 `signoz_check_metric_usage` does a real dashboard/alert lookup, so it correctly reports these

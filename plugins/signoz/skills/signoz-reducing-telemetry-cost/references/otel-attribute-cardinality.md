@@ -107,10 +107,10 @@ For each attribute: profile, why it matters, and what to do about it.
 
 | Attribute | Profile | Notes | Fix |
 |-----------|---------|-------|-----|
-| `k8s.pod.uid` | ACCUMULATING | New UID per pod restart. Accumulates over time — 7-day window captures every pod that ever ran, not just current pods | Exclude from cardinality scoring; aggregate away with metricstransform |
-| `k8s.pod.name` | ACCUMULATING | Pod names with random suffixes change on every restart/deploy. Same accumulation problem as pod.uid | Same fix |
-| `k8s.pod.start_time` | ACCUMULATING | Timestamp of pod start. Unique per pod lifecycle | Drop entirely |
-| `container.id` | ACCUMULATING | Container runtime ID. New per restart | Aggregate away |
+| `k8s.pod.uid` | ACCUMULATING | New UID per pod restart. Accumulates over time — 7-day window captures every pod that ever ran, not just current pods | Keep on Infra-page metrics; on unrelated custom metrics, aggregate only after identity and usage review |
+| `k8s.pod.name` | ACCUMULATING | Pod names with random suffixes change on every restart/deploy. Same accumulation problem as pod.uid | Keep on Infra-page metrics; apply the generic fix only to unrelated custom metrics |
+| `k8s.pod.start_time` | ACCUMULATING | Timestamp of pod start. Unique per pod lifecycle; the Pods page uses it for Pod Age | Keep on Pod Infra metrics; remove from unrelated custom metrics only after usage review |
+| `container.id` | ACCUMULATING | Container runtime ID. New per restart; current Infra container identity uses `k8s.pod.uid` + `k8s.container.name` | Aggregate away after usage review |
 | `k8s.namespace.name` | BOUNDED | Namespace. Fixed small set in most deployments | Safe |
 | `k8s.deployment.name` | BOUNDED | Deployment name. Fixed set | Safe |
 | `k8s.statefulset.name` | BOUNDED | StatefulSet name. Fixed set | Safe |
@@ -216,6 +216,9 @@ When uncertain — report the attribute name, its observed cardinality, and the 
 
 ## Fix reference
 
+For Infra-page metric families, the required identity attributes and page metadata in
+`infra-do-not-drop.md` override the generic fixes below.
+
 | Problem | Fix | Where |
 |---------|-----|-------|
 | UNBOUNDED label on existing metric | `metricstransform` processor — aggregate the label away (merges series) | OTel Collector |
@@ -226,7 +229,7 @@ When uncertain — report the attribute name, its observed cardinality, and the 
 | Too many service instances | `service.instance.id` is expected to be high — only a problem if it contains timestamps/UUIDs that don't reflect real instance count | Check format |
 
 **Important — cardinality reduction means fewer samples, and samples are the billable cost.**
-Use the `metricstransform` processor's `aggregate_labels` (or `combine`) action to *merge* the
+Use the `metricstransform` processor's `aggregate_labels` action to *merge* the
 series that share the remaining labels — that is what actually cuts the series and sample count.
 Do **not** use the `transform` processor's `delete_key`: removing a label key without merging
 leaves the same number of samples and produces colliding series (SigNoz sums them), so cost does

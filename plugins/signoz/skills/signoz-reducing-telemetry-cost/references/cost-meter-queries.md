@@ -45,7 +45,8 @@ Call `signoz_execute_builder_query` once per meter metric with `start`/`end` in 
 }
 ```
 
-Sum all values across every series/time-bucket in the response.
+Sum all values across every series/time-bucket in the response, excluding datapoints with
+`partial: true`; they are incomplete edge buckets.
 
 ## Breakdown by environment / service
 
@@ -61,6 +62,6 @@ or
 
 ## Converting and reconciling the numbers
 
-- GB divisor = 1073741824. "M samples" divisor = 1,000,000.
+- GB divisor = 1,000,000,000 (`1e9`). "M samples" divisor = 1,000,000 (`1e6`).
 - A grouped sum can differ from the ungrouped total. Use the ungrouped total for absolute cost
   figures; use grouped values only for percentages and ranking.
