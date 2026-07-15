@@ -47,13 +47,13 @@
       "id": 3,
       "eval_name": "tail-sampling-apm-count-caveat",
       "prompt": "Trace volume is high. Configure 10% tail sampling, but our SigNoz APM request totals and rates must remain exact because the on-call team uses them for capacity decisions.",
-      "expected_output": "Agent does not claim that tail sampling preserves exact built-in APM metrics. It explains that absolute request totals will undercount real traffic, while latency trends and error spikes may remain useful, and treats sampling as conditional on the user's explicit acceptance. Since exact request counts are mandatory, it should prefer structural filtering/SDK exclusions or stop before giving a sampling configuration.",
+      "expected_output": "Agent does not claim that tail sampling preserves exact built-in APM metrics. It explains that absolute request totals will undercount real traffic, while latency trends and error spikes may remain useful, and treats sampling as conditional on the user's explicit acceptance. Since exact request counts are mandatory, it must not remove spans unless the user confirms those operations fall outside the exact-count requirement; otherwise it stops before giving a reduction configuration.",
       "expectations": [
         "Agent states that tail sampling makes SigNoz APM absolute request totals undercount real traffic",
         "Agent does not claim that placing tail sampling downstream automatically preserves exact built-in APM metrics",
         "Agent distinguishes undercounted absolute totals from latency trends and error spikes that can remain useful",
         "Agent does not provide a 10 percent sampling configuration while exact APM request counts remain a hard requirement",
-        "Agent prioritizes structural noise filtering or SDK exclusions before sampling"
+        "Agent does not recommend SDK exclusions, Collector filters, or sampling unless the user confirms the removed operations fall outside the exact-count requirement"
       ],
       "files": []
     }
