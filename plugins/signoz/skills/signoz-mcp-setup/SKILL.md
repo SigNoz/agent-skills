@@ -58,6 +58,9 @@ ask which client they want to configure.
 Silently determine the SigNoz MCP server state using the reference flow,
 **scoped to the client identified in Step 1**:
 
+Probe with `signoz_list_services(timeRange: "1h", limit: 1)`. Do not use docs
+tools (`signoz_search_docs` or `signoz_fetch_doc`) for this check.
+
 - For a Claude Code, Codex, or Cursor bundled plugin install, the reference
   flow's registration-file fallback applies.
 - For every other client — including Devin CLI — do not read or search for
@@ -71,19 +74,14 @@ Silently determine the SigNoz MCP server state using the reference flow,
 
 State outcomes:
 
-- **working** — a tenant-backed read such as `signoz_list_services` succeeded;
-  continue with the user's original SigNoz request.
+- **working** — `signoz_list_services` succeeded; continue with the user's
+  original SigNoz request.
 - **not-setup** — run Step 3.
 - **configured-but-not-working** — if the user provided a new region or MCP URL,
   run Step 3. Otherwise tell them the SigNoz MCP server is configured but not
   connected, then ask for the SigNoz Cloud region or MCP URL to repair it. If
   they believe the endpoint is already correct, tell them to complete the
   client authentication step in Step 5.
-
-A successful `signoz_search_docs` call proves only that the MCP transport and
-local docs index are reachable. It does not validate the SigNoz tenant URL,
-credentials, or authorization, so never use docs search alone to mark the
-connection working; continue with the tenant-backed probe in `mcp-settings.md`.
 
 Do not fall back to raw HTTP calls for SigNoz data when MCP is unavailable.
 The MCP server is the supported API surface for this plugin's live SigNoz

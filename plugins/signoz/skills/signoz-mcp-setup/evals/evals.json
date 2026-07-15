@@ -47,15 +47,15 @@
       "id": 2,
       "eval_name": "docs-ready-is-not-tenant-ready",
       "prompt": "Check whether my SigNoz MCP setup is working. signoz_search_docs succeeds, but signoz_list_services returns an authentication error.",
-      "expected_output": "Agent does not mark setup working. It explains that docs search proves only MCP transport/local docs-index readiness, while the failed tenant-backed signoz_list_services probe means the connection is configured but not working for live SigNoz data. It routes the user to the client authentication or credential repair step without changing a known-correct endpoint.",
+      "expected_output": "Agent does not use documentation-tool success to judge connectivity. It uses signoz_list_services, classifies the connection as configured but not working, and routes the user to client authentication or credential repair without changing a known-correct endpoint.",
       "assertions": [
         {
-          "text": "Agent does not classify the connection as working from signoz_search_docs success alone",
-          "description": "Docs search does not access the configured SigNoz tenant"
+          "text": "Agent does not use signoz_search_docs or signoz_fetch_doc as connectivity probes",
+          "description": "Documentation tools do not validate live SigNoz access"
         },
         {
-          "text": "Agent uses signoz_list_services or another tenant-backed read as the live tenant connectivity probe",
-          "description": "Only a tenant-backed request validates tenant URL and authorization"
+          "text": "Agent uses signoz_list_services as the connectivity probe",
+          "description": "The setup check uses the prescribed tenant-backed tool"
         },
         {
           "text": "Agent classifies the state as configured-but-not-working and recommends authentication or credential repair",

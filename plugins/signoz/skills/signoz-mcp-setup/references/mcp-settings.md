@@ -20,19 +20,13 @@ Antigravity CLI, or OpenCode, read
 Silently determine `signoz-server-state`, **only after the client is known**
 (see `SKILL.md` Step 1 — identify the client before checking state):
 
-1. If `signoz_*` MCP tools are available, separate transport/docs readiness
-   from tenant readiness:
-   - `signoz_search_docs(searchText: "mcp setup")` may confirm that the MCP
-     transport and local docs index are reachable. Its success says nothing
-     about the configured SigNoz tenant or credentials.
-   - Call `signoz_list_services(timeRange: "1h", limit: 1)` as the lightweight
-     tenant-backed probe. A successful response, including a valid empty service
-     list, proves the server can reach and authenticate to the tenant.
-2. State is **working** only when the tenant-backed probe succeeds. If docs
-   search succeeds but the tenant-backed probe fails, state is
-   **configured-but-not-working**; preserve the endpoint and route the user to
-   authentication/credential repair rather than claiming setup is complete.
-3. If the tenant-backed call fails, returns no tools, or cannot be attempted:
+1. If `signoz_*` MCP tools are available, call
+   `signoz_list_services(timeRange: "1h", limit: 1)`. Do not use
+   docs tools (`signoz_search_docs` or `signoz_fetch_doc`) as connectivity
+   probes.
+2. If the call succeeds, including with an empty service list, state is
+   **working**.
+3. If the call fails, returns no tools, or cannot be attempted:
    - **Claude Code, Codex, or Cursor bundled plugin install** — read the
      plugin registration files below.
    - **Any other client** — do not read or file-search for the bundled
