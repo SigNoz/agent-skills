@@ -66,6 +66,20 @@
         {"id": "a3", "text": "Agent does not explain the dashboard from list metadata alone"},
         {"id": "a4", "text": "Output explains that Failed Payment Spans counts errored traces for service.name=payments"}
       ]
+    },
+    {
+      "id": 5,
+      "name": "custom-variable-and-trace-panel",
+      "prompt": "Explain my Trace Operations dashboard, including its region control and panel type.",
+      "expected_output": "Using the offline fixture, the agent identifies region as a CUSTOM variable with configured choices and explains Recent Checkout Traces as a trace panel filtered to checkout and the selected region.",
+      "files": ["evals/files/custom-variable-trace-panel.json"],
+      "assertions": [
+        {"id": "a1", "text": "Output identifies region as a CUSTOM variable rather than DYNAMIC, QUERY, or TEXTBOX"},
+        {"id": "a2", "text": "Output explains that the configured region choices are us-east-1 and eu-west-1 and notes multi-select/ALL behavior"},
+        {"id": "a3", "text": "Output identifies Recent Checkout Traces as a trace panel, not a graph or generic table"},
+        {"id": "a4", "text": "Output explains that the panel filters service.name=checkout and follows the selected $region value"},
+        {"id": "a5", "text": "Agent resolves Trace Operations through signoz_list_dashboards and calls signoz_get_dashboard with its UUID"}
+      ]
     }
   ]
 }

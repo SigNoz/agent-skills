@@ -98,6 +98,23 @@ optional.
    a saved view that must be deleted and recreated.
    For a `meter` view, tell `signoz-generating-queries` it's a **Cost Meter**
    query (`source=meter`) so discovery hits the meter store, not the default one.
+   Retain the exact `query` argument from its successful
+   `signoz_execute_builder_query` validation call, then translate it explicitly:
+
+   ```text
+   execution query.compositeQuery.queries
+     -> saved compositeQuery.queries
+   ```
+
+   Build the top-level `compositeQuery` argument to `signoz_create_view` as
+   `{ "queryType": "builder", "panelType": "<list|graph|table|value>",
+   "queries": <copied queries> }`. Copy the
+   `queries` array losslessly, but do not copy the execution-only envelope fields
+   `schemaVersion`, `start`, `end`, `requestType`, `formatOptions`, or
+   `variables`; do not put a `query` key or a second nested `compositeQuery`
+   inside the saved object.
+   Choose `panelType` from the saved-view intent rather than inventing it from
+   the execution envelope.
 4. **Enforce the signal rule** in every `builder_query` spec.
    - For `traces` / `logs` / `metrics`: `signal == sourcePage`. A
      `sourcePage:"traces"` view with `signal:"logs"` is a server-side error.
@@ -173,7 +190,11 @@ upstream). Sending a partial body wipes the unspecified fields. The flow:
    `source:"meter"`), and `panelType` changes often imply a `stepInterval`
    change too. For a `meter` view, tell `signoz-generating-queries` it is a
    **Cost Meter** query (`source=meter`) so it discovers and validates against
-   the meter store. For pure metadata tweaks (rename,
+   the meter store. Derive the replacement saved `compositeQuery` from the
+   successful execution query using the same explicit translation as Create:
+   copy only `query.compositeQuery.queries`, then add `queryType:"builder"` and
+   the intended `panelType`. Exclude `schemaVersion`, `start`, `end`,
+   `requestType`, `formatOptions`, and `variables`. For pure metadata tweaks (rename,
    recategorize), skip this step and do not touch `compositeQuery`.
 4. Modify only the field(s) the user asked to change.
 5. **Mandatory pre-save sample fetch — when `compositeQuery` changed.**
@@ -248,6 +269,13 @@ call.
   tell from JSON that the filter won't match, and autonomous mode
   has no preview, so the sample fetch is the only safety net.
 
+- **Translate the execution envelope before saving.** The executable query and
+  saved-view query intentionally have different outer shapes. Save exactly
+  `{queryType, panelType, queries}` in the create `compositeQuery` argument or
+  update `view.compositeQuery`, where `queries`
+  comes from the validated execution `query.compositeQuery.queries`. Never copy
+  the range, request, formatting, or variables envelope into a view.
+
 ## Quick reference
 
 | Operation | Tools called | Key guard |
@@ -263,6 +291,7 @@ call.
 | Mistake | Fix |
 |---------|-----|
 | Hand-composing `compositeQuery` from examples or memory (even after reading `signoz://view/examples`) | Use the `Skill` tool to invoke `signoz-generating-queries` — reading examples and validating with `signoz_search_traces` is not a substitute |
+| Copying the full executable query envelope into the saved `compositeQuery` | Copy only `query.compositeQuery.queries`, then construct the saved shape `{queryType:"builder", panelType, queries}`; exclude `schemaVersion`, `start`, `end`, `requestType`, `formatOptions`, and `variables` |
 | Lifting an attribute name from a metric, alert rule, or sibling view and using it in a `sourcePage=traces` / `=logs` view filter without re-verifying on the destination signal | Field keys are signal-scoped; an attribute on metrics may not exist on traces or logs. Always re-check via `signoz_get_field_keys signal=<destination signal>` (for a `meter` view, `signal=metrics source=meter` — never `signal=meter`) **and** run the mandatory pre-save sample fetch — the key check is necessary but not sufficient |
 | Skipping the pre-save sample fetch because `signoz-generating-queries` already validated the query | The sub-skill validates the query *it* authored; the filter you persist may have been edited or lifted since then. The Step 5 sample fetch is mandatory regardless |
 | Skipping `signoz_get_view` before delete (relying on list UUID alone) | Always call `signoz_get_view` to confirm name+sourcePage before `signoz_delete_view` |

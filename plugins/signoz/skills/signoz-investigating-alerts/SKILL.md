@@ -90,15 +90,22 @@ alerts.
    with the note's resolved absolute `start` and `end`, and preserve the same
    state/filter (including omission) and order. Stop when `nextCursor` is absent
    / the note reports `hasMore: false`; never use `offset` or page fullness.
-   Pattern analysis needs the complete transition set. From the response:
-   - **Pick the fire window**. Default to the most recent fire. If the
-     user passed an explicit time window via `$ARGUMENTS[1]`, honor it.
-   - **Note the fire pattern**:
+   Pattern analysis needs the complete transition set. Rows are emitted per
+   label-group `fingerprint`; do not interleave them. From the response:
+   - **Build rule-wide incident windows** from distinct rows where
+     `overallStateChanged: true`: an `overallState: "firing"` transition opens
+     an incident; the next `overallState: "inactive"` closes it. Deduplicate
+     matching timestamps and sort by `unixMilli` ascending before pairing.
+     Default to the most recent incident unless `$ARGUMENTS[1]` selects another.
+   - **Partition affected series by `fingerprint`** and retain each row's
+     labels. Use only `stateChanged: true` rows to decide when that group fired
+     and resolved, and which group should scope Tier 1–3 queries.
+   - **Note the fire pattern** from rule-wide transitions or one named fingerprint:
      - `one-off` → single fire with a long quiet period before/after.
      - `sustained` → fires that stayed firing for ≥ 1 evaluation cycle.
      - `flapping` → ≥ 3 fires within a 1h window, alternating fire/resolve.
      - `recurring` → fires at regular intervals (cron-like, e.g., every hour).
-   - The pattern tells you what to expect from tiers 2/3.
+   - Never infer flapping from different fingerprints. The pattern guides tiers 2/3.
 
 ### Step 2: Tier 1 — what fired and how hard
 
@@ -113,7 +120,8 @@ threshold tickle or flap) and quantifies the magnitude.
    - **Peak value** during the fire window.
    - **Threshold breach magnitude**: `(peak - threshold) / threshold *
      100` for "above" alerts, inverted for "below".
-   - **Fire duration**: how long the breach lasted.
+   - **Fire duration**: the rule's overall firing→inactive interval, or the
+     selected fingerprint's interval for a group-scoped investigation. Say which.
    - **Pre-fire baseline**: average value in the 30m before fire start.
 3. **Early-stop gate**: if the breach magnitude is < 10% over the
    threshold AND the fire duration is < 1 evaluation window, classify
@@ -164,12 +172,11 @@ specific failing operations.
    available):
    - Call `signoz_search_traces` for the fire window with filter:
      `service.name = <scope>` AND `has_error = true`. Cap at top 20.
-   - Group results by `name` (operation) and `error_message`. Surface
-     the top 3 by frequency with a representative trace ID for each.
-   - Optionally call `signoz_get_trace_details` on one representative
-     to extract specific span attributes (DB statement, downstream URL,
-     status code). Search results expose `trace_id`; pass that returned value
-     to the details tool as `traceId`.
+   - Group by `name` and `status_message`. Surface the sample's top 3 with one
+     trace ID each; do not call a 20-row sample count full-window frequency.
+   - Optionally call `signoz_get_trace_details` for span attributes. Pass the
+     search row's `trace_id` as `traceId` **plus the same absolute fire-window
+     `start` and `end`**; otherwise the 6h default misses older incidents.
 
 2. **Logs** for the fire window:
    - Call `signoz_search_logs` with filter:

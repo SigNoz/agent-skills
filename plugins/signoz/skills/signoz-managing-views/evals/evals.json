@@ -21,6 +21,14 @@
           "description": "View must capture the user's stated filter criteria"
         },
         {
+          "text": "The actual signoz_create_view payload sets its top-level compositeQuery argument to exactly queryType='builder', panelType='list', and queries copied losslessly from the successful execution query.compositeQuery.queries",
+          "description": "Execution and saved-view envelopes differ; the validated inner queries must be preserved while the saved wrapper is constructed explicitly"
+        },
+        {
+          "text": "The actual signoz_create_view compositeQuery argument does not contain schemaVersion, start, end, requestType, formatOptions, variables, or a nested query/compositeQuery envelope",
+          "description": "Execution-only range and formatting fields are invalid in the saved-view compositeQuery"
+        },
+        {
           "text": "Agent runs the mandatory pre-save sample fetch via signoz_search_traces with limit=1 using the exact filter from the about-to-save payload before signoz_create_view",
           "description": "Step 5 of the create flow: a saved view returning zero rows is a permanent artifact; the sample fetch is the only confirmation that the filter matches data"
         },
@@ -153,6 +161,14 @@
           "description": "The filter change must be written without dropping unrelated state"
         },
         {
+          "text": "The actual signoz_update_view payload sets view.compositeQuery to exactly queryType='builder', the intended panelType, and queries copied losslessly from the successful execution query.compositeQuery.queries",
+          "description": "A validated execution query must be translated to the saved-view wrapper rather than copied wholesale"
+        },
+        {
+          "text": "The updated view.compositeQuery excludes schemaVersion, start, end, requestType, formatOptions, variables, and nested execution query/compositeQuery fields",
+          "description": "Execution-only envelope fields must not leak into the saved view"
+        },
+        {
           "text": "signal in every builder_query matches the view's sourcePage",
           "description": "signal != sourcePage is a server-side error"
         }
@@ -176,6 +192,10 @@
         {
           "text": "Every builder_query spec has signal='metrics' AND source='meter'",
           "description": "A meter view is queried on the metrics signal against the meter store; omitting source='meter' silently queries the default store, and the server rejects a meter view without it"
+        },
+        {
+          "text": "The actual signoz_create_view payload uses compositeQuery={queryType:'builder', panelType:'graph', queries:[...]} with queries copied from the validated execution query and no execution-only envelope fields",
+          "description": "Cost Meter views use the same explicit execution-to-saved-view translation as every other sourcePage"
         },
         {
           "text": "Agent runs the pre-save sample fetch via signoz_query_metrics with source=meter before signoz_create_view",

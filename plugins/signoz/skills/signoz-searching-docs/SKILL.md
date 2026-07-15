@@ -21,7 +21,7 @@ Prefer the SigNoz MCP server tools when available; fall back to direct HTTP fetc
 ### Preferred: MCP tools
 
 - `signoz_search_docs` — BM25 search over the indexed docs corpus. Pass the user's natural-language query as `searchText`. Narrow with `section_slug` when the question maps cleanly to a single docs section (the tool's own schema lists valid slugs — defer to it rather than memorizing). Trust the ranking — the index handles relevance.
-- `signoz_fetch_doc` — full markdown for one indexed page. Pass the canonical URL or `/docs/...` path; optionally narrow to a section with `heading`.
+- `signoz_fetch_doc` — markdown for one indexed page. Pass the canonical URL or `/docs/...` path; optionally narrow to a section with `heading`. Inspect `truncation_reason` and `available_headings` in every response rather than assuming the returned `content` is complete.
 
 Never construct `/docs/...` URLs from memory. Only pass URLs returned by
 `signoz_search_docs` to `signoz_fetch_doc`; if you think you already know the
@@ -52,8 +52,9 @@ Accept: text/markdown
    - **With MCP tools**: call `signoz_search_docs` with the user's query; pass `section_slug` if the domain maps cleanly to one. Read the top 1-3 results and call `signoz_fetch_doc` on the chosen URL (use `heading` to narrow if the page is large and the question is sub-section-specific).
    - **Without MCP tools**: grep `sitemap.md` for candidate pages, rank the best 2-5 by how directly they answer the task, and `GET` only URLs discovered in the sitemap with `Accept: text/markdown`. Heuristic coverage is sparse — for topics without a heuristic row, skim the sitemap by section path and prefer setup/troubleshooting/API-reference pages over overviews.
    - Fetch **one page** for narrow questions; fetch **multiple pages** when the task spans setup + troubleshooting, or method-selection + language guide. Keep the set small.
-4. **Answer from the fetched docs** and cite canonical `https://signoz.io/docs/...` URLs.
-5. **Handle ambiguity deliberately**: if multiple pages are plausible, prefer the one that completes the task most directly; mention alternates only when they materially change the answer.
+4. **Handle truncated fetches before answering.** When `signoz_fetch_doc` returns `truncation_reason: "size"`, treat `content` as an incomplete prefix. Select the most relevant entry from `available_headings` and refetch the same search-result URL with that `heading`. If no heading covers the question, or the narrowed response is still truncated before the needed material, disclose that the fetched documentation is incomplete and do not infer that omitted content or a setting does not exist.
+5. **Answer from the fetched docs** and cite canonical `https://signoz.io/docs/...` URLs.
+6. **Handle ambiguity deliberately**: if multiple pages are plausible, prefer the one that completes the task most directly; mention alternates only when they materially change the answer.
 
 ## Message Actions
 

@@ -8,7 +8,8 @@
       "expected_output": "Agent starts with Cost Meter totals, keeps metrics as the primary driver, and investigates metrics, logs, and traces in current-cost order. The final answer consolidates findings into one prioritized list and does not repeat the full per-signal decision rules.",
       "expectations": [
         "Agent starts with signoz_execute_builder_query Cost Meter queries before signal-specific analysis",
-        "Agent discovers Cost Meter groupBy keys with signoz_get_field_keys signal=metrics source=meter and carries each returned fieldContext plus signal=metrics into raw builder groupBy entries",
+        "Agent discovers Cost Meter groupBy keys with signoz_get_field_keys signal=metrics source=meter",
+        "Every raw builder groupBy entry in the actual signoz_execute_builder_query payload losslessly copies name, fieldDataType, fieldContext, and signal from the selected signoz_get_field_keys result",
         "Agent analyzes metrics, logs, and traces because every signal has Cost Meter data",
         "Agent orders the investigation by current weighted cost: metrics, then logs, then traces",
         "Agent returns one consolidated prioritized action list without repeating the per-signal playbooks"

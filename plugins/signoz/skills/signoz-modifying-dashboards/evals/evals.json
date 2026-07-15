@@ -64,7 +64,7 @@
         "CPU Usage widget is absent from widgets[], layout[], and panelMap",
         "A new Error Rate widget is present with all required v5 fields and groupBy contains 'service.name'",
         "Net widget count equals original count (one removed, one added)",
-        "Agent dry-runs the new Error Rate panel with a lossless full payload that preserves query names A, B, and F1 before preparing the update",
+        "Agent dry-runs the new Error Rate panel with builder_query envelopes named A and B plus a sibling builder_formula envelope named F1 before preparing the update",
         "Transcript indicates a single planned update_dashboard call (changes batched, not iterative)",
         "All supported non-target widget, variable, and panelMap semantics are preserved",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
@@ -196,6 +196,20 @@
       "expectations": [
         "Agent explains that time range and refresh are viewer controls rather than persisted dashboard fields",
         "Agent does not call signoz_update_dashboard or invent timeRange, defaultTimeRange, or refresh fields"
+      ]
+    },
+    {
+      "id": 13,
+      "eval_name": "list-panel-execution-and-update-wrapper-contract",
+      "prompt": "Using the attached offline fixture, change the Recent Errors list on Error Explorer to 25 rows and sort oldest first, then apply the update.",
+      "expected_output": "Agent fetches the complete dashboard, changes only pageSize and orderBy in saved dashboard state, executes the canonical V5 equivalent against the stub, and calls the stubbed update tool with the required {id,dashboard} wrapper.",
+      "files": ["evals/files/update-payload-contract.json"],
+      "expectations": [
+        "The actual signoz_execute_builder_query call maps filters.items to filter.expression, pageSize=25 to limit=25, orderBy to order with key.name='timestamp' and direction='asc', and selectColumns to canonical selectFields",
+        "The dry-run builder_query.spec contains none of filters, pageSize, orderBy, selectColumns, queryName, or dataSource, and no groupBy/selectFields entry contains dashboard-only key/dataType/type; canonical order[].key is allowed",
+        "The actual signoz_update_dashboard call has top-level id='66666666-6666-4666-8666-666666666666' and a nested dashboard object; title, widgets, layout, and variables are not flattened beside id",
+        "The nested dashboard is the complete fetched state and retains dashboard/editor filters, pageSize=25, orderBy=[{columnName:'timestamp',order:'asc'}], and selectColumns",
+        "The update is called only after the canonical dry-run succeeds"
       ]
     }
   ]

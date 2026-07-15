@@ -71,7 +71,7 @@ from this skill).
 4. Discovery (parallel): `signoz_get_field_keys signal=traces
    fieldContext=resource` → confirms `service.name` and
    `deployment.environment` (no `.name` suffix in this install);
-   `signoz_get_field_values name=service.name` → user picks
+   `signoz_get_field_values signal=traces name=service.name` → user picks
    `checkout`, `payments`, `inventory`, `notifications`.
 5. Reads the `signoz://dashboard/*` MCP resources. Builds sections
    Overview / Latency / Errors / Throughput, with headline panels

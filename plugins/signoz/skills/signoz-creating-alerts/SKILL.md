@@ -150,14 +150,16 @@ silently never fires.
 Run a single probe over the last 1 hour using the same filter the alert
 will use, but with the simplest aggregation that confirms data exists:
 
-- **Metrics**: `signoz_execute_builder_query` with `count()`
-  (or `count_distinct(service.name)` if scope-discovering). Use
-  `signoz_query_metrics` when you already have a concrete
-  `metricName` — it auto-applies aggregation defaults and accepts
-  `filter`/`groupBy`, but requires a concrete `metricName` (no PromQL,
-  no filter-only probes).
-- **Logs**: `signoz_aggregate_logs` with `count()` over the filter.
-- **Traces**: `signoz_aggregate_traces` with `count()` over the filter.
+- **Metrics**: use `signoz_query_metrics` with the concrete `metricName` and
+  the alert's `filter`; it auto-applies aggregation defaults. If the full v5
+  tool is necessary, use a metrics aggregation object containing
+  `metricName`, `timeAggregation`, and `spaceAggregation`. Metrics do **not**
+  accept expression aggregations such as `count()` or filter-only probes.
+- **Logs**: call `signoz_aggregate_logs` with `aggregation: "count"` and the
+  alert filter. `count()` is a Query Builder expression, not a helper-tool
+  argument.
+- **Traces**: call `signoz_aggregate_traces` with `aggregation: "count"` and
+  the alert filter. Do not pass `aggregation: "count()"`.
 
 Inspect the result:
 
@@ -339,9 +341,10 @@ is actionable:
      whether the threshold is right. One hour can't distinguish "tuned
      well" from "barely caught a transient".
 3. **Exceptions:**
-   - **Anomaly alerts** — skip the breach count entirely (Z-scores aren't
-     directly comparable to raw values). Step 4 already verified the
-     underlying metric × service has data; nothing more to validate here.
+   - **Anomaly alerts** — execute the underlying metric query without the
+     anomaly `functions` transform to verify its shape and data, then skip the
+     breach count (Z-scores aren't directly comparable to raw values). Be
+     explicit that this validates the base query, not anomaly scoring.
    - **Log-based crash / panic / OOMKilled / FATAL alerts** — these
      intentionally have zero matches in a healthy system. Step 4 has
      already surfaced the zero-match result and obtained user confirmation;
@@ -374,9 +377,17 @@ create a notification channel inline for an alert that fails validation.
 4. If neither path resolves a channel, stop and ask the user for a
    notification channel (see *Required inputs* above).
 
-For multi-severity alerts, attach channels per threshold:
-`thresholds.spec[N].channels` is an array — typically warning → Slack only,
-critical → Slack + PagerDuty.
+Place the resolved channel according to the rule schema:
+
+- `threshold_rule` / `promql_rule` (v2alpha1): attach direct-routing channels
+  to each `condition.thresholds.spec[N].channels` array — typically warning →
+  Slack only, critical → Slack + PagerDuty.
+- `anomaly_rule` (v1): thresholds are forbidden, so put channel names in the
+  top-level `preferredChannels` array.
+
+Never put a chosen anomaly channel in a nonexistent thresholds block, and do
+not use top-level `preferredChannels` as a substitute for per-tier routing on a
+multi-severity threshold rule.
 
 #### Handling secret-bearing channel config
 
@@ -451,8 +462,10 @@ does).
   `LOGS_BASED_ALERT`. Mismatches fail validation.
 - **Anomaly rules are metrics-only** `anomaly_rule` + non-metric alertType
   is rejected.
-- **Channels must exist.** Use names from `signoz_list_notification_channels`
-  exactly, or create the channel inline first.
+- **Channels must exist and use the rule's routing field.** Use exact names
+  from `signoz_list_notification_channels`; put them in per-threshold
+  `channels` for threshold/PromQL rules or top-level `preferredChannels` for
+  anomaly rules.
 - **Never echo channel secrets.** Slack webhook URLs, PagerDuty integration
   keys, and similar webhook tokens are secrets. Pass them to
   `signoz_create_notification_channel` once and never repeat the

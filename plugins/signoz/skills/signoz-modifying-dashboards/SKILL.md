@@ -123,11 +123,12 @@ Merge the planned changes into the full dashboard JSON from Step 2.
      If rows exist, add it to the intended row's `panelMap[rowId].widgets`,
      creating that entry when absent. An empty `panelMap` does not prove the
      dashboard is rowless.
-  4. All modified panels are validated below as a hard requirement —
+  4. All schema-representable modified panels are validated below; unsupported
+     execution fields follow the explicit safety gate —
      see the "Dry-run modified panels" step before
      `signoz_update_dashboard` and the "Mandatory dry-run
      before update" guardrail. Author the saved query semantics first, then use
-     the lossless dry-run translation below.
+     the schema-checked dry-run translation below.
 
 - **Removing a panel:** Remove the widget from `widgets`, its entry from `layout`,
   and its entry from the parent row's `panelMap.widgets` (if it exists in panelMap).
@@ -174,26 +175,26 @@ Merge the planned changes into the full dashboard JSON from Step 2.
     `panelMap[rowId].widgets`. These are duplicated and must stay consistent.
 
 **Dry-run modified panels (mandatory).** Before `signoz_update_dashboard`, call
-`signoz_execute_builder_query` for each modified query-bearing panel. Build its
-complete payload from the current tool schema; do not pass widget JSON. Translate
-the active Builder, PromQL, or ClickHouse query losslessly into its matching
-envelope, preserving every semantic field and query name (`A`, `B`, `F1`, etc.).
-Supply representative values for referenced dashboard variables. A server error
-or unexpected empty result must be fixed before update, unless the user explicitly
-accepted confirmed missing telemetry.
+`signoz_execute_builder_query` for each modified query-bearing panel. Read
+[`references/dashboard-to-query-builder-v5.md`](./references/dashboard-to-query-builder-v5.md),
+build the complete current execution payload, and keep dashboard/editor aliases
+unchanged in saved state. Include every modified base-query, formula, and trace-
+operator sibling and supply representative variable values.
 
-Builder queries cross a contract boundary:
+If the current execution schema cannot represent an execution-affecting field,
+do not strip it and call the dry-run successful. Stop and surface the gap; proceed
+only after the user explicitly accepts that the panel is unvalidated. Server
+errors and unexpected empty results also block unless explicitly accepted.
 
-- `queryName` → `name`; `dataSource` → `signal`
-- `groupBy[].key` → `name`; `dataType` → `fieldDataType`; `type` → `fieldContext`
-- Set each dry-run `groupBy[].signal` to the translated query `signal`.
+Call `signoz_update_dashboard` with this exact outer wrapper, where `dashboard`
+is the **complete** modified dashboard object, not a partial patch:
 
-Keep the saved `groupBy` unchanged in `signoz_update_dashboard`, including
-`{key,dataType,type}`; dry-run `groupBy` must use only
-`{name,fieldDataType,fieldContext,signal}`.
-
-Call `signoz_update_dashboard` with the dashboard UUID and the **complete** modified
-dashboard JSON.
+```text
+signoz_update_dashboard({
+  "id": "<dashboard-uuid>",
+  "dashboard": <complete merged object from signoz_get_dashboard>
+})
+```
 
 ### Step 5: Report the result
 
@@ -202,10 +203,10 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
 ## Guardrails
 
 - **Full state on update**: `signoz_update_dashboard` requires the complete
-  dashboard JSON (not a partial patch). Always call `signoz_get_dashboard` first
-  to get the current state, merge your changes into that full object, and pass
-  the result to `signoz_update_dashboard`. Never construct an update payload from
-  scratch.
+  dashboard JSON nested under `{id, dashboard}` (not a partial patch). Always call
+  `signoz_get_dashboard` first, merge into that full object, and place the result
+  under `dashboard`. Never flatten dashboard fields beside `id` or construct an
+  update payload from scratch.
 - **Preserve what you don't change**: Preserve supported mutable semantics for
   widgets, variables, layout, and panelMap outside the request. Diff-and-merge;
   do not rebuild or promise byte-for-byte equality after MCP normalization.
@@ -213,9 +214,9 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
   deleting variables, confirm with the user — even if they say "just do it" or
   express urgency. Additions, renames, type changes, and variable additions do not
   need confirmation.
-- **Mandatory dry-run before update.** For every added or edited
-  query-bearing panel, run `signoz_execute_builder_query`
-  before `signoz_update_dashboard` (envelope translation in
+- **Mandatory dry-run before update.** For every schema-representable added or
+  edited query-bearing panel, run `signoz_execute_builder_query` before update.
+  Unsupported execution fields follow the safety gate instead (translation in
   the Dry-run step above). Row / header panels (`panelTypes:
   "row"`) have no query — validate their shape against
   `signoz://dashboard/widgets-examples` instead. Modifications are
@@ -256,7 +257,8 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
    appropriate row's `panelMap`.
 5. Dry-runs the new panel with `signoz_execute_builder_query`; fixes any error or
    unexpected empty result.
-6. Calls `signoz_update_dashboard` with the full modified JSON (all 9 panels).
+6. Calls `signoz_update_dashboard` with
+   `{id: "abc-123", dashboard: <full modified JSON>}` (all 9 panels).
 7. Reports: "Added an 'Error Rate' graph panel to your Redis Overview dashboard
    under the Overview section. Want me to adjust anything?"
 
@@ -271,9 +273,9 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
    confirms with user: "I found 'Request Latency'. Convert that one to a table?"
 3. Changes `panelTypes` from `"graph"` to `"table"`, matches the table shape in
    `widgets-examples`, and keeps the query intact.
-4. Calls `signoz_update_dashboard` with the full modified JSON (all panels
-   preserved).
-5. Reports: "Changed 'Request Latency' from a graph to a table. Want me to adjust
+4. Dry-runs the table execution shape because panel type affects request shape.
+5. Calls `signoz_update_dashboard` with `{id, dashboard: <full modified JSON>}`.
+6. Reports: "Changed 'Request Latency' from a graph to a table. Want me to adjust
    column widths or add column units?"
 
 ---
@@ -289,6 +291,6 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
 4. Removes the widget from `widgets`, its layout entry, and its panelMap reference.
    Leaves all other panel positions unchanged (the frontend grid closes gaps
    automatically). Updates `title` to "Service Health".
-5. Calls `signoz_update_dashboard` with the full modified JSON.
+5. Calls `signoz_update_dashboard` with `{id, dashboard: <full modified JSON>}`.
 6. Reports: "Removed the 'CPU Usage' panel and renamed the dashboard to 'Service
    Health'. Anything else to adjust?"

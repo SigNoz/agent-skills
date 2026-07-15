@@ -28,17 +28,17 @@ plugins/signoz/skills/signoz-creating-dashboards/evals/evals.json
 
 | Signal | Evals |
 |---|---|
-| metrics | 0, 1, 7, 9, 18 |
-| traces | 8, 10, 12, 15, 16, 17, 19 |
-| logs | 14 |
+| metrics | 0, 1, 7, 9, 18, 21 |
+| traces | 8, 10, 12, 15, 16, 17, 19, 23 |
+| logs | 14, 20 |
 
 ### Panel types (from `PANEL_TYPES` enum in `frontend/src/constants/queryBuilder.ts`)
 
 | Panel type | Evals |
 |---|---|
-| graph (timeseries) | 7, 9, 10, 12, 14, 17, 19 |
+| graph (timeseries) | 7, 9, 10, 12, 14, 17, 19, 21, 23 |
 | value | 9, 14, 16 |
-| table | 14, 16 |
+| table | 14, 16, 20, 22 |
 | list | 15 |
 | bar | 16 |
 | pie | 16 |
@@ -56,7 +56,7 @@ plugins/signoz/skills/signoz-creating-dashboards/evals/evals.json
 | Duplicate found on a later page → present choices before any write | 18 |
 | Broad/ambiguous request → present multiple template options | 2 |
 | Vague request → emit `needs_input` / clarify scope | 5 |
-| No template match → custom build | 6, 7, 8, 9, 10, 12, 14, 15, 16, 17, 19 |
+| No template match → custom build | 6, 7, 8, 9, 10, 12, 14, 15, 16, 17, 19, 20, 21, 22, 23 |
 
 ### Guardrails exercised
 
@@ -75,6 +75,10 @@ plugins/signoz/skills/signoz-creating-dashboards/evals/evals.json
 | Pie panel must have `groupBy` AND `legend` | 16 |
 | Error-rate formula `A*100/B` with `disabled:true` on base queries | 9, 16 |
 | Dashboard `groupBy` aliases stay in create payloads; dry-runs use canonical v5 fields | 10 |
+| Dashboard filters/limits/order/select fields/formulas translate to canonical execution fields | 9, 14, 15, 20, 22 |
+| Non-empty dashboard HAVING arrays stay saved but block parity claims because frontend execution drops them | 20 |
+| Trace operators become raw-preserved sibling `builder_trace_operator` envelopes | 23 |
+| Unsupported execution-affecting fields block false-positive dry-run success | 20, 21, 22 |
 | Non-default time range for SLO windows (28d) | 9 |
 | Variable-application prompt before injecting `$var` into panels | 17 |
 | Selected-panel variable wiring and dry-run | 19 |
@@ -107,6 +111,10 @@ plugins/signoz/skills/signoz-creating-dashboards/evals/evals.json
 | 17 | `custom-build-variable-application-prompt` | User asks for `service.name` dropdown; agent stops at panel-scope clarification | traces | graph | `DYNAMIC` variable shape, ask before injection |
 | 18 | `duplicate-dashboard-on-second-page` | Matching dashboard appears only after following `pagination.nextOffset` | metrics | n/a | later-page duplicate detection, no write before user choice |
 | 19 | `custom-build-variable-application-selected-panels` | Follow-up selects two panels and keeps the global panel unfiltered | traces | graph | targeted `$service_name` wiring, representative-value dry-runs |
+| 20 | `custom-build-having-array-validation-gap` | Structured filter translation plus the saved HAVING-array runtime gap | logs | table | `filters` → `filter.expression`; diagnostic HAVING expression is non-parity; explicit acceptance gate |
+| 21 | `unsupported-builder-function-blocks-lossy-validation` | Current execution schema cannot represent a requested Builder function | metrics | graph | surface unsupported field; never claim a stripped dry-run passed |
+| 22 | `formula-order-limit-schema-gate` | Formula order/limit unsupported by current execution schema | (builder) | table | preserve saved formula; block or explicitly accept unvalidated state |
+| 23 | `trace-operator-sibling-envelope-contract` | Trace-operator dashboard/editor JSON to V5 execution-envelope translation | traces | graph | base A/B plus raw-preserved sibling `builder_trace_operator` T1 in the actual dry-run call |
 
 ## Intentionally uncovered
 

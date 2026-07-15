@@ -5,13 +5,16 @@
       "id": 0,
       "eval_name": "full-rca-firing",
       "prompt": "The 'RED — p99 Latency > 2s by Service' alert (019ddf83-7d04-74c4-97c7-fea13d72c091) is firing. Investigate the most recent fire and tell me the root cause.",
-      "expected_output": "Agent runs full 3-tier flow: signoz_get_alert + cursor-paginated signoz_get_alert_history (first call timeRange=7d and order=desc; include firing and inactive transitions to reconstruct the recent fire window), then Tier-1 re-runs the alert query around the fire window to get peak/baseline/breach magnitude/duration; Tier-2 pulls neighbor signals (error rate, throughput, dependency latency) and compares fire vs baseline window with complete signoz_execute_builder_query arguments; Tier-3 pulls top error traces + error logs around the fire window and maps a returned trace_id to the traceId details input. Outputs ranked hypotheses with evidence + supporting query, plus next steps.",
+      "expected_output": "Agent runs full 3-tier flow: signoz_get_alert + cursor-paginated signoz_get_alert_history, reconstructs the rule incident from overall transitions and partitions label groups by fingerprint, then Tier-1 re-runs the alert query around that window; Tier-2 compares neighbor signals; Tier-3 pulls error traces/logs and maps trace_id plus the fire-window bounds to trace details. Outputs ranked hypotheses with evidence + supporting query, plus next steps.",
       "expectations": [
         "The first signoz_get_alert_history call uses timeRange=7d and order=desc without a state filter",
         "Each history continuation uses data.nextCursor as cursor plus the resolved absolute start/end and preserves state, filter, and order",
         "History pagination never uses offset or page fullness as the continuation signal",
+        "The rule incident is bounded by distinct overallStateChanged transitions, while group-specific transitions are partitioned by fingerprint and require stateChanged=true",
+        "The agent never infers flapping by alternating rows from different fingerprints",
         "Each Tier-2 signoz_execute_builder_query call has an outer query object with Unix-ms start/end, requestType=time_series, compositeQuery, formatOptions, variables, and stepInterval",
-        "When drilling into a searched trace, the agent maps the returned trace_id value to signoz_get_trace_details input traceId"
+        "Trace drill-down groups by status_message rather than nonexistent error_message",
+        "When drilling into a searched trace, signoz_get_trace_details receives the returned trace_id as traceId plus the same absolute start/end used for the fire-window trace search"
       ],
       "files": []
     },
@@ -26,7 +29,7 @@
       "id": 2,
       "eval_name": "marginal-flap-detection",
       "prompt": "Why did the 'test alerts-1' alert fire? Investigate. (rule id 0199e817-3d9f-7a12-99e8-038749ea9562)",
-      "expected_output": "Agent fetches alert + paginated 7d firing history in descending order. If breach magnitude is small (<10% over threshold) AND fire duration short, OR if fires are flapping, classifies as 'marginal fire' per Tier-1 early-stop. Skips Tier-2/3 and outputs a single 'threshold may be too tight, recommend tuning' hypothesis with low-medium confidence rather than fabricating root causes. If fires are flapping, identifies the pattern explicitly.",
+      "expected_output": "Agent fetches alert + paginated 7d history in descending order. If breach magnitude is small (<10% over threshold) AND fire duration short, OR if the rule-wide transition sequence or one named fingerprint truly flaps, classifies as 'marginal fire' per Tier-1 early-stop. It never infers flapping from interleaved groups. Skips Tier-2/3 and outputs a threshold-tuning hypothesis rather than fabricating root causes.",
       "files": []
     },
     {
@@ -42,6 +45,19 @@
       "prompt": "Investigate why alert 019d7041-1937-769f-b0e4-9d4ff846eb43 ('trace formula alert') is firing.",
       "expected_output": "Agent fetches alert + paginated 7d firing history in descending order. Identifies it as a TRACES_BASED formula alert. Runs Tier-1 to confirm fire is real and quantify magnitude. If real, runs Tier-2 against neighbor signals for the same resource scope (note: the alert may have an empty/missing service filter — agent should handle this gracefully). Surfaces ranked hypotheses with evidence and queries.",
       "files": []
+    },
+    {
+      "id": 5,
+      "eval_name": "grouped-history-fingerprint-partition",
+      "prompt": "Using the attached offline SigNoz responses, investigate the grouped latency alert's incident window and tell me whether it flapped. Do not query a live tenant.",
+      "expected_output": "Agent identifies one rule-wide incident from 1750000000000 through 1750001400000. It partitions by fingerprint and explains that checkout fingerprint 101 entered firing three times and flapped while payments fingerprint 202 kept the overall rule firing; it does not misreport the interleaved rows as three rule incidents.",
+      "expectations": [
+        "The rule-wide incident starts at the distinct overallStateChanged firing transition at 1750000000000 and ends at the overall inactive transition at 1750001400000",
+        "Rows are partitioned by fingerprint before series-pattern analysis",
+        "Checkout fingerprint 101 may be called flapping because its own stateChanged sequence contains three firing transitions",
+        "Output does not call the rule-wide sequence three separate incidents"
+      ],
+      "files": ["evals/files/grouped-alert-history.json"]
     }
   ]
 }

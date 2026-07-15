@@ -9,7 +9,8 @@
       "expectations": [
         "The first signoz_get_alert_history call uses timeRange=7d, state=firing, and order=desc",
         "Each history continuation uses data.nextCursor as cursor plus the resolved absolute start/end and preserves state, filter, and order",
-        "History pagination never uses offset or page fullness as the continuation signal"
+        "History pagination never uses offset or page fullness as the continuation signal",
+        "The fire-frequency summary counts distinct overallStateChanged transitions into overallState=firing, not raw history rows"
       ],
       "files": []
     },
@@ -24,7 +25,11 @@
       "id": 2,
       "eval_name": "anomaly-threshold-explain",
       "prompt": "Help me understand alert rule 019de287-6752-7629-83e4-375919d56dd8 — I'm confused about how anomaly thresholds work versus regular ones.",
-      "expected_output": "Agent fetches the rule, identifies ruleType=anomaly_rule and algorithm=standard, and explicitly contrasts anomaly vs threshold semantics: target=3 means 3 standard deviations from the learned baseline, NOT 3 raw req/s. Explains daily seasonality: the baseline adapts to hour-of-day patterns. Notes that lower target = more sensitive (more noise). Pulls paginated firing history for 7d in descending order and includes the complete fire-frequency summary.",
+      "expected_output": "Agent fetches the rule, identifies ruleType=anomaly_rule and algorithm=standard, and explicitly contrasts anomaly vs threshold semantics: target=3 means 3 standard deviations from the learned baseline, NOT 3 raw req/s. Explains daily seasonality and effective routing through top-level preferredChannels. Pulls paginated firing history for 7d in descending order and includes a rule-incident fire-frequency summary.",
+      "expectations": [
+        "The explanation treats top-level preferredChannels as the anomaly rule's direct notification routing because anomaly rules have no threshold channels",
+        "The fire-frequency summary counts rule-wide overallStateChanged transitions, not per-fingerprint rows"
+      ],
       "files": []
     },
     {
@@ -39,7 +44,23 @@
       "eval_name": "multi-severity-audit-kafka",
       "prompt": "Audit alert 019dad90-1c73-715e-b040-79901928deb2 (kafka consumer lag) — anything I should change?",
       "expected_output": "Agent fetches the rule, decodes the multi-severity threshold spec (warning at lag >= 50, critical at >= 200), explains the tiered routing. Performs Step 5 audit: flags missing labels.severity (rule has no severity label even though thresholds have severity tiers), considers groupBy cardinality, evaluates threshold calibration, suggests adding severity label, runbook annotations, alertOnAbsent if relevant. Pulls paginated firing history for 7d in descending order.",
+      "expectations": [
+        "For a v2 threshold rule with usePolicy=false, the explanation derives each tier's routing only from that threshold's channels array",
+        "The explanation never uses top-level preferredChannels as a fallback for an empty v2 threshold tier; it identifies such a tier as unrouted or misconfigured"
+      ],
       "files": []
+    },
+    {
+      "id": 5,
+      "eval_name": "grouped-history-rule-incidents",
+      "prompt": "Using the attached offline SigNoz responses, explain the grouped checkout latency alert and tell me how often it fired in the lookback.",
+      "expected_output": "Agent uses the fixture without querying a live tenant. It reports one rule-wide firing incident, not three fires: two fingerprint rows represent the same overall transition and the later checkout row is a series transition while the rule was already firing. It may additionally report three series-level firing transitions if clearly labeled as such.",
+      "expectations": [
+        "Output says the rule entered firing once in the lookback",
+        "Output does not report three rule fires by counting raw firing rows",
+        "If series activity is mentioned, it distinguishes fingerprint or label-group transitions from rule-wide incidents"
+      ],
+      "files": ["evals/files/grouped-alert-history.json"]
     }
   ]
 }

@@ -76,15 +76,17 @@ buckets. Use the unit returned by discovery when labeling or converting the tota
 ## Breakdown by environment / service
 
 Call `signoz_get_field_keys` with `signal: "metrics"` and `source: "meter"` before grouping.
-Use only a returned key and copy its `fieldContext`; raw builder queries do not auto-detect the
-context. Add the complete field to the same spec:
+Use only a returned key and losslessly copy its `name`, `fieldDataType`, `fieldContext`, and
+`signal`; raw builder queries do not reliably infer an omitted or ambiguous field descriptor.
+Add the complete returned field to the same spec:
 
 ```json
 "groupBy": [
   {
     "name": "<returned_field_name>",
+    "fieldDataType": "<returned_field_data_type>",
     "fieldContext": "<returned_field_context>",
-    "signal": "metrics"
+    "signal": "<returned_signal>"
   }
 ]
 ```

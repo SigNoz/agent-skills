@@ -1,0 +1,68 @@
+{
+  "skill_name": "signoz-mcp-setup",
+  "evals": [
+    {
+      "id": 0,
+      "eval_name": "claude-desktop-hosted-custom-connector",
+      "prompt": "Configure Claude Desktop to use the hosted SigNoz Cloud MCP endpoint https://mcp.eu.signoz.cloud/mcp. Show me exactly where you would put it.",
+      "expected_output": "Agent routes the remote endpoint through Claude Desktop Settings > Connectors > Add custom connector and does not write a remote URL entry to claude_desktop_config.json. It explains that the desktop JSON file is reserved for local stdio command registrations, then gives the connector authentication/reconnect step.",
+      "assertions": [
+        {
+          "text": "Agent configures the hosted URL through Claude Desktop Custom Connectors",
+          "description": "Claude Desktop remote MCP uses the connector UI"
+        },
+        {
+          "text": "Agent does not put a remote url entry in claude_desktop_config.json",
+          "description": "The desktop JSON file does not register hosted remote MCP endpoints"
+        },
+        {
+          "text": "Agent states that claude_desktop_config.json is only used here for a local stdio command with command, args, and env",
+          "description": "The remote and local configuration contracts must remain distinct"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": 1,
+      "eval_name": "claude-desktop-local-stdio-json",
+      "prompt": "I built signoz-mcp-server locally and want Claude Desktop to launch /opt/signoz/signoz-mcp-server over stdio. Configure it with SIGNOZ_URL and an environment-variable placeholder for SIGNOZ_API_KEY.",
+      "expected_output": "Agent uses claude_desktop_config.json because this is local stdio, creates a signoz mcpServers entry with command=/opt/signoz/signoz-mcp-server, args=[], and env containing SIGNOZ_URL, SIGNOZ_API_KEY placeholder, and LOG_LEVEL. It does not use a remote url field and tells the user to restart Claude Desktop.",
+      "assertions": [
+        {
+          "text": "The Claude Desktop JSON payload uses command, args, and env for the local stdio server",
+          "description": "Local binaries use the stdio registration shape"
+        },
+        {
+          "text": "The Claude Desktop JSON payload does not contain a remote url field",
+          "description": "A stdio entry must not be translated into a remote connector payload"
+        },
+        {
+          "text": "Agent avoids writing a real API key and tells the user to restart Claude Desktop",
+          "description": "Secrets stay out of tracked config examples and Desktop reloads the local entry"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "eval_name": "docs-ready-is-not-tenant-ready",
+      "prompt": "Check whether my SigNoz MCP setup is working. signoz_search_docs succeeds, but signoz_list_services returns an authentication error.",
+      "expected_output": "Agent does not mark setup working. It explains that docs search proves only MCP transport/local docs-index readiness, while the failed tenant-backed signoz_list_services probe means the connection is configured but not working for live SigNoz data. It routes the user to the client authentication or credential repair step without changing a known-correct endpoint.",
+      "assertions": [
+        {
+          "text": "Agent does not classify the connection as working from signoz_search_docs success alone",
+          "description": "Docs search does not access the configured SigNoz tenant"
+        },
+        {
+          "text": "Agent uses signoz_list_services or another tenant-backed read as the live tenant connectivity probe",
+          "description": "Only a tenant-backed request validates tenant URL and authorization"
+        },
+        {
+          "text": "Agent classifies the state as configured-but-not-working and recommends authentication or credential repair",
+          "description": "The endpoint is reachable, but live SigNoz access is not ready"
+        }
+      ],
+      "files": []
+    }
+  ]
+}

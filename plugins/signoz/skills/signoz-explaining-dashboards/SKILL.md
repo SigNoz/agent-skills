@@ -71,8 +71,8 @@ the `tags` if they provide useful context.
 **2. Variables and filters** — Explain each variable:
 - Name and what it filters (e.g., "The `service_name` variable filters all panels
   to a specific service")
-- Type: DYNAMIC (auto-populated from telemetry), QUERY (SQL-driven dropdown), or
-  TEXTBOX (free-form input)
+- Type: DYNAMIC (auto-populated from telemetry), QUERY (query-driven dropdown),
+  CUSTOM (configured choices), TEXTBOX (free-form input), or CONSTANT (fixed)
 - Whether it supports multi-select and has "ALL" option
 - Note if any panels do NOT reference a variable in their filters — changing that
   variable dropdown would not affect those panels, which can be confusing
@@ -81,7 +81,8 @@ the `tags` if they provide useful context.
 `panelMap` structure (row widget titles are the section headers). If the dashboard
 has no rows (empty `panelMap`), walk through panels in layout order (by `y` then
 `x` position) and organize by logical theme. For each panel:
-- **Title** and **panel type** (graph, value, table, bar, pie, histogram, list)
+- **Title** and **panel type** (graph, value, table, bar, pie, histogram, list,
+  trace)
 - **What it shows** — interpret the query in plain language. For builder queries,
   explain the metric/data source, aggregation, filters, and groupBy. For formulas,
   explain each sub-query and how the formula combines them. For ClickHouse SQL or

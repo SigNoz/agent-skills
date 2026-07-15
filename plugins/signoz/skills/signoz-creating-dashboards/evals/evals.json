@@ -115,8 +115,10 @@
         "Agent does not add timeRange, defaultTimeRange, or refresh fields to the dashboard payload and does not smuggle a PromQL range selector into a Builder query",
         "Agent uses service.name (dotted, OTel resource attribute) in builder-mode filters and variables — not the underscored span-metric label 'service_name' (this skill builds in builder mode only, never PromQL) and not the bare shorthand 'service'",
         "Agent emits a plain-language summary before creation that explains the formulas and tells the user to select the 28d global viewer range",
+        "The actual signoz_execute_builder_query call contains builder_query envelopes named A and B plus a sibling builder_formula envelope named F1 with its expression; no execution spec contains dashboard-only queryName or dataSource",
+        "Each dry-run base query carries the service restriction under filter.expression and does not send the dashboard filters alias",
         "Agent runs signoz_execute_builder_query as a per-panel dry-run for every authored panel before signoz_create_dashboard",
-        "Agent calls signoz_create_dashboard with a complete payload containing the formula panels and service filter"
+        "The actual signoz_create_dashboard call keeps queryName/dataSource in queryData, queryName in queryFormulas, and the service filter in dashboard/editor form"
       ],
       "files": []
     },
@@ -194,6 +196,8 @@
         "Timeseries panel includes legend with {{service.name}} matching the groupBy key",
         "Each widget includes selectedLogFields array (timestamp, body at minimum) per the widgets-examples shape",
         "Agent emits a plain-language summary (no JSON dump) before calling signoz_create_dashboard",
+        "The actual signoz_execute_builder_query call places the severity restriction only in filter.expression and contains no filters field",
+        "The actual signoz_create_dashboard call keeps the severity filter in the dashboard/editor filter or filters shape",
         "Agent runs signoz_execute_builder_query (with signal=logs in each builder_query.spec) as a per-panel dry-run before signoz_create_dashboard"
       ],
       "files": []
@@ -211,6 +215,9 @@
         "Filter on the list panel restricts to error spans (e.g. has_error=true, or equivalent)",
         "Agent does NOT use groupBy on the list panel (lists are unaggregated; groupBy would produce wrong behavior)",
         "Agent emits a plain-language summary (no JSON dump) before signoz_create_dashboard",
+        "The actual signoz_execute_builder_query call maps pageSize=10 to limit=10, orderBy to order=[{key:{name:'timestamp'},direction:'desc'}], and selectColumns to canonical selectFields entries",
+        "The dry-run builder_query.spec contains none of pageSize, orderBy, or selectColumns, and no groupBy/selectFields entry contains dashboard-only key/dataType/type; canonical order[].key is allowed",
+        "The actual signoz_create_dashboard call retains pageSize=10, orderBy with columnName/order, and selectColumns in dashboard/editor form",
         "Agent runs signoz_execute_builder_query as a dry-run for the list panel before signoz_create_dashboard"
       ],
       "files": []
@@ -226,6 +233,7 @@
         "Pie panel includes groupBy AND legend with {{<key>}} matching the groupBy key",
         "Bar panel uses panelTypes='bar' (not 'graph') and includes groupBy on status_code or equivalent",
         "Table panel uses groupBy and aggregation expressions include 'as' aliases for column names",
+        "The actual table-panel dry-run emits separate V5 aggregation objects for count() and avg(duration_nano), preserving aliases, rather than one combined expression",
         "Error-rate value panel uses an A*100/B formula with disabled:true on base queries (per widgets-examples error-rate pattern)",
         "Agent reads signoz://dashboard/widgets-examples before authoring (panel shapes vary per type)",
         "Layout places row panels at full width (w=12) and KPI value panels side-by-side at consistent y",
@@ -277,6 +285,64 @@
         "Agent does not call signoz_create_dashboard in the offline eval"
       ],
       "files": ["evals/files/service-variable-scope-context.json"]
+    },
+    {
+      "id": 20,
+      "eval_name": "custom-build-having-array-validation-gap",
+      "prompt": "Create a logs table for ERROR logs grouped by service.name that shows only groups with count() greater than 10.",
+      "expected_output": "Agent prepares the dashboard/editor filter and HAVING clause array, but recognizes that the frontend V5 converter drops non-empty HAVING arrays. It does not claim an expression probe is parity validation, warns that the saved panel may ignore HAVING, and blocks creation until the user explicitly accepts an unvalidated panel.",
+      "expectations": [
+        "The dashboard/editor draft, and any create payload sent only after explicit acceptance, keeps the ERROR restriction under filters.items with its telemetry key metadata",
+        "The actual signoz_execute_builder_query call converts that structured filter to an equivalent filter.expression and sends no filters field",
+        "The dashboard/editor draft keeps having as clauses such as [{columnName:'count()',op:'>',value:10}]",
+        "Agent explicitly identifies the non-empty HAVING array as a runtime and validation parity gap because the frontend execution converter drops it",
+        "If signoz_execute_builder_query is called with having.expression=count() > 10, Agent labels that call diagnostic and does not claim it validates the saved panel",
+        "No having clause array is passed to signoz_execute_builder_query",
+        "Agent warns that the saved panel may ignore HAVING and does not call signoz_create_dashboard without explicit user acceptance of the unvalidated panel"
+      ],
+      "files": []
+    },
+    {
+      "id": 21,
+      "eval_name": "unsupported-builder-function-blocks-lossy-validation",
+      "prompt": "Create a metrics dashboard panel that uses the Builder timeShift function to compare the current series with one hour ago.",
+      "expected_output": "Agent reads the current signoz_execute_builder_query schema. If that schema cannot represent Builder functions, it surfaces the exact validation gap instead of deleting timeShift and claiming a successful dry-run; it waits for explicit acceptance before any unvalidated create.",
+      "expectations": [
+        "Agent checks the current signoz_execute_builder_query schema for functions support",
+        "When functions is unsupported, no actual dry-run silently omits timeShift and no such lossy call is described as successful",
+        "Agent identifies the panel as unvalidated and asks for explicit acceptance before signoz_create_dashboard",
+        "Agent preserves the requested functions field in any dashboard/editor draft rather than weakening the saved query"
+      ],
+      "files": []
+    },
+    {
+      "id": 22,
+      "eval_name": "formula-order-limit-schema-gate",
+      "prompt": "Create a table of the top 5 services by error percentage using A / B * 100 as formula F1, ordered by F1 descending.",
+      "expected_output": "Agent authors formula F1 in dashboard/editor form, then checks whether the current builder_formula execution schema supports order and limit. With the current schema, it surfaces those unsupported execution-affecting fields and does not run a stripped formula or call create without explicit acceptance.",
+      "expectations": [
+        "The dashboard/editor draft keeps queryFormulas queryName='F1', expression='A / B * 100', limit=5, and orderBy in dashboard form",
+        "Agent checks the current builder_formula tool schema for limit and order support",
+        "When unsupported, the agent does not omit formula limit/order and describe the resulting dry-run as successful",
+        "Agent names the formula validation gap and waits for explicit acceptance before signoz_create_dashboard",
+        "If the live schema does support them, the actual execution call instead uses a builder_formula spec named F1 with limit=5 and canonical order, never queryName/orderBy"
+      ],
+      "files": []
+    },
+    {
+      "id": 23,
+      "eval_name": "trace-operator-sibling-envelope-contract",
+      "prompt": "Create a traces graph that counts flows where checkout span query A is a direct ancestor of payment span query B, using trace operator T1 with expression A => B.",
+      "expected_output": "Agent authors base trace queries A and B plus dashboard queryTraceOperator T1, translates them into sibling builder_query, builder_query, and raw-preserved builder_trace_operator envelopes in one execution call, validates that complete call, and only then creates the dashboard with the editor JSON unchanged.",
+      "expectations": [
+        "The actual signoz_create_dashboard payload keeps base queries A and B under builder.queryData and T1 under builder.queryTraceOperator with queryName='T1' and expression='A => B'",
+        "The actual signoz_execute_builder_query payload contains builder_query A, builder_query B, and builder_trace_operator T1 as siblings in the same compositeQuery.queries array",
+        "The builder_trace_operator spec has name='T1', expression='A => B', and trace aggregations such as [{expression:'count()'}]",
+        "The builder_trace_operator spec is passed through the current MCP raw-preservation contract and is never coerced into builder_query",
+        "The execution trace-operator spec does not copy dashboard aliases queryName, dataSource, pageSize, orderBy, selectColumns, or queryTraceOperator, and does not invent signal, filter, functions, or disabled fields",
+        "Agent does not call signoz_create_dashboard until the complete trace-operator execution call succeeds"
+      ],
+      "files": []
     }
   ]
 }

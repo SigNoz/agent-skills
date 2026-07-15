@@ -1,0 +1,44 @@
+{
+  "mode": "offline_mcp_fixture",
+  "instructions": "Use these responses to reconstruct the incident and analyze group-specific state transitions offline. Do not query a live tenant. History was requested with timeRange=7d, order=desc, and no state filter.",
+  "responses": [
+    {
+      "tool": "signoz_get_alert",
+      "request": {"id": "019f0000-0000-7000-8000-000000000201"},
+      "response": {
+        "data": {
+          "id": "019f0000-0000-7000-8000-000000000201",
+          "alert": "Latency by service",
+          "alertType": "TRACES_BASED_ALERT",
+          "ruleType": "threshold_rule",
+          "condition": {
+            "compositeQuery": {"queryType": "builder", "queries": []},
+            "thresholds": {"kind": "basic", "spec": [{"name": "critical", "target": 2, "targetUnit": "s", "op": "above", "matchType": "at_least_once", "channels": ["pagerduty-oncall"]}]}
+          },
+          "evaluation": {"kind": "rolling", "spec": {"evalWindow": "5m", "frequency": "1m"}},
+          "notificationSettings": {"groupBy": ["service.name"], "usePolicy": false}
+        }
+      }
+    },
+    {
+      "tool": "signoz_get_alert_history",
+      "request": {"id": "019f0000-0000-7000-8000-000000000201", "timeRange": "7d", "order": "desc"},
+      "response": {
+        "data": {
+          "items": [
+            {"overallState": "inactive", "overallStateChanged": true, "state": "inactive", "stateChanged": true, "unixMilli": 1750001400000, "labels": [{"key": {"name": "service.name"}, "value": "payments"}], "fingerprint": 202, "value": 1.1},
+            {"overallState": "firing", "overallStateChanged": false, "state": "inactive", "stateChanged": true, "unixMilli": 1750001300000, "labels": [{"key": {"name": "service.name"}, "value": "checkout"}], "fingerprint": 101, "value": 1.2},
+            {"overallState": "firing", "overallStateChanged": false, "state": "firing", "stateChanged": true, "unixMilli": 1750001250000, "labels": [{"key": {"name": "service.name"}, "value": "checkout"}], "fingerprint": 101, "value": 2.6},
+            {"overallState": "firing", "overallStateChanged": false, "state": "inactive", "stateChanged": true, "unixMilli": 1750001200000, "labels": [{"key": {"name": "service.name"}, "value": "checkout"}], "fingerprint": 101, "value": 1.0},
+            {"overallState": "firing", "overallStateChanged": false, "state": "firing", "stateChanged": true, "unixMilli": 1750001150000, "labels": [{"key": {"name": "service.name"}, "value": "checkout"}], "fingerprint": 101, "value": 2.5},
+            {"overallState": "firing", "overallStateChanged": false, "state": "inactive", "stateChanged": true, "unixMilli": 1750001100000, "labels": [{"key": {"name": "service.name"}, "value": "checkout"}], "fingerprint": 101, "value": 1.1},
+            {"overallState": "firing", "overallStateChanged": true, "state": "firing", "stateChanged": true, "unixMilli": 1750000000000, "labels": [{"key": {"name": "service.name"}, "value": "payments"}], "fingerprint": 202, "value": 2.8},
+            {"overallState": "firing", "overallStateChanged": true, "state": "firing", "stateChanged": true, "unixMilli": 1750000000000, "labels": [{"key": {"name": "service.name"}, "value": "checkout"}], "fingerprint": 101, "value": 2.4}
+          ],
+          "total": 8
+        },
+        "note": "hasMore: false"
+      }
+    }
+  ]
+}

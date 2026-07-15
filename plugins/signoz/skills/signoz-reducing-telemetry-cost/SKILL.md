@@ -62,8 +62,9 @@ For a rolling 7-day window (`end` = now, `start` = end − 7 days), get the per-
 
 Then break the primary signal down by environment and service. First call
 `signoz_get_field_keys` with `signal: "metrics"` and `source: "meter"`; use only keys it returns
-and copy each key's `fieldContext` into the raw builder `groupBy` alongside
-`signal: "metrics"`. Run the same meter query with that complete `groupBy` and report the top
+and copy each key's `name`, `fieldDataType`, `fieldContext`, and `signal` into the raw
+builder `groupBy` without translating or dropping fields. Run the same meter query with that
+complete `groupBy` and report the top
 ~10 per group with their share. If a non-prod environment (`staging`, `dev`, `test`, `qa`,
 `sandbox`, `preview`, `uat`, …) is > 40% of volume, recommend Ingestion Limits on that key
 before any signal-level change: https://signoz.io/docs/ingestion/signoz-cloud/keys/
@@ -226,7 +227,7 @@ all services at once.
 **4b. Cost per service + ops per service.** Span GB by service: use
 `signoz_execute_builder_query` with the discovered meter metric whose live unit and meaning
 represent span bytes, summed as in Step 1 and grouped by the `service.name` field returned by
-`signoz_get_field_keys` (including its `fieldContext` and `signal: "metrics"`).
+`signoz_get_field_keys` (copying its `name`, `fieldDataType`, `fieldContext`, and `signal`).
 Compute each service's % against the **grouped total (sum of all service groups from this same
 query)**, not a top-N sum and not the separately-fetched ungrouped total — keep numerator and
 denominator on one grouped basis. For each top-3

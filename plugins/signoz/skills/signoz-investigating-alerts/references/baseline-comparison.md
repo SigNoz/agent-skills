@@ -130,12 +130,13 @@ Tier 3 does not require a baseline — the question is "what happened",
 not "what changed". Run a single fire-window query for each:
 
 - `signoz_search_traces` with the resource filter + `has_error = true`.
-  Cap at 20. Group by `name` (operation) and surface the top 3 by
-  count with one representative `trace_id` each.
+  Cap at 20. Group the sample by `name` (operation) and `status_message`, and
+  surface the top 3 with one representative `trace_id` each.
 - `signoz_search_logs` with the resource filter +
   `severity_text IN ('ERROR', 'FATAL')`. Cap at 20 most recent. Group
   by message pattern (or `exception.type`) and surface the top 3.
 - For deep drill on one trace, map the search row's `trace_id` to the details
-  input: `signoz_get_trace_details` with `{ "traceId": "<returned trace_id>" }`.
+  input: `signoz_get_trace_details` with `{ "traceId": "<returned trace_id>",
+  "start": "<fire_start_ms>", "end": "<fire_end_ms>" }`.
   It extracts span-level attributes (DB statement, peer service, status code)
   when the operation name alone doesn't identify the failing call.

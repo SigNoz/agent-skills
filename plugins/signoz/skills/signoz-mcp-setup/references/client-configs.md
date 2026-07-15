@@ -131,19 +131,17 @@ by the `MCP: Open User Configuration` command.
 
 ### Claude Desktop
 
-Claude Desktop can add SigNoz Cloud as a custom connector from Settings. If
-the user asks for raw config, add the `signoz` entry to
-`claude_desktop_config.json`.
+For SigNoz Cloud or a **publicly reachable** self-hosted HTTP endpoint, add
+SigNoz through **Settings → Connectors → Add custom connector** and enter the
+resolved MCP URL. Complete OAuth when SigNoz Cloud prompts for it. Claude
+Desktop remote connectors originate from Anthropic's cloud, so `localhost`,
+VPN-only, and private-network endpoints are not reachable through this path;
+use a local stdio registration for those deployments.
 
-```json
-{
-  "mcpServers": {
-    "signoz": {
-      "url": "https://mcp.us.signoz.cloud/mcp"
-    }
-  }
-}
-```
+Do not put a remote `url` entry in `claude_desktop_config.json`; Claude Desktop
+does not use that file for remote MCP custom connectors. The file is only for a
+local stdio registration with `command`, `args`, and `env`, as shown under
+[Self-Hosted Stdio](#self-hosted-stdio).
 
 ### Claude Code native CLI
 
@@ -453,8 +451,10 @@ Edit `opencode.json` or `opencode.jsonc`.
   Tools & MCP if prompted.
 - VS Code / GitHub Copilot: open Copilot Chat in Agent mode, approve the
   `signoz` server, and complete authentication.
-- Claude Desktop: restart or reconnect the custom connector, then complete
-  authentication.
+- Claude Desktop hosted/public HTTP: reconnect the custom connector, then
+  complete authentication when applicable.
+- Claude Desktop local stdio: restart Claude Desktop so it reloads the local
+  command entry in `claude_desktop_config.json`; do not add a remote URL there.
 - Claude Code: run `/mcp`, select `signoz`, and complete authentication.
 - Codex (SigNoz Cloud): run `codex mcp login signoz`, then verify with `/mcp`.
 - Codex (self-hosted HTTP): no OAuth step unless the server runs with

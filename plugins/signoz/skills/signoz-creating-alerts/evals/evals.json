@@ -5,7 +5,12 @@
       "id": 0,
       "eval_name": "metric-cpu-multi-severity",
       "prompt": "set up an alert for cartservice CPU usage. warning at 80%, page on-call at 90%. send warnings to #staging-alerts slack and criticals to 'test pager send resolved' pagerduty.",
-      "expected_output": "Multi-severity METRIC_BASED_ALERT with two thresholds (warning 80, critical 90), per-severity channels (slack on warning, pagerduty on critical), service.name='cartservice' filter on a CPU metric (e.g. system.cpu.utilization or k8s.pod.cpu.utilization), targetUnit percent, op='above', matchType='on_average' (canonical word form preferred over numeric codes). Should run discovery for the right CPU metric and run the mandatory signoz_execute_builder_query dry-run before emitting a plain-language summary and saving.",
+      "expected_output": "Multi-severity METRIC_BASED_ALERT with two thresholds (warning 80, critical 90), per-severity channels (slack on warning, pagerduty on critical), service.name='cartservice' filter on a CPU metric (e.g. system.cpu.utilization or k8s.pod.cpu.utilization), targetUnit percent, op='above', matchType='on_average' (canonical word form preferred over numeric codes). Runs a concrete-metric data probe, then the mandatory full-query dry-run before emitting a plain-language summary and saving.",
+      "expectations": [
+        "The data probe calls signoz_query_metrics with a concrete metricName and the cartservice filter; it never sends count() or count_distinct(service.name) as a metrics aggregation expression",
+        "The signoz_create_alert payload puts Slack in the warning threshold channels and PagerDuty in the critical threshold channels",
+        "The threshold-rule create payload does not rely on top-level preferredChannels for its per-severity routing"
+      ],
       "files": []
     },
     {
@@ -13,20 +18,35 @@
       "eval_name": "traces-error-rate-duplicate-detection",
       "prompt": "alert me when error rate on checkoutservice goes above 3%. send to #staging-alerts on slack.",
       "expected_output": "TRACES_BASED_ALERT with formula F1 = A*100/B (A = count of error spans, B = count of all spans) on service.name='checkoutservice', threshold target 3, targetUnit percent. CRITICAL: must paginate signoz_list_alert_rules and detect existing 'checkout-svc Error Rate > 3%' alert, surface it as a duplicate, and ask whether to proceed/modify/cancel rather than silently creating another one.",
+      "expectations": [
+        "The trace data probe calls signoz_aggregate_traces with aggregation=count, never aggregation=count()",
+        "If creation proceeds after duplicate resolution, the direct channel is in condition.thresholds.spec[].channels"
+      ],
       "files": []
     },
     {
       "id": 2,
       "eval_name": "logs-pod-crash-keywords",
       "prompt": "create a log-based alert for pod crashes — fire if we see OOMKilled, CrashLoopBackOff, panic, or FATAL anywhere in log bodies. group by service so I know which one. notify #staging-alerts.",
-      "expected_output": "LOGS_BASED_ALERT, signal=logs, count() aggregation, body filter using LIKE/CONTAINS for the four keywords (OR'd), groupBy service.name with fieldContext=resource and fieldDataType=string. Threshold > 0, matchType='at_least_once' (canonical word form preferred over numeric codes). Runs the mandatory dry-run via signoz_execute_builder_query (with signal=logs in the builder_query.spec). CRITICAL: crash-pattern alerts (OOMKilled / CrashLoopBackOff / panic / FATAL) intentionally have zero matches in a healthy system — agent must surface the zero-match result, ask the user to confirm before saving an alert that returns nothing now, and skip the would-have-fired breach-count computation per the skill's healthy-zero exception. Must NOT treat zero matches as a failure or nudge the user to loosen the filter.",
+      "expected_output": "LOGS_BASED_ALERT, signal=logs, count() aggregation, body filter using LIKE/CONTAINS for the four keywords (OR'd), groupBy service.name with fieldContext=resource and fieldDataType=string. Threshold > 0, matchType='at_least_once' (canonical word form preferred over numeric codes). Runs the mandatory data probe and full-query dry-run. CRITICAL: crash-pattern alerts (OOMKilled / CrashLoopBackOff / panic / FATAL) intentionally have zero matches in a healthy system — agent must surface the zero-match result, ask the user to confirm before saving an alert that returns nothing now, and skip the would-have-fired breach-count computation per the skill's healthy-zero exception. Must NOT treat zero matches as a failure or nudge the user to loosen the filter.",
+      "expectations": [
+        "The log data probe calls signoz_aggregate_logs with aggregation=count, never aggregation=count()",
+        "The full dry-run uses signoz_execute_builder_query with signal=logs in the builder_query spec",
+        "The signoz_create_alert payload puts the chosen Slack channel in condition.thresholds.spec[].channels"
+      ],
       "files": []
     },
     {
       "id": 3,
       "eval_name": "anomaly-frontend-request-rate",
       "prompt": "set up anomaly detection for frontend service request rate — alert me if traffic suddenly drops or spikes versus normal patterns. slack #staging-alerts is fine.",
-      "expected_output": "METRIC_BASED_ALERT with anomaly_rule, algorithm=standard (z-score based), seasonality=daily or hourly. Uses signoz_calls_total or http.server.request.count metric filtered by service.name='frontend'. Threshold target ~3 standard deviations and op='above' because the anomaly score is absolute. Skips the 'would have fired N times' breach count for anomaly alerts but still runs the mandatory signoz_execute_builder_query dry-run to verify the underlying query returns data.",
+      "expected_output": "METRIC_BASED_ALERT with anomaly_rule, algorithm=standard (z-score based), seasonality=daily or hourly. Uses signoz_calls_total or http.server.request.count metric filtered by service.name='frontend'. Threshold target ~3 standard deviations and op='above' because the anomaly score is absolute. Skips the 'would have fired N times' breach count but dry-runs the underlying metric query and routes to Slack through top-level preferredChannels.",
+      "expectations": [
+        "The metric data probe calls signoz_query_metrics with a concrete metricName and service.name='frontend'; it never uses an expression-only count() metrics aggregation",
+        "The signoz_execute_builder_query dry-run validates the base metric query without claiming to validate the anomaly functions transform or anomaly score",
+        "The signoz_create_alert payload has top-level preferredChannels containing the selected Slack channel",
+        "The anomaly create payload omits condition.thresholds, evaluation, notificationSettings, and schemaVersion"
+      ],
       "files": []
     },
     {
@@ -34,6 +54,11 @@
       "eval_name": "formula-gated-p99-with-count-guard",
       "prompt": "alert me when paymentservice p99 latency exceeds 1 second, but ONLY when request count is above 50 per minute — don't want to be paged on low-traffic noise. critical severity, send to both #staging-alerts slack AND 'test pager send resolved' pagerduty.",
       "expected_output": "TRACES_BASED_ALERT with query A = p99(duration_nano) on service.name='paymentservice', stepInterval=60, and having.expression='count() > 50' to suppress low-traffic one-minute buckets. selectedQueryName='A'. Threshold target 1 with targetUnit='s', op='above', critical severity, and both channels attached. It does not invent a comparison inside a numeric formula. Runs the exact guarded query through signoz_execute_builder_query before save and explains the count guard in the preview.",
+      "expectations": [
+        "The trace data probe calls signoz_aggregate_traces with aggregation=count, never aggregation=count()",
+        "The full dry-run preserves having.expression=count() > 50 in the Query Builder spec",
+        "The signoz_create_alert payload places both Slack and PagerDuty names in the critical threshold channels array"
+      ],
       "files": []
     }
   ]

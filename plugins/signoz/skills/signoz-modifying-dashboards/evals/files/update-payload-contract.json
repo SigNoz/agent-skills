@@ -1,0 +1,82 @@
+{
+  "mode": "offline_mcp_fixture",
+  "instructions": "Use the ordered reads and stubbed writes to produce an offline simulated tool trace. The update endpoint is a stub; make the actual tool call so its payload can be inspected.",
+  "responses": [
+    {
+      "tool": "signoz_list_dashboards",
+      "request": {"limit": 50, "offset": 0},
+      "response": {
+        "data": [{"uuid": "66666666-6666-4666-8666-666666666666", "name": "Error Explorer"}],
+        "pagination": {"total": 1, "offset": 0, "limit": 50, "hasMore": false, "nextOffset": -1}
+      }
+    },
+    {
+      "tool": "signoz_get_dashboard",
+      "request": {"id": "66666666-6666-4666-8666-666666666666"},
+      "response": {
+        "status": "success",
+        "data": {
+          "uuid": "66666666-6666-4666-8666-666666666666",
+          "title": "Error Explorer",
+          "description": "Recent error traces",
+          "tags": ["traces"],
+          "variables": {},
+          "widgets": [
+            {
+              "id": "77777777-7777-4777-8777-777777777777",
+              "panelTypes": "list",
+              "title": "Recent Errors",
+              "query": {
+                "queryType": "builder",
+                "builder": {
+                  "queryData": [
+                    {
+                      "queryName": "A",
+                      "dataSource": "traces",
+                      "expression": "A",
+                      "filters": {
+                        "items": [
+                          {
+                            "key": {"key": "has_error", "dataType": "bool", "type": "span"},
+                            "op": "=",
+                            "value": true
+                          }
+                        ],
+                        "op": "AND"
+                      },
+                      "groupBy": [],
+                      "pageSize": 10,
+                      "orderBy": [{"columnName": "timestamp", "order": "desc"}],
+                      "selectColumns": [
+                        {"name": "service.name", "fieldDataType": "string", "fieldContext": "resource", "signal": "traces"},
+                        {"name": "name", "fieldDataType": "string", "fieldContext": "span", "signal": "traces"}
+                      ],
+                      "aggregations": []
+                    }
+                  ],
+                  "queryFormulas": []
+                }
+              },
+              "selectedLogFields": [],
+              "selectedTracesFields": [],
+              "thresholds": [],
+              "contextLinks": []
+            }
+          ],
+          "layout": [{"i": "77777777-7777-4777-8777-777777777777", "x": 0, "y": 0, "w": 12, "h": 6}],
+          "panelMap": {}
+        }
+      }
+    }
+  ],
+  "stubbed_tools": [
+    {
+      "tool": "signoz_execute_builder_query",
+      "response": {"status": "success", "data": {"result": [{"service.name": "checkout", "name": "POST /checkout"}]}}
+    },
+    {
+      "tool": "signoz_update_dashboard",
+      "response": "dashboard updated"
+    }
+  ]
+}

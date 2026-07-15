@@ -419,8 +419,9 @@ What this orchestration layer adds on top of that skill:
 ## Phase 9 — Hand off
 
 Hand back to the human:
-- Dashboard ID(s), view IDs, alert IDs. Don't synthesize frontend URLs —
-  return IDs and let the UI resolve them.
+- Dashboard ID(s), view IDs, and alert IDs. Include a `webUrl` only when that
+  exact value was returned by an MCP tool; otherwise return the ID. Never
+  construct a frontend URL from an ID or tenant hostname.
 - Open questions you couldn't resolve — hand them over as explicit
   TODOs.
 - Baselines that may need tuning (e.g. "tool error rate is 5.1% today;
@@ -440,7 +441,8 @@ Hand back to the human:
 - **One alert per metric.** Group by routing tier, not per-metric.
 - **High-cardinality labels on metric series.** They detonate the bill.
   Move to traces/logs.
-- **Synthesizing frontend URLs.** Tools return IDs. Return IDs.
+- **Synthesizing frontend URLs.** Return an MCP-provided `webUrl` when present;
+  otherwise return the resource ID only.
 - **Including scanner traffic in SLI denominators.** Real but
   irrelevant. Exclude.
 - **Treating exploration findings as throwaway.** Baselines,

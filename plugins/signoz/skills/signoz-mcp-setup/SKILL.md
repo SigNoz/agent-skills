@@ -71,13 +71,19 @@ Silently determine the SigNoz MCP server state using the reference flow,
 
 State outcomes:
 
-- **working** — continue with the user's original SigNoz request.
+- **working** — a tenant-backed read such as `signoz_list_services` succeeded;
+  continue with the user's original SigNoz request.
 - **not-setup** — run Step 3.
 - **configured-but-not-working** — if the user provided a new region or MCP URL,
   run Step 3. Otherwise tell them the SigNoz MCP server is configured but not
   connected, then ask for the SigNoz Cloud region or MCP URL to repair it. If
   they believe the endpoint is already correct, tell them to complete the
   client authentication step in Step 5.
+
+A successful `signoz_search_docs` call proves only that the MCP transport and
+local docs index are reachable. It does not validate the SigNoz tenant URL,
+credentials, or authorization, so never use docs search alone to mark the
+connection working; continue with the tenant-backed probe in `mcp-settings.md`.
 
 Do not fall back to raw HTTP calls for SigNoz data when MCP is unavailable.
 The MCP server is the supported API surface for this plugin's live SigNoz
@@ -188,8 +194,12 @@ client-specific authentication step:
   already-authenticated `signoz` server is connected.
 - **Claude Code** — restart Claude Code if the server does not appear, then run
   `/mcp`, select `signoz`, and complete authentication.
-- **Claude Desktop** — restart Claude Desktop or reconnect the custom
-  connector, then complete authentication when prompted.
+- **Claude Desktop** — for SigNoz Cloud or publicly reachable self-hosted HTTP,
+  reconnect the custom connector and complete authentication when prompted.
+  Private-network or localhost endpoints need local stdio because remote
+  connectors originate from Anthropic's cloud. Restart Claude Desktop after a
+  local stdio change so it reloads `claude_desktop_config.json`; that file is
+  only for command-based registration, not a hosted URL.
 - **Gemini CLI** — restart Gemini CLI if needed, then run `/mcp auth signoz`.
 - **Devin CLI** — start a new session so the updated `.devin/config.json` is
   picked up. For SigNoz Cloud, run `devin mcp login signoz` to complete OAuth.

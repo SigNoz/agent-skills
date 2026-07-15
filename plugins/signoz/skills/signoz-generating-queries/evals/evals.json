@@ -5,7 +5,16 @@
       "id": 0,
       "eval_name": "metrics-error-rate-service",
       "prompt": "Show me the error rate for the checkout-service over the last hour.",
-      "expected_output": "Agent runs metrics discovery (signoz_list_metrics) then queries an error-rate metric (e.g., signoz_calls_total) with service filter and a ratio formula. Reports the rate with the time window, or correctly handles a no-data / missing-instrumentation case.",
+      "expected_output": "Agent discovers a concrete request-count metric by a substring that can match its name, discovers the error field/value, and calls signoz_query_metrics with a complete A/B formula payload. Primary query A filters the requested service plus the discovered error value; formulaQueries defines B with the same discovered metric and metadata but only the service filter, and formula is A / B * 100. Reports the rate with the time window, or correctly handles a no-data / missing-instrumentation case.",
+      "expectations": [
+        "Agent calls signoz_list_metrics with a searchText that can match the selected metric name; it does not claim searchText=error discovered signoz_calls_total",
+        "Agent discovers the metric's error field and calls signoz_get_field_values with signal=metrics, the returned field name/context, and the same metricName before using the returned error value in a filter",
+        "The actual signoz_query_metrics call uses the exact metricName, metricType, temporality, and isMonotonic values returned by discovery",
+        "The actual signoz_query_metrics primary filter for query A contains both service.name = 'checkout-service' and the discovered error condition",
+        "The actual signoz_query_metrics formulaQueries is an array containing a query named B with a concrete metricName and the same discovered metric metadata as A",
+        "Query B has a distinct total-request filter containing service.name = 'checkout-service' but not the error-only condition",
+        "The actual signoz_query_metrics call sets formula to A / B * 100, so every referenced query name is defined"
+      ],
       "files": []
     },
     {
@@ -40,12 +49,13 @@
       "id": 5,
       "eval_name": "metrics-cost-meter-ingestion-by-service",
       "prompt": "How much log data is each service ingesting?",
-      "expected_output": "Agent recognizes ingestion bytes live only in the Cost Meter store and discovers the live metric name, unit, and temporality with signoz_list_metrics source=meter. It discovers service.name with signoz_get_field_keys signal=metrics source=meter, then uses signoz_execute_builder_query, not signoz_query_metrics, with the full outer query wrapper, Unix-ms range, requestType=time_series, formatOptions, variables, source=meter, the discovered metricName and temporality, stepInterval=3600, raw timeAggregation=sum, spaceAggregation=sum, and a groupBy carrying the returned fieldContext plus signal=metrics. It excludes partial datapoints and sums complete hourly buckets per service. If the meter lacks the requested attribute, it falls back to a direct count aggregation and clearly notes that bytes remain meter-only.",
+      "expected_output": "Agent recognizes ingestion bytes live only in the Cost Meter store and discovers the live metric name, unit, and temporality with signoz_list_metrics source=meter. It discovers service.name with signoz_get_field_keys signal=metrics source=meter, then uses signoz_execute_builder_query, not signoz_query_metrics, with the full outer query wrapper, Unix-ms range, requestType=time_series, formatOptions, variables, source=meter, the discovered metricName and temporality, stepInterval=3600, raw timeAggregation=sum, spaceAggregation=sum, and a groupBy that losslessly copies the returned name, fieldDataType, fieldContext, and signal. It excludes partial datapoints and sums complete hourly buckets per service. If the meter lacks the requested attribute, it falls back to a direct count aggregation and clearly notes that bytes remain meter-only.",
       "expectations": [
         "Agent calls signoz_list_metrics with source=meter and uses the returned log-volume metric name, unit, and temporality",
-        "Agent calls signoz_get_field_keys with signal=metrics and source=meter and uses the returned service.name fieldContext",
+        "Agent calls signoz_get_field_keys with signal=metrics and source=meter and uses the returned service.name field descriptor",
         "Agent uses signoz_execute_builder_query with an outer query object containing Unix-millisecond start and end, requestType=time_series, formatOptions, and variables",
-        "Agent uses signal=metrics, source=meter, the discovered metricName and temporality, stepInterval=3600, raw timeAggregation=sum, spaceAggregation=sum, and groupBy service.name with the returned fieldContext and signal=metrics",
+        "The actual signoz_execute_builder_query payload uses signal=metrics, source=meter, the discovered metricName and temporality, stepInterval=3600, raw timeAggregation=sum, and spaceAggregation=sum",
+        "Every raw builder groupBy entry in the actual payload losslessly copies name, fieldDataType, fieldContext, and signal from signoz_get_field_keys",
         "Agent does not use signoz_query_metrics for the grouped Cost Meter total attribution",
         "Agent excludes partial=true datapoints and sums complete hourly buckets per service",
         "Agent falls back to a direct count and notes that bytes remain meter-only if service.name is unavailable in the meter"

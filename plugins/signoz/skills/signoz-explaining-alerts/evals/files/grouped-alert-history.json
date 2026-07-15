@@ -1,0 +1,40 @@
+{
+  "mode": "offline_mcp_fixture",
+  "instructions": "Use these responses to explain the rule and compute fire frequency offline. Do not query a live tenant. History was requested with timeRange=7d, state=firing, order=desc.",
+  "responses": [
+    {
+      "tool": "signoz_get_alert",
+      "request": {"id": "019f0000-0000-7000-8000-000000000101"},
+      "response": {
+        "data": {
+          "id": "019f0000-0000-7000-8000-000000000101",
+          "alert": "Checkout latency by service",
+          "alertType": "TRACES_BASED_ALERT",
+          "ruleType": "threshold_rule",
+          "condition": {
+            "compositeQuery": {"queryType": "builder", "queries": []},
+            "thresholds": {"kind": "basic", "spec": [{"name": "critical", "target": 2, "targetUnit": "s", "op": "above", "matchType": "at_least_once", "channels": ["pagerduty-oncall"]}]}
+          },
+          "evaluation": {"kind": "rolling", "spec": {"evalWindow": "5m", "frequency": "1m"}},
+          "notificationSettings": {"groupBy": ["service.name"], "usePolicy": false},
+          "labels": {"severity": "critical"}
+        }
+      }
+    },
+    {
+      "tool": "signoz_get_alert_history",
+      "request": {"id": "019f0000-0000-7000-8000-000000000101", "timeRange": "7d", "state": "firing", "order": "desc"},
+      "response": {
+        "data": {
+          "items": [
+            {"overallState": "firing", "overallStateChanged": false, "state": "firing", "stateChanged": true, "unixMilli": 1750000300000, "labels": [{"key": {"name": "service.name"}, "value": "checkout"}], "fingerprint": 101, "value": 2.4},
+            {"overallState": "firing", "overallStateChanged": true, "state": "firing", "stateChanged": true, "unixMilli": 1750000000000, "labels": [{"key": {"name": "service.name"}, "value": "payments"}], "fingerprint": 202, "value": 2.8},
+            {"overallState": "firing", "overallStateChanged": true, "state": "firing", "stateChanged": true, "unixMilli": 1750000000000, "labels": [{"key": {"name": "service.name"}, "value": "checkout"}], "fingerprint": 101, "value": 2.3}
+          ],
+          "total": 3
+        },
+        "note": "hasMore: false"
+      }
+    }
+  ]
+}

@@ -104,6 +104,20 @@
         {"id": "fetches_canonical_cost_meter_page", "text": "Agent fetches the canonical Cost Meter meter explorer query guide page."},
         {"id": "cites_canonical_url", "text": "Answer cites the canonical https://signoz.io/docs/... URL."}
       ]
+    },
+    {
+      "id": 7,
+      "eval_name": "refetches-size-truncated-page-by-heading",
+      "prompt": "Find the SigNoz self-hosted authentication documentation and explain the API-key configuration. The first signoz_fetch_doc response has truncation_reason='size' and available_headings includes an Authentication heading that is relevant to my question.",
+      "expected_output": "Agent treats the first content block as incomplete, selects the relevant Authentication entry from available_headings, and refetches the same canonical search-result URL with heading='Authentication' (or its returned anchor/text). It answers from the narrowed fetched content. If the narrowed fetch is still incomplete before the needed details, it explicitly discloses that limitation rather than claiming the setting is absent.",
+      "files": [],
+      "assertions": [
+        {"id": "checks_truncation_reason", "text": "Agent inspects truncation_reason and recognizes 'size' means the first fetched content is incomplete."},
+        {"id": "uses_available_heading", "text": "Agent selects the relevant Authentication heading from available_headings rather than guessing a heading."},
+        {"id": "refetches_same_url", "text": "Agent calls signoz_fetch_doc again with the same canonical URL and the returned relevant heading."},
+        {"id": "grounds_answer_in_narrow_fetch", "text": "Agent grounds the API-key answer in the narrowed fetched content and cites the canonical URL."},
+        {"id": "discloses_if_still_incomplete", "text": "If the narrowed response is still truncated before the needed material, Agent discloses incomplete coverage and does not infer that missing content or a setting does not exist."}
+      ]
     }
   ]
 }

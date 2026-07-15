@@ -347,9 +347,9 @@ asks for a specific window, mention that range in the final handoff instead of
 inventing `timeRange`, `defaultTimeRange`, or `refresh` fields. Do not encode a
 PromQL range selector inside a Builder query.
 
-All panels are validated in Step 3b-ii.6 via the mandatory dry-run
-before save. Author the saved query semantics first, then use the
-lossless dry-run translation below.
+Representable panels are validated in Step 3b-ii.6 via the mandatory
+dry-run before save; accepted validation gaps stay explicit. Author the
+saved query semantics first, then use the schema-checked translation below.
 
 **Defaults the skill applies (and surfaces in the preview):**
 
@@ -393,25 +393,24 @@ native JSON — stringifying them produces errors like
 
 ##### Step 3b-ii.6: Dry-run before save (mandatory)
 
-Call `signoz_execute_builder_query` per panel. The dry-run
-validates the query is well-formed *and* confirms data flows under
-that filter — the per-panel data probe folds in here.
+Read
+[`references/dashboard-to-query-builder-v5.md`](./references/dashboard-to-query-builder-v5.md),
+then call `signoz_execute_builder_query` per panel. Build the complete payload from
+the current tool schema; never pass widget JSON. Translate every
+execution-affecting field, all base-query/formula/trace-operator envelopes,
+query names (`A`, `B`, `F1`, `T1`), and representative variable values. Keep
+dashboard aliases unchanged in `signoz_create_dashboard`.
 
-Build the complete payload from the current tool schema; do not pass widget JSON. Translate PromQL and ClickHouse losslessly. Builder queries cross a contract boundary:
-
-- `queryName` → `name`; `dataSource` → `signal`
-- `groupBy[].key` → `name`; `dataType` → `fieldDataType`; `type` → `fieldContext`
-- Set each dry-run `groupBy[].signal` to the translated query `signal`.
-
-Keep the saved `groupBy` unchanged in `signoz_create_dashboard`, including `{key,dataType,type}`; dry-run `groupBy` must use only
-`{name,fieldDataType,fieldContext,signal}`. Preserve all other
-semantics, query names (`A`, `B`, `F1`), and representative variable values.
+If the current execution schema cannot represent an execution-affecting saved
+field, do not strip it and call the dry-run successful. Stop and surface the
+validation gap; proceed only after the user explicitly accepts that the panel is
+unvalidated. Saved-only display metadata such as `legend` does not block.
 
 Server or validation error = fail. Unexpected zero rows also fail,
 unless the user already chose to build despite confirmed missing telemetry.
 
-Coverage: dry-run **every query-bearing panel**, regardless of count
-or shape. Trivial panels fail silently too (wrong severity filter,
+Coverage: dry-run **every schema-representable query-bearing panel**; use the
+safety gate for unsupported fields. Trivial panels fail silently too (wrong severity filter,
 wrong resource scope, attribute name shorthand like `service` instead
 of `service.name`) — the same footguns that bite non-trivial panels.
 Row / header panels (`panelTypes: "row"`) have no query to execute —
@@ -423,13 +422,13 @@ instead and skip them here.
 1. **Preview** Emit a one-paragraph plain-language summary of what
    will be created — no JSON dump. A 20–30 widget payload is hundreds
    of lines the user cannot meaningfully review in chat, and the
-   dry-run has already validated every query-bearing panel; data was
-   confirmed except where the user accepted missing telemetry.
+   dry-run has validated every representable query-bearing panel; call
+   out any validation gap the user explicitly accepted.
 
    > **Summary**: This dashboard tracks [signals] for [scope], with
    > sections [list]. Variables: [list].
-   > Dry-run: all [N] query-bearing panels passed validation. Data:
-   > [confirmed / pending ingestion by explicit user choice].
+   > Dry-run: [N] panels passed. Unvalidated: [none / accepted gaps].
+   > Data: [confirmed / pending ingestion by explicit user choice].
 
 2. **Save** Call `signoz_create_dashboard` with the payload.
 
@@ -465,8 +464,9 @@ instead and skip them here.
 - **Mandatory dry-run before save on custom builds** Before
   `signoz_create_dashboard`, run
   `signoz_execute_builder_query` per Step 3b-ii.6 using the current
-  tool schema and lossless active-query translation. Skipping is
-  equivalent to skipping the duplicate check.
+  tool schema and the referenced active-query translation. Never call
+  a stripped query losslessly validated; surface unsupported
+  execution fields and require explicit acceptance before proceeding.
   The create-dashboard schema accepts queries that 500 at query time
   — a `groupBy` on a numeric attribute, an
   aggregation incompatible with the metric type — and the result
