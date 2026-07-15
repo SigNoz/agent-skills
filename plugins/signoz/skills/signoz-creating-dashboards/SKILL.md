@@ -89,19 +89,11 @@ a guessed value.
 
 ## Workflow
 
-The flow runs in order: **duplicate check → user picks modify-or-create
-→ on create, template lookup decides template-import vs custom-build →
-no-data probe → per-panel dry-run → preview → save**. Duplicate check
-comes first so we never silently create a second copy of something that
-already exists. Once the user has chosen to create, the template lookup
-is an internal implementation detail — if a curated template fits we
-use it, otherwise we build from scratch. The per-panel dry-run
-(`signoz_execute_builder_query` against every query-bearing
-panel) is mandatory before save — a saved empty panel from a typo'd
-attribute or wrong severity filter is the worst failure mode for this
-skill, and dry-run is the only step that catches it. The user is
-offered exactly two upfront choices: modify an existing dashboard, or
-create a new one.
+The create path starts **duplicate check → modify-or-create choice → template
+lookup**. A matching template uses **no-data probe → preview → import**;
+a custom build uses **no-data probe → build → per-panel dry-run → preview →
+create**. Template lookup is internal; the user's only upfront choices are
+modify or create.
 
 ### Step 1: Check for duplicates
 
@@ -285,9 +277,6 @@ data:
    — always trust the discovered key over the one in the defaults
    table.
 
-Per-panel validation happens later as a hard requirement — see
-Step 3b-ii.6 and the "Mandatory dry-run before save" guardrail.
-
 If **none** of the discovered signals return data, tell the user the
 dashboard's data isn't being ingested yet, explain the panels will
 show "No data" until ingestion is set up, and offer to build anyway
@@ -305,9 +294,7 @@ core resources before authoring widget JSON.
 > cannot read `signoz://...` URIs in this session, fall back to
 > `signoz_list_dashboards` + `signoz_get_dashboard` on
 > an existing dashboard of the same signal type (metrics / traces /
-> logs) and read its `widgets` array for v5 widget shapes. The
-> mandatory dry-run in Step 3b-ii.6 then backstops any shape errors
-> the fallback misses.
+> logs) and read its `widgets` array for v5 widget shapes.
 
 - `signoz://dashboard/instructions` — title, tags, description,
   variables.
@@ -346,10 +333,6 @@ refresh interval. Panels follow the viewer-selected global range. If the user
 asks for a specific window, mention that range in the final handoff instead of
 inventing `timeRange`, `defaultTimeRange`, or `refresh` fields. Do not encode a
 PromQL range selector inside a Builder query.
-
-Representable panels are validated in Step 3b-ii.6 via the mandatory
-dry-run before save; accepted validation gaps stay explicit. Author the
-saved query semantics first, then use the schema-checked translation below.
 
 **Defaults the skill applies (and surfaces in the preview):**
 
@@ -393,37 +376,25 @@ native JSON — stringifying them produces errors like
 
 ##### Step 3b-ii.6: Dry-run before save (mandatory)
 
-Read
-[`references/dashboard-to-query-builder-v5.md`](./references/dashboard-to-query-builder-v5.md),
-then call `signoz_execute_builder_query` per panel. Build the complete payload from
-the current tool schema; never pass widget JSON. Translate every
-execution-affecting field, all base-query/formula/trace-operator envelopes,
-query names (`A`, `B`, `F1`, `T1`), and representative variable values. Keep
-dashboard aliases unchanged in `signoz_create_dashboard`.
+For every query-bearing panel, read the compact
+[`dashboard-to-query-builder-v5` reference](./references/dashboard-to-query-builder-v5.md).
+When the execution schema can represent the panel, call
+`signoz_execute_builder_query` with the translated payload, never widget JSON.
+Use representative variable values and keep editor aliases unchanged in
+`signoz_create_dashboard`.
 
-If the current execution schema cannot represent an execution-affecting saved
-field, do not strip it and call the dry-run successful. Stop and surface the
-validation gap; proceed only after the user explicitly accepts that the panel is
-unvalidated. Saved-only display metadata such as `legend` does not block.
-
-Server or validation error = fail. Unexpected zero rows also fail,
-unless the user already chose to build despite confirmed missing telemetry.
-
-Coverage: dry-run **every schema-representable query-bearing panel**; use the
-safety gate for unsupported fields. Trivial panels fail silently too (wrong severity filter,
-wrong resource scope, attribute name shorthand like `service` instead
-of `service.name`) — the same footguns that bite non-trivial panels.
-Row / header panels (`panelTypes: "row"`) have no query to execute —
-validate their shape against `signoz://dashboard/widgets-examples`
-instead and skip them here.
+If the reference's safety gate finds an unsupported execution field, report the
+panel as unvalidated and continue only after explicit user acceptance. Server or
+validation errors block. Unexpected empty results block unless the user already
+accepted absent telemetry. Skip row panels and validate their shape against
+`signoz://dashboard/widgets-examples`.
 
 ##### Step 3b-ii.7: Preview, save, report
 
 1. **Preview** Emit a one-paragraph plain-language summary of what
    will be created — no JSON dump. A 20–30 widget payload is hundreds
-   of lines the user cannot meaningfully review in chat, and the
-   dry-run has validated every representable query-bearing panel; call
-   out any validation gap the user explicitly accepted.
+   of lines the user cannot meaningfully review in chat. Call out any
+   validation gap the user explicitly accepted.
 
    > **Summary**: This dashboard tracks [signals] for [scope], with
    > sections [list]. Variables: [list].
@@ -461,16 +432,8 @@ instead and skip them here.
   / `signoz_create_dashboard`. A "No data" dashboard is a worse
   outcome than one extra confirmation prompt. Skip only if the user has
   explicitly opted out for this request.
-- **Mandatory dry-run before save on custom builds** Before
-  `signoz_create_dashboard`, run
-  `signoz_execute_builder_query` per Step 3b-ii.6 using the current
-  tool schema and the referenced active-query translation. Never call
-  a stripped query losslessly validated; surface unsupported
-  execution fields and require explicit acceptance before proceeding.
-  The create-dashboard schema accepts queries that 500 at query time
-  — a `groupBy` on a numeric attribute, an
-  aggregation incompatible with the metric type — and the result
-  ships as a silently empty panel.
+- **Validate custom builds before save** Follow Step 3b-ii.6; never treat a
+  dry-run that omits active query semantics as validated.
 - **Preview before save on custom builds** Emit the plain-language
   summary before `signoz_create_dashboard` so the human can
   intervene on intent.

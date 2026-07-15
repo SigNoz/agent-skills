@@ -123,13 +123,6 @@ Merge the planned changes into the full dashboard JSON from Step 2.
      If rows exist, add it to the intended row's `panelMap[rowId].widgets`,
      creating that entry when absent. An empty `panelMap` does not prove the
      dashboard is rowless.
-  4. All schema-representable modified panels are validated below; unsupported
-     execution fields follow the explicit safety gate —
-     see the "Dry-run modified panels" step before
-     `signoz_update_dashboard` and the "Mandatory dry-run
-     before update" guardrail. Author the saved query semantics first, then use
-     the schema-checked dry-run translation below.
-
 - **Removing a panel:** Remove the widget from `widgets`, its entry from `layout`,
   and its entry from the parent row's `panelMap.widgets` (if it exists in panelMap).
   **Do not** try to auto-compact or shift `y` positions of remaining panels — the
@@ -137,12 +130,8 @@ Merge the planned changes into the full dashboard JSON from Step 2.
   three references (widget, layout, panelMap entry) and leave all other positions
   unchanged.
 
-- **Editing a panel's query:** Replace the query object on the target widget. Keep
-  all other widget fields intact. If the user is changing *what* the panel
-  measures (not just renaming a label), the new query is validated by the
-  mandatory dry-run step below (and the "Mandatory dry-run before update"
-  guardrail) — replacing a working query with a broken one is a destructive
-  change the user will only notice after the panel goes empty.
+- **Editing a panel's query:** Replace the query object on the target widget and
+  keep all other widget fields intact.
 
 - **Changing panel type:** Update `panelTypes` and handle type-specific fields:
   follow the target type's complete shape in `widgets-examples`. Preserve the
@@ -174,17 +163,18 @@ Merge the planned changes into the full dashboard JSON from Step 2.
     top-level `layout` array, apply the same change to the matching entry in
     `panelMap[rowId].widgets`. These are duplicated and must stay consistent.
 
-**Dry-run modified panels (mandatory).** Before `signoz_update_dashboard`, call
-`signoz_execute_builder_query` for each modified query-bearing panel. Read
-[`references/dashboard-to-query-builder-v5.md`](./references/dashboard-to-query-builder-v5.md),
-build the complete current execution payload, and keep dashboard/editor aliases
-unchanged in saved state. Include every modified base-query, formula, and trace-
-operator sibling and supply representative variable values.
+**Dry-run modified panels (mandatory).** For every added or changed query-bearing
+panel, read the compact
+[`dashboard-to-query-builder-v5` reference](./references/dashboard-to-query-builder-v5.md).
+When the execution schema can represent the panel, call
+`signoz_execute_builder_query` with the translated payload. Use representative
+variable values and keep editor aliases unchanged in saved state.
 
-If the current execution schema cannot represent an execution-affecting field,
-do not strip it and call the dry-run successful. Stop and surface the gap; proceed
-only after the user explicitly accepts that the panel is unvalidated. Server
-errors and unexpected empty results also block unless explicitly accepted.
+If the reference's safety gate finds an unsupported execution field, report the
+panel as unvalidated and continue only after explicit acceptance. Server or
+validation errors and unexpected empty results block unless explicitly accepted.
+Skip row panels and validate their shape against
+`signoz://dashboard/widgets-examples`.
 
 Call `signoz_update_dashboard` with this exact outer wrapper, where `dashboard`
 is the **complete** modified dashboard object, not a partial patch:
@@ -214,15 +204,8 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
   deleting variables, confirm with the user — even if they say "just do it" or
   express urgency. Additions, renames, type changes, and variable additions do not
   need confirmation.
-- **Mandatory dry-run before update.** For every schema-representable added or
-  edited query-bearing panel, run `signoz_execute_builder_query` before update.
-  Unsupported execution fields follow the safety gate instead (translation in
-  the Dry-run step above). Row / header panels (`panelTypes:
-  "row"`) have no query — validate their shape against
-  `signoz://dashboard/widgets-examples` instead. Modifications are
-  especially prone to silent regression because the panel worked
-  before the edit — a saved empty panel from a typo'd rename or
-  attribute swap is the worst failure mode for this skill.
+- **Validate changed queries** Follow the mandatory dry-run step above before
+  update.
 - **Valid JSON only**: Follow the v5 schema documented in the
   `signoz://dashboard/*` MCP resources (`instructions`, `widgets-instructions`,
   `widgets-examples`, `query-builder-example`). Never generate malformed queries
