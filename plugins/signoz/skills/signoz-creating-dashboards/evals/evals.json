@@ -143,6 +143,7 @@
         "Payload sent to signoz_create_dashboard has layout as an array of objects (not a stringified JSON string)",
         "Payload sent to signoz_create_dashboard has widgets as an array of objects (not a stringified JSON string)",
         "Each widget in the payload includes id, panelTypes, title, query, selectedLogFields, selectedTracesFields, thresholds, and contextLinks",
+        "Each widget contextLinks is an object with a linksData array, never a bare array",
         "The widget's query object includes queryType and the complete active Builder payload; inactive PromQL and ClickHouse payloads need not be authored",
         "Agent runs signoz_execute_builder_query as a dry-run for the panel before signoz_create_dashboard"
       ],
@@ -341,6 +342,21 @@
         "The builder_trace_operator spec is passed through the current MCP raw-preservation contract and is never coerced into builder_query",
         "The execution trace-operator spec does not copy dashboard aliases queryName, dataSource, pageSize, orderBy, selectColumns, or queryTraceOperator, and does not invent signal, filter, functions, or disabled fields",
         "Agent does not call signoz_create_dashboard until the complete trace-operator execution call succeeds"
+      ],
+      "files": []
+    },
+    {
+      "id": 24,
+      "eval_name": "saved-not-in-to-execution-not-in",
+      "prompt": "Create a logs table grouped by service that excludes checkout and frontend services.",
+      "expected_output": "Agent discovers the actual log-side service field, saves the panel with the dashboard groupBy key shape and filters.items op=NOT_IN, then dry-runs the canonical execution form with filter.expression using NOT IN and a non-empty groupBy name. The dry-run outer query includes absolute integer Unix-ms bounds; the saved and execution filters remain semantically identical.",
+      "expectations": [
+        "Agent calls signoz_get_field_keys with signal=logs and uses the returned service field name rather than assuming service.name exists on logs",
+        "The signoz_create_dashboard payload keeps groupBy in dashboard form and filters.items uses op=NOT_IN, never the execution spelling NOT IN",
+        "The actual signoz_execute_builder_query call uses filter.expression with NOT IN and sends no filters field",
+        "The actual dry-run outer query contains start and end as JSON integer Unix-millisecond values",
+        "Every execution groupBy entry has a non-empty name equal to the discovered attribute key and contains no dashboard-only key/dataType/type aliases",
+        "The saved NOT_IN values and execution NOT IN values are semantically identical"
       ],
       "files": []
     }

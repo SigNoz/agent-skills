@@ -5,15 +5,17 @@
       "id": 0,
       "eval_name": "metrics-error-rate-service",
       "prompt": "Show me the error rate for the checkout-service over the last hour.",
-      "expected_output": "Agent discovers a concrete request-count metric by a substring that can match its name, discovers the error field/value, and calls signoz_query_metrics with a complete A/B formula payload. Primary query A filters the requested service plus the discovered error value; formulaQueries defines B with the same discovered metric and metadata but only the service filter, and formula is A / B * 100. Reports the rate with the time window, or correctly handles a no-data / missing-instrumentation case.",
+      "expected_output": "Agent discovers a concrete request-count metric by a matching substring, discovers both service and error label keys/values for that exact metric, and calls signoz_query_metrics with a complete A/B formula payload. Query A uses the discovered service and error labels; B uses the same discovered service label without the error condition; formula is A / B * 100. Reports the rate with the window, or correctly handles no data / missing instrumentation.",
       "expectations": [
         "Agent calls signoz_list_metrics with a searchText that can match the selected metric name; it does not claim searchText=error discovered signoz_calls_total",
-        "Agent discovers the metric's error field and calls signoz_get_field_values with signal=metrics, the returned field name/context, and the same metricName before using the returned error value in a filter",
+        "After metric discovery and before filtering, Agent calls signoz_get_field_keys with signal=metrics and the exact metricName and discovers both service and error label keys",
+        "Agent calls signoz_get_field_values for both discovered keys with signal=metrics, each returned name/context, and the same metricName before filtering",
         "The actual signoz_query_metrics call uses the exact metricName, metricType, temporality, and isMonotonic values returned by discovery",
-        "The actual signoz_query_metrics primary filter for query A contains both service.name = 'checkout-service' and the discovered error condition",
+        "The actual signoz_query_metrics primary filter for query A contains the discovered service key = 'checkout-service' and the discovered error condition",
         "The actual signoz_query_metrics formulaQueries is an array containing a query named B with a concrete metricName and the same discovered metric metadata as A",
-        "Query B has a distinct total-request filter containing service.name = 'checkout-service' but not the error-only condition",
-        "The actual signoz_query_metrics call sets formula to A / B * 100, so every referenced query name is defined"
+        "Query B uses the same discovered service key = 'checkout-service' but omits the error-only condition",
+        "The actual signoz_query_metrics call sets formula to A / B * 100, so every referenced query name is defined",
+        "Agent uses signoz_query_metrics for the metric ratio and does not route the formula through signoz_execute_builder_query"
       ],
       "files": []
     },
@@ -59,6 +61,59 @@
         "Agent does not use signoz_query_metrics for the grouped Cost Meter total attribution",
         "Agent excludes partial=true datapoints and sums complete hourly buckets per service",
         "Agent falls back to a direct count and notes that bytes remain meter-only if service.name is unavailable in the meter"
+      ],
+      "files": []
+    },
+    {
+      "id": 6,
+      "eval_name": "traces-simple-grouped-count-prefers-aggregate",
+      "prompt": "Rank the top 10 services by error span count over the last hour.",
+      "expected_output": "Agent discovers the trace grouping key, then uses signoz_aggregate_traces with bare aggregation=count, error=true, the discovered service key in groupBy, scalar request type, and a one-hour range. It relies on default aggregation-descending order or valid tool-schema ordering and does not hand-build a Query Builder envelope for this plain grouped count.",
+      "expectations": [
+        "Agent calls signoz_get_field_keys with signal=traces before grouping and uses the returned service attribute name verbatim",
+        "Agent calls signoz_aggregate_traces with aggregation=count, requestType=scalar, timeRange=1h, and the discovered groupBy key",
+        "The aggregation token is count, never count() or count(service.name)",
+        "Agent does not call signoz_execute_builder_query for the simple grouped count"
+      ],
+      "files": []
+    },
+    {
+      "id": 7,
+      "eval_name": "traces-error-rate-ranking-needs-builder-formula",
+      "prompt": "Rank services by trace error rate, not raw error count, for the last hour.",
+      "expected_output": "Agent discovers the trace service and error fields, then uses signoz_execute_builder_query with error-count and total-count builder queries plus a sibling formula computing their ratio. The outer query uses schemaVersion v1 and absolute integer Unix-ms bounds; no aggregate convenience call is presented as sufficient for a ratio.",
+      "expectations": [
+        "Agent discovers every trace field used in filters or groupBy with signoz_get_field_keys signal=traces",
+        "The actual signoz_execute_builder_query call contains two trace builder_query siblings and a builder_formula sibling whose expression computes error count divided by total count",
+        "The actual outer query has schemaVersion=v1 and start/end as JSON integer Unix-millisecond values",
+        "Every execution groupBy entry has a non-empty discovered name and contains no dashboard-only key alias",
+        "Agent does not use signoz_aggregate_traces alone to answer the error-rate ranking"
+      ],
+      "files": []
+    },
+    {
+      "id": 8,
+      "eval_name": "logs-error-rate-ranking-needs-builder-formula",
+      "prompt": "Show the top services by percentage of ERROR logs over all their logs in the last 24 hours.",
+      "expected_output": "Agent discovers log-side service and severity keys, then uses signoz_execute_builder_query with ERROR-log and all-log counts plus a sibling percentage formula. It does not assume service.name exists on logs and does not use a single aggregate count as an error rate.",
+      "expectations": [
+        "Agent calls signoz_get_field_keys with signal=logs before using service or severity fields and uses returned dot-notation names verbatim",
+        "The actual signoz_execute_builder_query call contains two log builder_query siblings and a builder_formula sibling computing A / B * 100 or an equivalent percentage",
+        "The actual outer query has absolute start/end JSON integer Unix-ms values and every execution groupBy name is non-empty",
+        "Agent does not claim signoz_aggregate_logs alone computes the requested per-service percentage"
+      ],
+      "files": []
+    },
+    {
+      "id": 9,
+      "eval_name": "metrics-non-monotonic-sum-aggregation",
+      "prompt": "Graph the average cart value metric by service for the last 6 hours. Discovery reports metricType=sum and isMonotonic=false.",
+      "expected_output": "Agent discovers the concrete metric and its metric labels, preserves the non-monotonic sum metadata, and calls signoz_query_metrics with timeAggregation=avg. It never selects latest, rate, or increase for this non-monotonic sum.",
+      "expectations": [
+        "Agent calls signoz_list_metrics and then signoz_get_field_keys with signal=metrics and the discovered metricName before filtering or grouping",
+        "The actual signoz_query_metrics call preserves metricType=sum and isMonotonic=false from discovery",
+        "The actual signoz_query_metrics call uses timeAggregation=avg",
+        "The actual query does not use timeAggregation=latest, rate, or increase"
       ],
       "files": []
     }

@@ -310,6 +310,11 @@ core resources before authoring widget JSON.
 Add signal-specific resources as needed:
 
 - Metrics (PromQL): `signoz://promql/instructions`.
+  Saved PromQL may reference declared dashboard `$var` variables, but
+  `signoz_execute_builder_query` does not expand them: substitute representative
+  literals only for dry-runs, never in saved panels. Grafana-only
+  `$__rate_interval` / `$__interval` are invalid. Dotted OTel metric names use
+  Prometheus 3.x UTF-8 selectors such as `{"metric.name.with.dots"}`.
 - Metrics (ClickHouse): `signoz://dashboard/clickhouse-schema-for-metrics`
   + `signoz://dashboard/clickhouse-metrics-example`.
 - Metrics (Query Builder aggregation rules):
@@ -333,6 +338,17 @@ refresh interval. Panels follow the viewer-selected global range. If the user
 asks for a specific window, mention that range in the final handoff instead of
 inventing `timeRange`, `defaultTimeRange`, or `refresh` fields. Do not encode a
 PromQL range selector inside a Builder query.
+
+Use SigNoz enums and JSON types exactly. `panelTypes: "graph"` means time series
+(never Grafana `timeseries`); variable types are uppercase (`DYNAMIC`, `CUSTOM`).
+PromQL `queryType` is valid only for graph, value, bar, and histogram panels;
+table and pie accept `builder` or `clickhouse_sql`; list requires `builder`.
+`softMax` / `softMin` are numbers, `contextLinks` is `{"linksData": [...]}`, and
+saved `having` is an array of clause objects; defer full shapes to the resources.
+
+Keep widget/layout IDs bijective: every `widgets[].id` appears exactly once in
+`layout[].i` and vice versa; create/remove both entries together. During import
+or rebuild, strip the UI drag artifact id `"__dropping-elem__"` from both arrays.
 
 **Defaults the skill applies (and surfaces in the preview):**
 
@@ -449,7 +465,8 @@ accepted absent telemetry. Skip row panels and validate their shape against
   `signoz://dashboard/*` MCP resources. Required widget and `queryData`
   fields are listed in `signoz://dashboard/widgets-instructions` and
   `signoz://dashboard/widgets-examples`. Never wrap arrays/objects in
-  `JSON.stringify`.
+  `JSON.stringify`; enforce the widget/layout bijection, field types, and enums
+  from Step 3b-ii.4.
 - **Scope boundary** This skill creates dashboards. The moment the
   user asks to modify, edit, rearrange, or extend an existing dashboard
   — including immediately after import — hand off to

@@ -78,10 +78,17 @@ syntax, dashboard templates, query examples, and a validation checklist.
 ## Top Anti-Patterns
 
 - Missing `ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp`.
-- Using plain `IN` instead of `GLOBAL IN` on the resource fingerprint subquery.
+- Plain `IN` / `JOIN` whose subquery reads a distributed table: with
+  `distributed_product_mode='deny'` it fails. Prefer the time-bounded fingerprint
+  `GLOBAL IN` pattern or a local subquery table. Use `GLOBAL JOIN` only for a
+  demonstrably small, bounded RHS; it broadcasts that dataset to every shard.
 - Adding a resource CTE when there is no resource attribute filter.
+- Omitting a non-aggregated projection from `GROUP BY`, including computed
+  projections such as `JSONExtractString(body, ...)`.
 - Logs query with `$start_datetime` or `$end_datetime`.
 - Traces query with `$start_timestamp_nano` or `$end_timestamp_nano`.
+- Logs query against `signoz_logs.logs`, bare `logs`, or `distributed_logs`;
+  always use `signoz_logs.distributed_logs_v2`.
 - Traces query with `resources_string['service.name']` instead of
   `resource_string_service$$name`.
 

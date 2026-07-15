@@ -8,6 +8,7 @@
   - Timestamp Bucketing
   - Use Indexed (Selected) Columns Over Map Access
   - Use GLOBAL IN for Resource Fingerprint Subquery
+  - Complete GROUP BY Projections
   - Body Text Search — Engaging Skip Indexes (predicate engagement,
     anti-patterns, OR-of-LIKE, hyphens/punctuation, EXPLAIN, type traps)
 - Attribute Access Syntax (resource attributes, span/log attributes,
@@ -120,7 +121,18 @@ Always use `GLOBAL IN`, not plain `IN`:
 WHERE resource_fingerprint GLOBAL IN __resource_filter
 ```
 
-### 5. Body Text Search — Engaging Skip Indexes
+Plain `IN` or `JOIN` with a distributed table in its subquery fails when
+`distributed_product_mode='deny'`. Prefer the time-bounded fingerprint
+`GLOBAL IN` pattern above, then a local table in the subquery. Do not default to
+`GLOBAL JOIN`: it broadcasts the RHS to every shard and is safe only when that
+dataset is demonstrably small and bounded.
+
+### 5. Complete GROUP BY Projections
+
+Every non-aggregated `SELECT` expression must appear in `GROUP BY`, including
+computed expressions: `SELECT JSONExtractString(body, 'kind') AS kind, count() ... GROUP BY kind`.
+
+### 6. Body Text Search — Engaging Skip Indexes
 
 The `body` column has two skip indexes, **both on `lower(body)`**:
 
@@ -370,10 +382,11 @@ Before finalizing any query, verify:
 - [ ] **`ts_bucket_start`** filter is included: `BETWEEN $start_timestamp - 1800 AND $end_timestamp`
 - [ ] **Nanosecond variables** used for the `timestamp` column: `$start_timestamp_nano` / `$end_timestamp_nano`
 - [ ] **`fromUnixTimestamp64Nano(timestamp)`** used in SELECT when displaying timestamps
-- [ ] **`GLOBAL IN`** is used (not plain `IN`) for the any subquery
+- [ ] **`GLOBAL IN`** is used (not plain `IN`) for the resource fingerprint subquery
+- [ ] Every non-aggregated projection, including computed expressions, appears in `GROUP BY`
 - [ ] **Indexed columns** used over map access where the attribute is a selected field
 - [ ] **Body searches** use `lower(body)` (not raw `body`) and `LIKE` (not `position` / `positionCaseInsensitive`); for OR'd patterns, a shared `hasToken` or `LIKE` is ANDed before the OR block
 - [ ] **`seen_at_ts_bucket_start`** filter is included in the resource CTE
 - [ ] For timeseries: results are ordered by `ts ASC`
-- [ ] **Table Name**: Always use the `distributed_` prefix (`distributed_logs_v2`, not `logs_v2`)
+- [ ] **Table Name**: use `signoz_logs.distributed_logs_v2`, never `signoz_logs.logs`, bare `logs`, or `distributed_logs`
 - [ ] If multiple tables are joined, ensure all tables have timestamp and bucket filter applied if applicable.

@@ -17,10 +17,13 @@ unsupported unless the tool schema exposes them. `legend` may remain saved-only.
 
 ## Translate one panel
 
-Build the complete outer `query` with its time range, request type, composite
-queries, format options, and representative variable values. Dashboard request
-types are: graph/time-series/bar/histogram -> `time_series`; table/pie/value ->
-`scalar`; trace -> `trace`; list -> `raw`.
+Saved panels persist no time range. Build the complete outer `query` with
+absolute `start` / `end` as JSON integer Unix-ms (for example, the last hour),
+request type, composite queries, format options, and representative variable
+values; omitted bounds fail with `missing start or end timestamp`. Dashboard
+request types are: graph/bar/histogram -> `time_series`;
+table/pie/value -> `scalar`; trace -> `trace`; list -> `raw`. These are the only
+values; never invent `aggregate`, `table`, or `timeseries`.
 
 Put every dependency in one `compositeQuery.queries` array: `queryData[]` ->
 `builder_query`; `queryFormulas[]` -> sibling `builder_formula`;
@@ -30,9 +33,13 @@ For each `builder_query`:
 
 - `queryName` -> `name`; `dataSource` -> `signal`.
 - Use `filter.expression`, or convert `filters.items[]` and `filters.op` exactly.
-  Never send `filters`.
-- `groupBy[].key/dataType/type` -> `name/fieldDataType/fieldContext`; set
-  `signal` from the field or enclosing query. Send no dashboard aliases.
+  Saved operators use underscore enums (`NOT_IN`); execution expressions use
+  SQL-ish forms (`NOT IN`). Translate, never mix representations, and keep both
+  forms semantically aligned when saved JSON contains both. Never send `filters`.
+- Saved `groupBy[].key/dataType/type` -> execution
+  `name/fieldDataType/fieldContext`; set `signal` from the field or enclosing
+  query. For "by <dimension>", `name` is the actual attribute key and never
+  empty; omit `groupBy` when ungrouped. Send no dashboard aliases.
 - `selectColumns[]` -> `selectFields[]`: `name` from `name` or `key`,
   `fieldDataType` from `fieldDataType` or `dataType`, `fieldContext` from
   `fieldContext` or `type`, plus `signal`. Send only canonical metadata.

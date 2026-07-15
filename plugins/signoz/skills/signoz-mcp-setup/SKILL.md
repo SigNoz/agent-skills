@@ -176,6 +176,17 @@ For native client setup, use `client-configs.md`:
 - Keep the server name `signoz` in native client configs (the bundled Claude
   Code plugin file is the only one that uses the `mcp` key — do not rename it).
 
+### Auth and role diagnosis
+
+Backend RBAC classifies MCP failures from the API key's user role: reads need at
+least viewer; alert/dashboard writes need editor or admin; notification-channel
+management and API-key creation need admin. `401` / `UNAUTHORIZED` means the
+credential is missing, invalid, or expired: check configuration/presence
+first, then reauthenticate or reissue as appropriate. `403` /
+`PERMISSION_DENIED` means credentials are valid but under-privileged. Have a
+sufficiently privileged user act or issue a dedicated minimum-role key; never
+paste elevated keys into chat or tracked config.
+
 ### Step 5: Tell the user how to finish
 
 Tell the user that the SigNoz MCP endpoint has been configured, then give the

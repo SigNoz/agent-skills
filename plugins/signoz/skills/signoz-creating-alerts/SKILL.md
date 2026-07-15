@@ -14,19 +14,15 @@ argument-hint: <natural-language alert intent>
 
 # Alert Create
 
-Build a SigNoz alert from a user's natural-language intent. The skill targets
-two consumers: an autonomous AI SRE agent that runs without a human in the
-loop, and a human at a Claude Code / Codex / Cursor prompt. Both go through
-the same flow.
+Build a SigNoz alert from natural-language intent. Autonomous agents and
+interactive clients follow the same flow.
 
 ## Prerequisites
 
-This skill calls SigNoz MCP server tools (`signoz_create_alert`,
-`signoz_list_alert_rules`, `signoz_get_field_keys`, etc.). Before running the
-workflow, confirm the `signoz_*` tools are available. If they are not,
-run `signoz-mcp-setup` first to initialize or repair the MCP connection. Do not
-try to fall back to raw HTTP calls or fabricate alert configs without the MCP
-tools.
+This skill calls SigNoz MCP tools (`signoz_create_alert`,
+`signoz_list_alert_rules`, `signoz_get_field_keys`, etc.). Confirm they are
+available; otherwise run `signoz-mcp-setup`. Never fall back to raw HTTP or
+fabricate alert configs.
 
 ## When to use
 
@@ -45,9 +41,8 @@ Do NOT use when the user wants to:
 
 ## Required inputs (strict)
 
-Alert creation is a write operation against a shared system. Guessing here
-creates noisy alerts on the wrong service that someone else has to clean up.
-The skill enforces a strict input contract:
+Alert creation writes to a shared system. Enforce this strict input contract;
+guesses create noisy alerts on the wrong service:
 
 | Input | Required | Source if missing |
 |---|---|---|
@@ -57,25 +52,19 @@ The skill enforces a strict input contract:
 | Severity | inferred from intent | default `warning`; promote to `critical` only if user said "page", "wake up", "critical" |
 | Notification channel | yes | `signoz_list_notification_channels` + offer "create new" |
 
-If a required input is missing and cannot be discovered, **stop before
-calling any write tool** and ask the user. The host application decides
-how the question is surfaced (a structured clarification tool, inline
-`<assistant_question>` tags, an interactive prompt, etc.) — follow the
-host's UI rendering rules.
+If a required input is missing and undiscoverable, **stop before any write**
+and ask through the host's supported clarification UI.
 
 What to include in the question:
 
-- **What is missing** — name the input concretely (e.g. "which
-  resource-attribute filter to use").
-- **Candidate lists** populated from your discovery calls — concrete
-  values per attribute the user can pick from. Example shape:
+- **What is missing** — name it concretely (e.g. "which resource-attribute
+  filter to use").
+- **Candidate lists** from discovery — concrete values per attribute, e.g.:
   `service.name` → `frontend`, `checkout`, `payments`;
   `host.name` → `prod-api-1`, `prod-db-1`.
-- **Allow free-form input** so the user can name a value you didn't
-  surface.
+- **Free-form input** so the user can name an unsurfaced value.
 
-In autonomous mode (no human), escalate to the caller or fill the gap
-from upstream context. Either way, do not proceed to
+In autonomous mode, escalate or use upstream context; never call
 `signoz_create_alert` with a guessed value.
 
 ## Workflow
@@ -184,10 +173,8 @@ result and ask the user to confirm before save. Treat this exception
 narrowly: it applies to "alert me when bad thing happens" log queries,
 not to alerts that depend on continuous data flow.
 
-This probe is cheap (one query, ~100ms), and catching the no-data case
-early avoids the worst UX failure mode of this skill — the user reading
-through a fully-authored JSON payload and only then learning the alert
-can never fire.
+This cheap probe catches no-data before the user reviews an alert that cannot
+fire.
 
 ### Step 5: Build the alert config
 
@@ -195,6 +182,10 @@ The MCP server is the source of truth for the alert JSON schema, threshold
 codes, and validation rules. Read the `signoz://alert/instructions` and
 `signoz://alert/examples` MCP resources for the canonical, version-current
 shape.
+
+Threshold/PromQL `condition.thresholds` requires `kind` (use `"basic"`) and
+non-empty `spec[]`, except when `alertOnAbsent` is the sole trigger. Anomaly
+rules omit it.
 
 For most user intents, the config is one of a small number of patterns:
 
@@ -209,12 +200,11 @@ For most user intents, the config is one of a small number of patterns:
 | ClickHouse SQL alert — author SQL using the schema in `signoz://alert/examples` | non-trivial joins, custom aggregations the builder cannot express |
 | PromQL alert — delegate to `signoz-generating-queries` for the query, then return here | when user already has PromQL |
 
-**Threshold `op` and `matchType` values.** v2alpha1 accepts the
-human-readable strings (`"above"`, `"on_average"`); the legacy numeric
-codes (`"1"`, `"3"`) are also accepted but harder to read in the UI. Prefer
-the words. Use `op: "above"` for anomaly rules: the anomaly score is already
-an absolute deviation, so this detects both spikes and drops without an
-unsupported `"above_or_below"` operator.
+**Threshold `op` and `matchType` values.** Prefer readable words; symbols and
+legacy numeric codes are accepted but discouraged. Valid `op` words are
+`above`, `below`, `equal`, `not_equal`,
+`above_or_equal`, `below_or_equal`, and `outside_bounds`; `equals` is invalid.
+Use `above` for anomaly rules: their absolute score covers spikes and drops.
 
 | Comparison | `op` | Evaluation behavior | `matchType` |
 |---|---|---|---|
@@ -232,11 +222,8 @@ unsupported `"above_or_below"` operator.
 - `matchType: "at_least_once"` for error counts / error rates —
   catches any breach.
 
-**Severity defaults — derive from the intrinsic urgency of the alert, not
-just the user's words.** The user saying "alert me" doesn't force `warning`
-when the condition itself describes a critical event. Use this table; an
-explicit user cue overrides it ("just FYI" → demote, "page me" / "wake me
-up" → promote).
+**Severity defaults — derive intrinsic urgency, not just wording.** An explicit
+cue overrides this table ("just FYI" → demote; "page me" → promote).
 
 | Alert intent | Default severity |
 |---|---|
@@ -253,13 +240,11 @@ When the user's intent is ambiguous on severity (no urgency cue, no
 clearly-critical condition), default to `warning` and surface the choice
 in the preview so they can adjust.
 
-**OTel attribute names** — always use semantic conventions:
-`service.name`, `host.name`, `k8s.namespace.name`, `deployment.environment` or `deployment.environment.name`. Never `service`, `host`, or `env`.
+**Attribute names** — use exact keys returned by `signoz_get_field_keys`; when
+available they are usually OTel names such as `service.name`, not `service`.
 
-**Annotation templates** — the on-call engineer sees the notification, not
-the alert config. A notification that says "Pod crash detected" with no
-service name, no count, and no value is nearly useless at 3am. Always
-include the moving values:
+**Annotation templates** — include moving values; on-call sees the notification,
+not the config:
 
 - `summary` — single-line headline. Include the resource scope and the
   numeric value: `"checkoutservice error rate {{$value}}% above 3%"`.
@@ -316,10 +301,17 @@ Run the full primary query (or formula) over the last hour:
 - `signoz_execute_builder_query` for **all** builder, formula,
   and PromQL queries — set `compositeQuery.queries[].type` to
   `builder_query` / `builder_formula` / `promql` as appropriate. For
-  PromQL put the query string in `spec.query` and read
+  PromQL specs use only `name` / `query` / `legend` / `disabled`; omit
+  builder-only fields such as `stepInterval`. Put the string in `spec.query`, read
   `signoz://promql/instructions` for the UTF-8 quoted-selector form
   SigNoz requires (`{"metric.name.with.dots"}` — not the underscored
-  or bare-dotted forms).
+  or bare-dotted forms), and keep alert PromQL fully literal: no `$var`,
+  `$__rate_interval`, or other dashboard variable is evaluated.
+- Alert specs omit time bounds, but this dry-run cannot: set outer-query
+  `start` / `end` to absolute JSON integer Unix-ms (e.g. now−3600000 → now),
+  or `signoz_execute_builder_query` fails with `missing start or end timestamp`.
+- For intent grouped by a dimension, each execution `groupBy[].name` is the
+  exact Step 2 key (e.g. `k8s.pod.name`), never empty. Omit `groupBy` otherwise.
 - `signoz_aggregate_logs` / `signoz_aggregate_traces`
   when those fit better.
 - `signoz_query_metrics` when the alert query targets a single
@@ -357,12 +349,8 @@ alert that will never fire.
 
 ### Step 7: Resolve notification channels
 
-The skill **must** resolve at least one channel before save. An alert with no
-channels saves successfully and silently never notifies anyone — the second
-most common silent failure after bad queries. Channel resolution runs after
-the dry-run so any threshold-driven severity changes (warning → critical)
-are settled before the user is asked to pick routing, and so we never
-create a notification channel inline for an alert that fails validation.
+Resolve at least one channel after dry-run and final severity; otherwise the
+alert saves but never notifies.
 
 1. Call `signoz_list_notification_channels` and follow
    `pagination.nextOffset` while `pagination.hasMore` is true.
@@ -377,17 +365,23 @@ create a notification channel inline for an alert that fails validation.
 4. If neither path resolves a channel, stop and ask the user for a
    notification channel (see *Required inputs* above).
 
+Channel creation is admin-gated. On `PERMISSION_DENIED`, have an admin create it
+out of band or configure a dedicated, short-lived minimum-role credential via
+the host's environment/secret store; never request an elevated key in chat or
+tracked config.
+
 Place the resolved channel according to the rule schema:
 
 - `threshold_rule` / `promql_rule` (v2alpha1): attach direct-routing channels
   to each `condition.thresholds.spec[N].channels` array — typically warning →
-  Slack only, critical → Slack + PagerDuty.
+  Slack only, critical → Slack + PagerDuty. When `alertOnAbsent` is the sole
+  trigger and thresholds are omitted, put fallback channels in top-level
+  `preferredChannels`.
 - `anomaly_rule` (v1): thresholds are forbidden, so put channel names in the
   top-level `preferredChannels` array.
 
-Never put a chosen anomaly channel in a nonexistent thresholds block, and do
-not use top-level `preferredChannels` as a substitute for per-tier routing on a
-multi-severity threshold rule.
+Never put a chosen anomaly or absent-only channel in a nonexistent thresholds
+block, or substitute `preferredChannels` for per-tier multi-severity routing.
 
 #### Handling secret-bearing channel config
 
@@ -445,17 +439,14 @@ does).
 
 ## Guardrails
 
-- **Strict inputs over guessing** Resource attribute and channel are
-  required. If missing, stop and ask the user (see *Required inputs* above). Creating an alert on
-  a guessed service is harder to undo than asking.
+- **Strict inputs over guessing** Resource attribute and channel are required;
+  if missing, stop and ask rather than guessing a service.
 - **Always paginate `signoz_list_alert_rules`** Stopping at page 1 misses
   duplicates and produces noise.
-- **Dry-run is mandatory** Step 4 (data probe) and Step 6 (full
-  query + threshold calibration) are both required before
-  `signoz_create_alert`. A never-firing alert is *worse* than no
-  alert: it provides a false sense of safety.
-- **Threshold operators use canonical words** Prefer `op: "above"` /
-  `"below"` / `"equal"` / `"not_equal"`. Numeric codes (`"1"`–`"7"`)
+- **Dry-run is mandatory** Complete Steps 4 and 6 before
+  `signoz_create_alert`; a never-firing alert creates false confidence.
+- **Threshold operators use canonical words** Prefer valid words, never
+  `equals`. Numeric codes (`"1"`–`"7"`)
   are accepted but discouraged — same goes for `matchType`
   (`"on_average"` / `"at_least_once"`, not `"3"` / `"1"`).
 - **Signal must match alertType** `signal: "logs"` requires
@@ -464,8 +455,8 @@ does).
   is rejected.
 - **Channels must exist and use the rule's routing field.** Use exact names
   from `signoz_list_notification_channels`; put them in per-threshold
-  `channels` for threshold/PromQL rules or top-level `preferredChannels` for
-  anomaly rules.
+  `channels` for threshold/PromQL rules, or top-level `preferredChannels` for
+  anomaly and absent-only threshold/PromQL rules without thresholds.
 - **Never echo channel secrets.** Slack webhook URLs, PagerDuty integration
   keys, and similar webhook tokens are secrets. Pass them to
   `signoz_create_notification_channel` once and never repeat the

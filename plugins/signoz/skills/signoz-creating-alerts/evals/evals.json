@@ -8,6 +8,7 @@
       "expected_output": "Multi-severity METRIC_BASED_ALERT with two thresholds (warning 80, critical 90), per-severity channels (slack on warning, pagerduty on critical), service.name='cartservice' filter on a CPU metric (e.g. system.cpu.utilization or k8s.pod.cpu.utilization), targetUnit percent, op='above', matchType='on_average' (canonical word form preferred over numeric codes). Runs a concrete-metric data probe, then the mandatory full-query dry-run before emitting a plain-language summary and saving.",
       "expectations": [
         "The data probe calls signoz_query_metrics with a concrete metricName and the cartservice filter; it never sends count() or count_distinct(service.name) as a metrics aggregation expression",
+        "Every signoz_execute_builder_query dry-run carries start and end as JSON integer Unix-millisecond values in the outer query",
         "The signoz_create_alert payload puts Slack in the warning threshold channels and PagerDuty in the critical threshold channels",
         "The threshold-rule create payload does not rely on top-level preferredChannels for its per-severity routing"
       ],
@@ -57,7 +58,22 @@
       "expectations": [
         "The trace data probe calls signoz_aggregate_traces with aggregation=count, never aggregation=count()",
         "The full dry-run preserves having.expression=count() > 50 in the Query Builder spec",
+        "The actual signoz_execute_builder_query dry-run carries start and end as JSON integer Unix-millisecond values in the outer query",
         "The signoz_create_alert payload places both Slack and PagerDuty names in the critical threshold channels array"
+      ],
+      "files": []
+    },
+    {
+      "id": 5,
+      "eval_name": "absent-data-sole-trigger-omits-thresholds",
+      "prompt": "Create an alert for checkoutservice that fires only when its request metric stops arriving. Notify #staging-alerts.",
+      "expected_output": "Agent discovers and probes a concrete checkoutservice request metric, builds a threshold/PromQL-family absent-data rule whose sole trigger is alertOnAbsent, validates the full query with absolute integer Unix-ms bounds, and creates the alert without condition.thresholds. It routes #staging-alerts through top-level preferredChannels rather than inventing an empty thresholds block or numeric threshold.",
+      "expectations": [
+        "Agent discovers a concrete metric and verifies the checkoutservice filter before authoring the alert",
+        "The full signoz_execute_builder_query dry-run has start and end as JSON integer Unix-millisecond values in the outer query",
+        "The signoz_create_alert payload enables alertOnAbsent as the sole trigger",
+        "The signoz_create_alert payload omits condition.thresholds entirely rather than sending an empty or fabricated threshold spec",
+        "The signoz_create_alert payload puts #staging-alerts in top-level preferredChannels"
       ],
       "files": []
     }

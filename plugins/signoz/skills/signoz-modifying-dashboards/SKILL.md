@@ -104,6 +104,11 @@ Merge the planned changes into the full dashboard JSON from Step 2.
   what the user requested, and compare semantics after MCP normalization. Do not
   drop unrelated widgets, variables, layout items, or panelMap entries.
 
+- **Preserve widget/layout identity.** Every `widgets[].id` appears exactly once
+  in `layout[].i` and vice versa. Reuse existing widget IDs verbatim; add/remove
+  widget and layout entries together. Strip any literal `"__dropping-elem__"`
+  widget/layout id leaked by the UI drag state.
+
 - **Read schemas before every update.** Read all required and applicable
   conditional resources named by `signoz_update_dashboard`. For Query Builder,
   also read `signoz://metrics-aggregation-guide`,
@@ -222,6 +227,9 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
 - **Identifiers**: Use UUIDs for new widget and variable IDs. Reuse the widget ID
   as `layout.i`; keep each variable map key identical to its human-readable `name`,
   and keep query names such as `A`, `B`, and `F1` stable.
+- **Real dashboard IDs only**: Never send a sentinel such as `"unused"` as a
+  dashboard UUID. Resolve it through `signoz_list_dashboards` and
+  `signoz_get_dashboard` first.
 - **Scope boundary**: This skill modifies existing dashboards. Hand new-dashboard
   requests to `signoz-creating-dashboards`.
 

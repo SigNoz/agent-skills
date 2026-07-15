@@ -90,6 +90,8 @@ alerts.
    with the note's resolved absolute `start` and `end`, and preserve the same
    state/filter (including omission) and order. Stop when `nextCursor` is absent
    / the note reports `hasMore: false`; never use `offset` or page fullness.
+   If a later intentional state filter means "resolved" / "recovered", map it
+   to `inactive`; history accepts only `firing` or `inactive`.
    Pattern analysis needs the complete transition set. Rows are emitted per
    label-group `fingerprint`; do not interleave them. From the response:
    - **Build rule-wide incident windows** from distinct rows where

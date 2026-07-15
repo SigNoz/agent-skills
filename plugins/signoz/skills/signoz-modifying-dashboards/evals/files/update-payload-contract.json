@@ -60,7 +60,7 @@
               "selectedLogFields": [],
               "selectedTracesFields": [],
               "thresholds": [],
-              "contextLinks": []
+              "contextLinks": {"linksData": []}
             }
           ],
           "layout": [{"i": "77777777-7777-4777-8777-777777777777", "x": 0, "y": 0, "w": 12, "h": 6}],
