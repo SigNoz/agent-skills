@@ -4,13 +4,12 @@
     {
       "id": 0,
       "eval_name": "full-investigation-covers-every-signal",
-      "prompt": "Run a full SigNoz ingestion-cost investigation. The Cost Meter has data for all three signals. Metrics are the largest current cost contributor, logs are second, and traces are third. Logs grew 8x week over week from a tiny baseline, but their current weighted cost is still below metrics. I want one prioritized action list, not three separate reports.",
-      "expected_output": "Agent starts with Cost Meter totals, keeps metrics as the primary driver despite the faster log growth, and investigates metrics, logs, and traces in current-cost order. The final answer consolidates findings into one prioritized list and does not repeat the full per-signal decision rules.",
+      "prompt": "Run a full SigNoz ingestion-cost investigation. The Cost Meter has data for all three signals. Metrics are the largest current cost contributor, logs are second, and traces are third. I want one prioritized action list, not three separate reports.",
+      "expected_output": "Agent starts with Cost Meter totals, keeps metrics as the primary driver, and investigates metrics, logs, and traces in current-cost order. The final answer consolidates findings into one prioritized list and does not repeat the full per-signal decision rules.",
       "expectations": [
         "Agent starts with signoz_execute_builder_query Cost Meter queries before signal-specific analysis",
         "Agent analyzes metrics, logs, and traces because every signal has Cost Meter data",
         "Agent orders the investigation by current weighted cost: metrics, then logs, then traces",
-        "Agent treats the 8x log growth as trend context and does not promote logs above metrics solely because of growth rate",
         "Agent returns one consolidated prioritized action list without repeating the per-signal playbooks"
       ],
       "files": []
@@ -33,27 +32,26 @@
     {
       "id": 2,
       "eval_name": "cost-meter-uses-explicit-builder-sum",
-      "prompt": "Show me my total SigNoz span, log, and metric ingestion for the last seven days and compare it with the previous seven days. Walk me through which query tool you use for the totals.",
+      "prompt": "Show me my total SigNoz span, log, and metric ingestion for the last seven days. Walk me through which query tool you use for the totals.",
       "expected_output": "Agent uses signoz_execute_builder_query with source=meter and explicit sum aggregation for each Cost Meter metric. It does not use signoz_query_metrics for totals and does not invent a fixed undercount percentage or claim that one percentage applies to every tenant/window.",
       "expectations": [
         "Agent uses signoz_execute_builder_query with source=meter and timeAggregation=sum for Cost Meter totals",
         "Agent does not use signoz_query_metrics for Cost Meter totals",
-        "Agent does not cite a fixed 6 percent or other universal undercount figure",
-        "Agent reports week-over-week change as context while ranking the current primary driver by weighted cost"
+        "Agent does not cite a fixed 6 percent or other universal undercount figure"
       ],
       "files": []
     },
     {
       "id": 3,
-      "eval_name": "tail-sampling-apm-count-caveat",
-      "prompt": "Trace volume is high. Configure 10% tail sampling, but our SigNoz APM request totals and rates must remain exact because the on-call team uses them for capacity decisions.",
-      "expected_output": "Agent does not claim that tail sampling preserves exact built-in APM metrics. It explains that absolute request totals will undercount real traffic, while latency trends and error spikes may remain useful, and treats sampling as conditional on the user's explicit acceptance. Since exact request counts are mandatory, it must not remove spans unless the user confirms those operations fall outside the exact-count requirement; otherwise it stops before giving a reduction configuration.",
+      "eval_name": "trace-sampling-is-never-recommended",
+      "prompt": "Trace volume is high. Configure 10% tail sampling. We understand that SigNoz APM values may become approximate and accept that tradeoff.",
+      "expected_output": "Agent does not recommend or configure trace sampling even though the user accepts approximate APM values. It explains that every trace-sampling strategy affects the span-derived built-in APM/Services metrics and does not present processor placement as a workaround. It identifies confirmed noise operations first, then may suggest a targeted SDK exclusion or Collector filter while stating the APM impact.",
       "expectations": [
-        "Agent states that tail sampling makes SigNoz APM absolute request totals undercount real traffic",
-        "Agent does not claim that placing tail sampling downstream automatically preserves exact built-in APM metrics",
-        "Agent distinguishes undercounted absolute totals from latency trends and error spikes that can remain useful",
-        "Agent does not provide a 10 percent sampling configuration while exact APM request counts remain a hard requirement",
-        "Agent does not recommend SDK exclusions, Collector filters, or sampling unless the user confirms the removed operations fall outside the exact-count requirement"
+        "Agent does not recommend or provide a configuration for head, probabilistic, tail, or any other trace sampling",
+        "Agent states that trace sampling degrades the span-derived built-in APM/Services metrics",
+        "Agent does not present Collector processor placement as a workaround for the APM impact",
+        "Agent investigates confirmed noise operations instead of treating sampling as a cost-reduction lever",
+        "Agent states that targeted SDK exclusions or Collector filters remove those operations from APM before configuring them"
       ],
       "files": []
     }

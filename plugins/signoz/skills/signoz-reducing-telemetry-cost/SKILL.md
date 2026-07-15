@@ -46,9 +46,6 @@ unit divisors. Do **not** use `signoz_query_metrics` for Cost Meter totals.
 For a rolling 7-day window (`end` = now, `start` = end − 7 days), get the per-signal totals
 (span size, log size, metric datapoints), then compute and report:
 
-- **Week-over-week.** Repeat the queries for the prior 7-day window and report the percentage
-  change as trend context. Do not let growth rate override the current cost-based ranking: a
-  small signal can grow quickly without becoming the primary driver.
 - **Primary cost driver.** The signal with the highest *dollar* weight — traces/logs at
   $0.30/GB, metrics at $0.10/M samples (orientation only; never quote dollar savings). This
   picks by cost, not by raw volume.
@@ -209,7 +206,7 @@ query)**, not a top-N sum and not the separately-fetched ungrouped total — kee
 denominator on one grouped basis. For each top-3
 service by GB, get its dominant operations with `signoz_get_service_top_operations` (or
 `signoz_aggregate_traces` with `service: "<svc>"` + `groupBy: "name"`). The op breakdown is
-top-3 for brevity, but the error-rate gate (4c) and the APM guard below apply to **every**
+top-3 for brevity, but the error-rate check (4c) and the APM guard below apply to **every**
 service you consider reducing.
 
 **4c. Error rate per service.** `signoz_aggregate_traces`, `count`, `groupBy: "service.name"`
@@ -217,8 +214,7 @@ service you consider reducing.
 
 **4d. Trace alerts.** `signoz_list_alert_rules`, **paginating through every page** (follow
 `pagination.nextOffset` until `pagination.hasMore` is false). Keep
-`alertType == "TRACES_BASED_ALERT"`; `signoz_get_alert(id)` for what each guards. Name any
-trace-based alert before suggesting sampling.
+`alertType == "TRACES_BASED_ALERT"`; `signoz_get_alert(id)` for what each guards.
 
 **Classify the dominant operations.**
 - Common noise candidates: health/liveness (`/health`, `/ping`, `/ready`,
@@ -229,32 +225,17 @@ trace-based alert before suggesting sampling.
   (HMGET/GET/SET… → ioredis, redis-py, Jedis, go-redis…); unfamiliar gRPC methods. Search first;
   if still unidentified after searching, say so.
 
-**Fix layer.** Prefer SDK/env disable (`OTEL_INSTRUMENTATION_*_ENABLED=false`) — stops
-generation at source. Else a Collector filter on the operation name. Sampling is **not** the fix
-for known-noise ops — the data still reaches the Collector before the drop.
+**Fix layer.** For a confirmed noise operation, prefer SDK/env disable
+(`OTEL_INSTRUMENTATION_*_ENABLED=false`). This stops generation at source. If no SDK control
+exists, use a Collector filter on the operation name.
 
-> **Error-rate sampling gates.** > 10% error rate → do **not** suggest sampling; errors must be
-> investigated first, sampling would hide the signal — flag it as a real problem. < 2% → sampling
-> is eligible for consideration only if the other conditions below also hold. 2–10% → investigate
-> before sampling.
-
-> **Span → APM guard.** SDK exclusions, Collector filters, head sampling, and tail sampling can
-> change the spans available to SigNoz APM metrics unless you verify that the deployed pipeline
-> aggregates those metrics first. With tail sampling, absolute values
-> such as request totals undercount real traffic; latency trends and error spikes can remain useful,
-> but the built-in APM metrics no longer represent all requests. State the relevant impact before
-> recommending any span-volume reduction. Do not assume a particular Collector processor order
-> preserves the built-in APM metrics; verify the deployed pipeline. See
-> https://signoz.io/docs/traces-management/guides/tail-sampling/
-
-**Tail sampling is an optional lever, not a default fix.** Raise it only when structural fixes
-are exhausted (noisy ops already filtered/SDK-disabled), volume is genuinely high, and the
-dominant ops are real application traffic. Never when volume is explained by fixable issues,
-error rate > 10%, or trace-based alerts exist. State the tradeoffs (misses rare errors, harder
-debugging, more Collector overhead, and undercounted APM request totals) and ask the user to
-accept them before giving a sampling configuration. If traces look structurally healthy, say so
-first, then offer tail sampling as a voluntary lever — never as a remedy for a problem that
-doesn't exist.
+> **Span → APM guard (mandatory).** Never recommend or configure head, probabilistic, tail, or
+> any other trace sampling as a cost-reduction lever. Sampling changes the spans used to generate
+> the built-in APM/Services metrics and degrades request-rate, latency, and error data. Processor
+> placement does not provide a workaround.
+>
+> Use SDK exclusions and Collector filters for confirmed noise. State that the removed operation
+> will disappear from APM before giving a configuration.
 Docs: https://signoz.io/docs/traces-management/guides/drop-spans/
 
 ### Step 5: Report what you found
@@ -294,11 +275,8 @@ a signal the workflow already analyzed.
   pattern. Fix order: at source (`LOG_LEVEL=WARN`) → Collector scope filter
   (`instrumentation_scope.name`) → `severity_text` filter.
 - **Logs attribution is a hard threshold:** ≥ 10% → Path A; < 10% → Path B. Compute it.
-- **Traces:** error-rate gates are hard thresholds — > 10% → never suggest sampling (flag errors
-  first); < 2% → sampling only if other conditions hold. Any sampling can make APM request totals
-  undercount real traffic; state that catch and get the user's acceptance first. Name any
-  trace-based alert before suggesting sampling. Tail sampling is a lever, never a fix for a
-  non-problem or for noise.
+- **Traces:** never recommend or configure head, probabilistic, tail, or any other sampling. It
+  degrades the built-in APM/Services data regardless of sampling strategy or processor placement.
 - **UNBOUNDED and IDENTIFIER labels are always worth flagging** — the problem is trajectory, not
   just current count.
 - **Never suggest changing retention. Never estimate dollar savings.** Never call a dashboard or
