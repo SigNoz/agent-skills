@@ -1,0 +1,61 @@
+{
+  "skill_name": "signoz-reducing-telemetry-cost",
+  "evals": [
+    {
+      "id": 0,
+      "eval_name": "full-investigation-covers-every-signal",
+      "prompt": "Run a full SigNoz ingestion-cost investigation. The Cost Meter has data for all three signals. Metrics are the largest current cost contributor, logs are second, and traces are third. Logs grew 8x week over week from a tiny baseline, but their current weighted cost is still below metrics. I want one prioritized action list, not three separate reports.",
+      "expected_output": "Agent starts with Cost Meter totals, keeps metrics as the primary driver despite the faster log growth, and investigates metrics, logs, and traces in current-cost order. The final answer consolidates findings into one prioritized list and does not repeat the full per-signal decision rules.",
+      "expectations": [
+        "Agent starts with signoz_execute_builder_query Cost Meter queries before signal-specific analysis",
+        "Agent analyzes metrics, logs, and traces because every signal has Cost Meter data",
+        "Agent orders the investigation by current weighted cost: metrics, then logs, then traces",
+        "Agent treats the 8x log growth as trend context and does not promote logs above metrics solely because of growth rate",
+        "Agent returns one consolidated prioritized action list without repeating the per-signal playbooks"
+      ],
+      "files": []
+    },
+    {
+      "id": 1,
+      "eval_name": "retained-metric-cardinality-and-interval",
+      "prompt": "Metric samples are my main cost. `debug_request_id_total` is unused and I agree to drop it. `checkout_request_duration` backs a dashboard and alert, so I must keep it; it is exported every 10 seconds and I could tolerate one-minute resolution. Check cardinality and suggest the next safe lever. Do not change the metric's delta/cumulative behavior.",
+      "expected_output": "Agent checks usage before cardinality, skips cardinality analysis for the agreed drop, and inspects cardinality only for the retained checkout metric. It may recommend increasing the appropriate collection, scrape, or SDK export interval after identifying the source, while preserving dashboard/alert resolution and explicitly avoiding any temporality change.",
+      "expectations": [
+        "Agent runs or relies on signoz_check_metric_usage before classifying either metric",
+        "Agent does not call signoz_check_metric_cardinality for debug_request_id_total after the user agrees to drop it",
+        "Agent calls signoz_check_metric_cardinality for checkout_request_duration because the user must retain it",
+        "Agent identifies the metric source before choosing collection_interval, scrape_interval, or OTEL_METRIC_EXPORT_INTERVAL",
+        "Agent considers the dashboard and alert's required resolution before recommending a longer interval",
+        "Agent does not recommend switching between delta and cumulative temporality"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "eval_name": "cost-meter-uses-explicit-builder-sum",
+      "prompt": "Show me my total SigNoz span, log, and metric ingestion for the last seven days and compare it with the previous seven days. Walk me through which query tool you use for the totals.",
+      "expected_output": "Agent uses signoz_execute_builder_query with source=meter and explicit sum aggregation for each Cost Meter metric. It does not use signoz_query_metrics for totals and does not invent a fixed undercount percentage or claim that one percentage applies to every tenant/window.",
+      "expectations": [
+        "Agent uses signoz_execute_builder_query with source=meter and timeAggregation=sum for Cost Meter totals",
+        "Agent does not use signoz_query_metrics for Cost Meter totals",
+        "Agent does not cite a fixed 6 percent or other universal undercount figure",
+        "Agent reports week-over-week change as context while ranking the current primary driver by weighted cost"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "eval_name": "tail-sampling-apm-count-caveat",
+      "prompt": "Trace volume is high. Configure 10% tail sampling, but our SigNoz APM request totals and rates must remain exact because the on-call team uses them for capacity decisions.",
+      "expected_output": "Agent does not claim that tail sampling preserves exact built-in APM metrics. It explains that absolute request totals will undercount real traffic, while latency trends and error spikes may remain useful, and treats sampling as conditional on the user's explicit acceptance. Since exact request counts are mandatory, it should prefer structural filtering/SDK exclusions or stop before giving a sampling configuration.",
+      "expectations": [
+        "Agent states that tail sampling makes SigNoz APM absolute request totals undercount real traffic",
+        "Agent does not claim that placing tail sampling downstream automatically preserves exact built-in APM metrics",
+        "Agent distinguishes undercounted absolute totals from latency trends and error spikes that can remain useful",
+        "Agent does not provide a 10 percent sampling configuration while exact APM request counts remain a hard requirement",
+        "Agent prioritizes structural noise filtering or SDK exclusions before sampling"
+      ],
+      "files": []
+    }
+  ]
+}

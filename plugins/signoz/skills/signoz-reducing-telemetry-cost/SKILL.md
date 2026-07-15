@@ -10,19 +10,9 @@ description: >
   "reduce telemetry volume", "which metrics cost the most", "cardinality
   health check", or "what can I safely drop" — or otherwise asks about
   telemetry spend, ingestion volume, or metric cardinality, even if they
-  don't say "cost" or "optimize" explicitly. Do NOT use for building
-  dashboards or ad-hoc data queries — use signoz-generating-queries.
-argument-hint: [investigation focus, e.g. "metrics cost" or "cardinality health"]
+  don't say "cost" or "optimize" explicitly.
+argument-hint: <investigation focus, such as metrics cost or cardinality health>
 ---
-
-# Reduce Telemetry Cost
-
-Find what is driving SigNoz ingestion cost and cardinality, and return safe, specific ways to
-reduce it. The skill reads the Cost Meter to identify the primary cost driver across metrics,
-logs, and traces, drills into that signal, and produces a prioritized action list where every
-recommendation carries a safety status — is it safe to drop, or would it break a dashboard,
-an alert, or a built-in SigNoz page. It is the companion to `signoz-generating-queries`: that
-runs ad-hoc queries; this runs a structured cost/cardinality investigation.
 
 ## Prerequisites
 
@@ -40,36 +30,25 @@ Read both reference files before drawing conclusions:
   **and the APM/Services page** (span-derived `signoz_*` RED metrics); never present these as
   "safe to drop" even when usage shows them unused.
 
-## When to use
-
-Use this skill when the user wants to:
-- Understand what is driving their SigNoz ingestion cost or bill.
-- Find high-cardinality, unbounded, or accumulating metric labels.
-- Get safe recommendations to reduce telemetry volume across metrics, logs, or traces.
-
-Do NOT use when the user wants to:
-- Build or edit a dashboard → `signoz-creating-dashboards`.
-- Run a free-form ad-hoc query → `signoz-generating-queries`.
-
 ## Workflow
 
-Always start with the Cost Meter snapshot (Step 1) — it names the primary cost driver. Then run
-the step for that signal (metrics, logs, or traces). Finish with the report (Step 5).
+Always start with the Cost Meter snapshot (Step 1). For a full cost investigation, run the
+metrics, logs, and traces steps for every signal with data, ordered by current cost contribution
+(primary, secondary, tertiary). Finish with the report (Step 5).
 
 ### Step 1: Cost Meter snapshot
 
 Establish the cross-signal cost picture first. Query the Cost Meter with
 `signoz_execute_builder_query` (`source: "meter"`, `timeAggregation: "sum"`) — see
 `references/cost-meter-queries.md` for the exact template, the meter metric names, and the
-unit divisors. Do **not** use `signoz_query_metrics` for these totals; it forces an `increase`
-aggregation that undercounts the billing figure by ~6%.
+unit divisors. Do **not** use `signoz_query_metrics` for Cost Meter totals.
 
 For a rolling 7-day window (`end` = now, `start` = end − 7 days), get the per-signal totals
 (span size, log size, metric datapoints), then compute and report:
 
-- **Week-over-week.** Repeat the queries for the prior 7-day window. A ratio > 1.5× is a
-  **spike** — that signal is the primary driver regardless of absolute volume. 1.1–1.5× is
-  rising; < 0.9× is falling.
+- **Week-over-week.** Repeat the queries for the prior 7-day window and report the percentage
+  change as trend context. Do not let growth rate override the current cost-based ranking: a
+  small signal can grow quickly without becoming the primary driver.
 - **Primary cost driver.** The signal with the highest *dollar* weight — traces/logs at
   $0.30/GB, metrics at $0.10/M samples (orientation only; never quote dollar savings). This
   picks by cost, not by raw volume.
@@ -84,8 +63,8 @@ change: https://signoz.io/docs/ingestion/signoz-cloud/keys/
 
 ### Step 2: Metrics
 
-Run when metrics are the primary driver, or when the user asks about metric cost or cardinality.
-Three tools, in order.
+Run when the Cost Meter shows metric data, ordered by its cost contribution, or when the user
+explicitly asks about metric cost or cardinality.
 
 **2a. Rank by volume — `signoz_get_top_metrics`.** Returns the top 100 metrics by ingested
 samples with percentages pre-computed and `totalValue` sample counts (pass `start`/`end`). This
@@ -109,9 +88,10 @@ below.
 > drop." This overrides the empty usage result. Also exclude internal `signoz_` / `signoz.`
 > metrics (auto-generated RED metrics that power the APM page, not customer-controlled).
 
-**2c. Inspect cardinality — `signoz_check_metric_cardinality`.** Only for metrics that are **in
-use** (unused metrics are drop candidates — cardinality adds nothing). Returns attribute keys
-sorted highest-cardinality first, each with `valueCount` and sample `values`. Classify each with
+**2c. Inspect cardinality — `signoz_check_metric_cardinality`.** Run this for metrics that are
+not drop candidates and for any drop candidate the user chooses to retain. Cardinality analysis
+adds no value for a metric the user has agreed to drop. The tool returns attribute keys sorted
+highest-cardinality first, each with `valueCount` and sample `values`. Classify each with
 `references/otel-attribute-cardinality.md`:
 
 - **UNBOUNDED** (`url.full`, `http.target`, `db.query.text`, `client.port`, `trace.id`,
@@ -129,9 +109,19 @@ For histograms, reducing bucket boundaries cuts samples with little P99 impact. 
 https://signoz.io/docs/userguide/drop-metrics/ ·
 https://signoz.io/docs/metrics-management/dropping-metric-labels/
 
+**2d. Review the collection interval.** For a high-volume metric that must be kept, identify how
+it is produced and its current interval before recommending a change. A longer interval reduces
+ingested datapoints but also lowers time resolution, so preserve the resolution required by its
+dashboards and alerts. Use the source's own control: a receiver `collection_interval` for
+Collector-generated metrics, the scrape interval for Prometheus-scraped metrics, or
+`OTEL_METRIC_EXPORT_INTERVAL` for SDK push metrics when that SDK supports it. Never recommend
+switching a metric between delta and cumulative temporality; changing temporality for the same
+metric can break SigNoz queries.
+
 ### Step 3: Logs
 
-Run when logs are the primary driver, or when the user asks about log cost.
+Run when the Cost Meter shows log data, ordered by its cost contribution, or when the user
+explicitly asks about log cost.
 
 **3a. Total + attribution decides the path.**
 - Total log GB (the absolute cost figure): `signoz_execute_builder_query`, `source: "meter"`,
@@ -139,8 +129,8 @@ Run when logs are the primary driver, or when the user asks about log cost.
 - Attribution: run the **same meter query grouped by `service.name`**. This returns one group per
   service plus an unset/empty-`service.name` group for logs with no attribution. Compute the ratio
   entirely from THIS grouped result so numerator and denominator share one basis — a grouped sum can
-  differ from the ungrouped total by ~5%, so never divide the grouped attributed sum by the
-  ungrouped total:
+  differ from the ungrouped total, so never divide the grouped attributed sum by the ungrouped
+  total:
   - attributed GB = sum of the groups with a non-empty `service.name`.
   - grouped total = sum of *all* groups (including the empty one).
   - **Attribution % = attributed ÷ grouped total.**
@@ -204,7 +194,8 @@ coverage** and name the alert. Docs: https://signoz.io/docs/logs-management/guid
 
 ### Step 4: Traces
 
-Run when spans are the primary driver, or when the user asks about span cost.
+Run when the Cost Meter shows span data, ordered by its cost contribution, or when the user
+explicitly asks about span cost.
 
 **4a. Global operation-name view — read this first.** `signoz_aggregate_traces`,
 `aggregation: count`, `groupBy: "name"`, `orderBy: "count() desc"`, limit 20, **no service
@@ -230,8 +221,9 @@ service you consider reducing.
 trace-based alert before suggesting sampling.
 
 **Classify the dominant operations.**
-- Known-safe to pre-filter (near-zero diagnostic value): health/liveness (`/health`, `/ping`,
-  `/ready`, `grpc.health.v1.Health/Check`); proxy/sidecar (`envoy.*`, `istio.*`, `linkerd.*`).
+- Common noise candidates: health/liveness (`/health`, `/ping`, `/ready`,
+  `grpc.health.v1.Health/Check`); proxy/sidecar (`envoy.*`, `istio.*`, `linkerd.*`). Treat these as
+  candidates, not automatically safe removals; the APM guard below still applies.
 - Research before concluding — do not assume: SQL fragments (the language decides the library:
   Java → JDBC, Python → SQLAlchemy, Node → pg/mysql2/sequelize, .NET → EF/Dapper); cache commands
   (HMGET/GET/SET… → ioredis, redis-py, Jedis, go-redis…); unfamiliar gRPC methods. Search first;
@@ -243,20 +235,26 @@ for known-noise ops — the data still reaches the Collector before the drop.
 
 > **Error-rate sampling gates.** > 10% error rate → do **not** suggest sampling; errors must be
 > investigated first, sampling would hide the signal — flag it as a real problem. < 2% → sampling
-> is safe *only if* the other conditions below also hold. 2–10% → investigate before sampling.
+> is eligible for consideration only if the other conditions below also hold. 2–10% → investigate
+> before sampling.
 
-> **Span → APM guard.** The SigNoz APM/Services page is built from span-derived `signoz_*` RED
-> metrics generated by the `signozspanmetrics` processor on the traces pipeline (see
-> `references/infra-do-not-drop.md`). Head-sampling or dropping spans **upstream** of that
-> processor degrades the APM page (skews rate/latency/error). Prefer **tail-sampling downstream**
-> of the processor. State this before recommending any span-volume reduction.
+> **Span → APM guard.** SDK exclusions, Collector filters, head sampling, and tail sampling can
+> change the spans available to SigNoz APM metrics unless you verify that the deployed pipeline
+> aggregates those metrics first. With tail sampling, absolute values
+> such as request totals undercount real traffic; latency trends and error spikes can remain useful,
+> but the built-in APM metrics no longer represent all requests. State the relevant impact before
+> recommending any span-volume reduction. Do not assume a particular Collector processor order
+> preserves the built-in APM metrics; verify the deployed pipeline. See
+> https://signoz.io/docs/traces-management/guides/tail-sampling/
 
 **Tail sampling is an optional lever, not a default fix.** Raise it only when structural fixes
 are exhausted (noisy ops already filtered/SDK-disabled), volume is genuinely high, and the
 dominant ops are real application traffic. Never when volume is explained by fixable issues,
 error rate > 10%, or trace-based alerts exist. State the tradeoffs (misses rare errors, harder
-debugging, more Collector overhead). If traces look structurally healthy, say so first, then
-offer tail sampling as a voluntary lever — never as a remedy for a problem that doesn't exist.
+debugging, more Collector overhead, and undercounted APM request totals) and ask the user to
+accept them before giving a sampling configuration. If traces look structurally healthy, say so
+first, then offer tail sampling as a voluntary lever — never as a remedy for a problem that
+doesn't exist.
 Docs: https://signoz.io/docs/traces-management/guides/drop-spans/
 
 ### Step 5: Report what you found
@@ -271,21 +269,13 @@ Lead with a **TL;DR** — concise, no headers, two parts:
    dependency** (breaks the Hosts/K8s view). For metric drops, include the volume % so the
    reader knows the cost impact.
 
-Then the detail: what generates the cost and why (grounded in what was actually observed), and
-what to do about it in priority order. Priority depends on the signal:
-- **Metrics:** drop unused metrics first (complete saving, zero dashboard impact) → fix UNBOUNDED
-  labels → fix ACCUMULATING labels → trim histogram buckets → reduce HIGH-but-bounded labels.
-  Never the Infra/APM do-not-drop set.
-- **Logs:** fix reducible volume at source (`LOG_LEVEL=WARN`) → scope-filter the noisy INFO/DEBUG
-  pattern (never blanket-filter a service or namespace carrying active ERROR/WARN > 1%) → add a
-  parser where severity is unparsed. Flag high-error services as real problems, not volume.
-- **Traces:** investigate errors first (never sample a service with > 10% error rate) →
-  SDK-disable / pre-filter known-noise ops → only then consider tail-sampling downstream, and
-  only if healthy and genuinely high volume.
+After the TL;DR, add only evidence or context that was not already stated. Rank the actions using
+the decision order in Steps 2–4, but state each finding and guardrail once instead of repeating
+the action list or the per-signal playbooks.
 
 Keep it conversational — a prioritized triage list, not a formatted report with headers and
-tables. If the signal investigated is not the primary driver, say which is larger and by how
-much, and ask whether to look at that one too.
+tables. Cover every signal with Cost Meter data in that single list; do not ask whether to inspect
+a signal the workflow already analyzed.
 
 ## Guardrails
 
@@ -296,7 +286,7 @@ much, and ask whether to look at that one too.
 - **Volume = GB from the Cost Meter** (`signoz.meter.span.size`, `signoz.meter.log.size`) or
   samples (`signoz.meter.metric.datapoint.count`). Never cite span/log record counts as volume.
 - **Cost totals via `signoz_execute_builder_query`** with `timeAggregation: sum` — never
-  `signoz_query_metrics`, which undercounts by ~6%.
+  `signoz_query_metrics`.
 - **Never present an Infra-page or APM metric as safe to drop** (see
   `references/infra-do-not-drop.md`), even when usage-check shows no dashboards or alerts.
 - **Logs:** never recommend dropping/filtering a whole service or namespace that carries active
@@ -305,9 +295,10 @@ much, and ask whether to look at that one too.
   (`instrumentation_scope.name`) → `severity_text` filter.
 - **Logs attribution is a hard threshold:** ≥ 10% → Path A; < 10% → Path B. Compute it.
 - **Traces:** error-rate gates are hard thresholds — > 10% → never suggest sampling (flag errors
-  first); < 2% → sampling only if other conditions hold. Sampling upstream of `signozspanmetrics`
-  degrades the APM page — tail-sample downstream. Name any trace-based alert before suggesting
-  sampling. Tail sampling is a lever, never a fix for a non-problem or for noise.
+  first); < 2% → sampling only if other conditions hold. Any sampling can make APM request totals
+  undercount real traffic; state that catch and get the user's acceptance first. Name any
+  trace-based alert before suggesting sampling. Tail sampling is a lever, never a fix for a
+  non-problem or for noise.
 - **UNBOUNDED and IDENTIFIER labels are always worth flagging** — the problem is trajectory, not
   just current count.
 - **Never suggest changing retention. Never estimate dollar savings.** Never call a dashboard or

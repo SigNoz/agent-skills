@@ -78,10 +78,12 @@ calls, external calls) query ONLY these span-derived metrics:
   them as ordinary metrics — normal usage-check applies; if unused and not in a dashboard/alert
   they are genuinely droppable (histograms: trim buckets rather than hard-drop). No special APM
   protection.
-- **Trace-layer dependency:** because these RED metrics are generated FROM spans, aggressively
-  dropping or **head-sampling spans upstream** of the span-metrics processor degrades the APM
-  page (skews rate/latency/error). Prefer **tail-sampling downstream** of the processor. Dropping
-  the `signoz_*` metrics themselves breaks APM entirely — two different levers.
+- **Trace-layer dependency:** because these RED metrics are generated from spans, SDK exclusions,
+  Collector filters, and head or tail sampling can make APM request totals undercount real traffic
+  unless you verify that the deployed pipeline aggregates span metrics first. Latency trends and error
+  spikes can remain useful after tail sampling, but do not describe the APM page as exact. Verify
+  the deployed order instead of assuming it. Dropping the `signoz_*` metrics themselves breaks APM
+  entirely. Treat that as a separate lever.
 
 ## Required attributes (not metrics, but do-not-drop for resolution/filtering)
 - Hosts: `host.name` (required — missing = host not clickable), `host.id` (fallback)
