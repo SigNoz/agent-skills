@@ -2,7 +2,7 @@
 
 ## Contents
 - Why `signoz_execute_builder_query` (not `signoz_query_metrics`) for totals
-- Meter metrics
+- Discover meter metrics
 - Per-signal total (template)
 - Breakdown by environment / service
 - Converting and reconciling the numbers
@@ -16,48 +16,77 @@ Do **not** use `signoz_query_metrics` for Cost Meter totals. Use
 `signoz_execute_builder_query`, which honors the explicit raw builder `sum` required for these
 meter metrics.
 
-## Meter metrics
+## Discover meter metrics
 
-| metricName | unit | signal |
-|---|---|---|
-| `signoz.meter.span.size` | bytes → GB | traces volume (cost) |
-| `signoz.meter.log.size` | bytes → GB | logs volume (cost) |
-| `signoz.meter.metric.datapoint.count` | samples | metrics volume (cost) |
-| `signoz.meter.span.count` | count | span count (context only, not cost) |
-| `signoz.meter.log.count` | count | log record count (context only, not cost) |
+Always call `signoz_list_metrics` with `source: "meter"` before querying. Treat its returned
+metric names, types, temporalities, and units as the live source of truth; the meter set evolves.
+Select the discovered size, datapoint, or record-count metric that matches the requested signal.
+Names such as `signoz.meter.log.size` and `signoz.meter.span.count` are examples, not an
+exhaustive table. Do not query an example name that discovery did not return. Copy the selected
+metric's returned `temporality` into the raw builder aggregation.
 
 ## Per-signal total (template)
 
-Call `signoz_execute_builder_query` once per meter metric with `start`/`end` in unix ms
-(only `metricName` changes):
+Call `signoz_execute_builder_query` once per discovered meter metric. Replace
+`<discovered_meter_metric_name>` with the live name returned by `signoz_list_metrics`; replace
+the example `start` and `end` integers with the requested range in Unix milliseconds.
 
 ```json
 {
-  "schemaVersion": "v1",
-  "start": <start_ms>, "end": <end_ms>,
-  "requestType": "time_series",
-  "compositeQuery": { "queries": [ { "type": "builder_query", "spec": {
-    "name": "A", "signal": "metrics", "source": "meter", "stepInterval": 86400,
-    "aggregations": [ { "metricName": "signoz.meter.span.size",
-                        "timeAggregation": "sum", "spaceAggregation": "sum" } ],
-    "disabled": false
-  } } ] }
+  "query": {
+    "schemaVersion": "v1",
+    "start": 1751932800000,
+    "end": 1752537600000,
+    "requestType": "time_series",
+    "compositeQuery": {
+      "queries": [
+        {
+          "type": "builder_query",
+          "spec": {
+            "name": "A",
+            "signal": "metrics",
+            "source": "meter",
+            "stepInterval": 3600,
+            "aggregations": [
+              {
+                "metricName": "<discovered_meter_metric_name>",
+                "temporality": "<discovered_temporality>",
+                "timeAggregation": "sum",
+                "spaceAggregation": "sum"
+              }
+            ],
+            "disabled": false
+          }
+        }
+      ]
+    },
+    "formatOptions": {
+      "formatTableResultForUI": false,
+      "fillGaps": false
+    },
+    "variables": {}
+  }
 }
 ```
 
-Sum all values across every series/time-bucket in the response, excluding datapoints with
-`partial: true`; they are incomplete edge buckets.
+Meter buckets are hourly, so keep `stepInterval: 3600`. Sum all complete hourly values across
+every returned series, excluding datapoints with `partial: true`; they are incomplete edge
+buckets. Use the unit returned by discovery when labeling or converting the total.
 
 ## Breakdown by environment / service
 
-Add a `groupBy` to the same spec:
+Call `signoz_get_field_keys` with `signal: "metrics"` and `source: "meter"` before grouping.
+Use only a returned key and copy its `fieldContext`; raw builder queries do not auto-detect the
+context. Add the complete field to the same spec:
 
 ```json
-"groupBy": [ { "name": "deployment.environment" } ]
-```
-or
-```json
-"groupBy": [ { "name": "service.name" } ]
+"groupBy": [
+  {
+    "name": "<returned_field_name>",
+    "fieldContext": "<returned_field_context>",
+    "signal": "metrics"
+  }
+]
 ```
 
 ## Converting and reconciling the numbers

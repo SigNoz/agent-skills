@@ -8,6 +8,7 @@
       "expected_output": "Agent starts with Cost Meter totals, keeps metrics as the primary driver, and investigates metrics, logs, and traces in current-cost order. The final answer consolidates findings into one prioritized list and does not repeat the full per-signal decision rules.",
       "expectations": [
         "Agent starts with signoz_execute_builder_query Cost Meter queries before signal-specific analysis",
+        "Agent discovers Cost Meter groupBy keys with signoz_get_field_keys signal=metrics source=meter and carries each returned fieldContext plus signal=metrics into raw builder groupBy entries",
         "Agent analyzes metrics, logs, and traces because every signal has Cost Meter data",
         "Agent orders the investigation by current weighted cost: metrics, then logs, then traces",
         "Agent returns one consolidated prioritized action list without repeating the per-signal playbooks"
@@ -33,11 +34,13 @@
       "id": 2,
       "eval_name": "cost-meter-uses-explicit-builder-sum",
       "prompt": "Show me my total SigNoz span, log, and metric ingestion for the last seven days. The Cost Meter response includes an edge datapoint with partial=true. Walk me through the query tool and unit conversion you use for the totals.",
-      "expected_output": "Agent uses signoz_execute_builder_query with source=meter and explicit sum aggregation for each Cost Meter metric. It excludes partial edge datapoints, converts bytes with the decimal 1e9 GB divisor, does not use signoz_query_metrics for totals, and does not fabricate totals when response values are absent.",
+      "expected_output": "Agent first discovers the live meter metrics, units, and temporalities with signoz_list_metrics source=meter. It uses signoz_execute_builder_query with the full outer query wrapper, Unix-ms start/end, requestType=time_series, stepInterval=3600, formatOptions, variables, the discovered temporality, and explicit raw sum aggregation for each discovered Cost Meter metric. It excludes partial datapoints and sums complete hourly buckets, converts byte units with the decimal 1e9 GB divisor, does not use signoz_query_metrics for totals, and does not fabricate totals when response values are absent.",
       "expectations": [
-        "Agent uses signoz_execute_builder_query with source=meter and timeAggregation=sum for Cost Meter totals",
+        "Agent calls signoz_list_metrics with source=meter and uses the returned metric names and units rather than assuming a fixed meter list",
+        "Agent calls signoz_execute_builder_query with an outer query object containing Unix-millisecond start and end, requestType=time_series, formatOptions, and variables",
+        "Agent uses source=meter, the discovered metricName and temporality, stepInterval=3600, and timeAggregation=sum for Cost Meter totals",
         "Agent does not use signoz_query_metrics for Cost Meter totals",
-        "Agent excludes datapoints marked partial=true from Cost Meter totals",
+        "Agent excludes datapoints marked partial=true and sums the remaining complete hourly buckets",
         "Agent converts log and span bytes to GB with the decimal 1e9 divisor",
         "Agent does not fabricate totals when the prompt provides no complete response values",
         "Agent does not cite a fixed 6 percent or other universal undercount figure"

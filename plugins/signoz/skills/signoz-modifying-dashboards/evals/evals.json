@@ -5,7 +5,7 @@
       "id": 0,
       "eval_name": "add-panel-to-existing-dashboard",
       "prompt": "Add a traces panel showing p99 latency by service to my 'API Monitoring' dashboard. Group by service.name.",
-      "expected_output": "Agent resolves 'API Monitoring' to a UUID by paginating dashboard results, fetches it, reads the required dashboard and traces query resources, builds a complete graph widget with a UUID, appends it within the 12-column layout, preserves supported non-target state, and dry-runs the exact query before preparing the full update.",
+      "expected_output": "Agent resolves 'API Monitoring' to a UUID by paginating dashboard results, fetches it, reads the required dashboard and traces query resources, builds a complete graph widget with a UUID, appends it within the 12-column layout, preserves supported non-target state, and dry-runs the exact query before preparing the full update. The prepared dashboard update keeps the dashboard/editor groupBy shape, while the actual dry-run translates it to the Query Builder v5 execution shape.",
       "files": [],
       "expectations": [
         "Updated dashboard has exactly one more widget than original",
@@ -13,11 +13,12 @@
         "New widget includes id, panelTypes, title, query, selectedLogFields, selectedTracesFields, thresholds, and contextLinks",
         "New widget query includes queryType and the complete active Builder payload required by the MCP resources; inactive query payloads need not be authored",
         "New widget's id is a valid UUID",
-        "New widget's query uses 'service.name' (OTel naming) in groupBy, not 'service'",
+        "New widget's query prepared for signoz_update_dashboard keeps groupBy in dashboard form with key='service.name', dataType='string', and type='resource' (not the execution-only aliases)",
         "Layout has one new entry whose 'i' matches the new widget's id",
         "When rows exist, the new widget appears exactly once in the intended panelMap row and its x, y, w, h match the top-level layout entry",
         "All supported non-target widget and variable semantics remain present",
-        "Agent calls signoz_execute_builder_query for the new panel before preparing or calling signoz_update_dashboard, and the translated builder query retains its name A",
+        "The actual signoz_execute_builder_query call maps queryName='A' to name='A' and dataSource='traces' to signal='traces', and maps groupBy to name='service.name', fieldDataType='string', fieldContext='resource', signal='traces'",
+        "No groupBy entry passed to signoz_execute_builder_query contains the dashboard-only key, dataType, or type fields",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
       ]
     },

@@ -40,7 +40,16 @@
       "id": 5,
       "eval_name": "metrics-cost-meter-ingestion-by-service",
       "prompt": "How much log data is each service ingesting?",
-      "expected_output": "Agent recognizes ingestion bytes live only in the Cost Meter store, discovers the metric with signoz_list_metrics source=meter, then calls signoz_query_metrics with source=meter, timeAggregation=increase, spaceAggregation=sum, groupBy=service.name, requestType=scalar, and reduceTo=sum without stepInterval. It reports total ingested bytes rather than hourly buckets or the default per-second rate. If the meter lacks a requested attribute, it falls back to a direct count aggregation and clearly notes that bytes remain meter-only.",
+      "expected_output": "Agent recognizes ingestion bytes live only in the Cost Meter store and discovers the live metric name, unit, and temporality with signoz_list_metrics source=meter. It discovers service.name with signoz_get_field_keys signal=metrics source=meter, then uses signoz_execute_builder_query, not signoz_query_metrics, with the full outer query wrapper, Unix-ms range, requestType=time_series, formatOptions, variables, source=meter, the discovered metricName and temporality, stepInterval=3600, raw timeAggregation=sum, spaceAggregation=sum, and a groupBy carrying the returned fieldContext plus signal=metrics. It excludes partial datapoints and sums complete hourly buckets per service. If the meter lacks the requested attribute, it falls back to a direct count aggregation and clearly notes that bytes remain meter-only.",
+      "expectations": [
+        "Agent calls signoz_list_metrics with source=meter and uses the returned log-volume metric name, unit, and temporality",
+        "Agent calls signoz_get_field_keys with signal=metrics and source=meter and uses the returned service.name fieldContext",
+        "Agent uses signoz_execute_builder_query with an outer query object containing Unix-millisecond start and end, requestType=time_series, formatOptions, and variables",
+        "Agent uses signal=metrics, source=meter, the discovered metricName and temporality, stepInterval=3600, raw timeAggregation=sum, spaceAggregation=sum, and groupBy service.name with the returned fieldContext and signal=metrics",
+        "Agent does not use signoz_query_metrics for the grouped Cost Meter total attribution",
+        "Agent excludes partial=true datapoints and sums complete hourly buckets per service",
+        "Agent falls back to a direct count and notes that bytes remain meter-only if service.name is unavailable in the meter"
+      ],
       "files": []
     }
   ]

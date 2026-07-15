@@ -397,11 +397,15 @@ Call `signoz_execute_builder_query` per panel. The dry-run
 validates the query is well-formed *and* confirms data flows under
 that filter — the per-panel data probe folds in here.
 
-Build the complete payload from the current tool schema; do not pass
-widget JSON. Translate the active Builder, PromQL, or ClickHouse query
-losslessly into its matching envelope, preserving every semantic field
-and query name (`A`, `B`, `F1`, etc.). Supply representative values for
-referenced dashboard variables.
+Build the complete payload from the current tool schema; do not pass widget JSON. Translate PromQL and ClickHouse losslessly. Builder queries cross a contract boundary:
+
+- `queryName` → `name`; `dataSource` → `signal`
+- `groupBy[].key` → `name`; `dataType` → `fieldDataType`; `type` → `fieldContext`
+- Set each dry-run `groupBy[].signal` to the translated query `signal`.
+
+Keep the saved `groupBy` unchanged in `signoz_create_dashboard`, including `{key,dataType,type}`; dry-run `groupBy` must use only
+`{name,fieldDataType,fieldContext,signal}`. Preserve all other
+semantics, query names (`A`, `B`, `F1`), and representative variable values.
 
 Server or validation error = fail. Unexpected zero rows also fail,
 unless the user already chose to build despite confirmed missing telemetry.

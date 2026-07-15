@@ -5,7 +5,14 @@
       "id": 0,
       "eval_name": "full-rca-firing",
       "prompt": "The 'RED — p99 Latency > 2s by Service' alert (019ddf83-7d04-74c4-97c7-fea13d72c091) is firing. Investigate the most recent fire and tell me the root cause.",
-      "expected_output": "Agent runs full 3-tier flow: signoz_get_alert + paginated signoz_get_alert_history (order=desc; include firing and inactive transitions to reconstruct the recent fire window), then Tier-1 re-runs the alert query around the fire window to get peak/baseline/breach magnitude/duration; Tier-2 pulls neighbor signals (error rate, throughput, dependency latency) and compares fire vs baseline window; Tier-3 pulls top error traces + error logs around the fire window. Outputs ranked hypotheses with evidence + supporting query, plus next steps.",
+      "expected_output": "Agent runs full 3-tier flow: signoz_get_alert + cursor-paginated signoz_get_alert_history (first call timeRange=7d and order=desc; include firing and inactive transitions to reconstruct the recent fire window), then Tier-1 re-runs the alert query around the fire window to get peak/baseline/breach magnitude/duration; Tier-2 pulls neighbor signals (error rate, throughput, dependency latency) and compares fire vs baseline window with complete signoz_execute_builder_query arguments; Tier-3 pulls top error traces + error logs around the fire window and maps a returned trace_id to the traceId details input. Outputs ranked hypotheses with evidence + supporting query, plus next steps.",
+      "expectations": [
+        "The first signoz_get_alert_history call uses timeRange=7d and order=desc without a state filter",
+        "Each history continuation uses data.nextCursor as cursor plus the resolved absolute start/end and preserves state, filter, and order",
+        "History pagination never uses offset or page fullness as the continuation signal",
+        "Each Tier-2 signoz_execute_builder_query call has an outer query object with Unix-ms start/end, requestType=time_series, compositeQuery, formatOptions, variables, and stepInterval",
+        "When drilling into a searched trace, the agent maps the returned trace_id value to signoz_get_trace_details input traceId"
+      ],
       "files": []
     },
     {

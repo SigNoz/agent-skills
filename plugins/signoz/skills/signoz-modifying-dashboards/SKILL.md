@@ -182,6 +182,16 @@ Supply representative values for referenced dashboard variables. A server error
 or unexpected empty result must be fixed before update, unless the user explicitly
 accepted confirmed missing telemetry.
 
+Builder queries cross a contract boundary:
+
+- `queryName` → `name`; `dataSource` → `signal`
+- `groupBy[].key` → `name`; `dataType` → `fieldDataType`; `type` → `fieldContext`
+- Set each dry-run `groupBy[].signal` to the translated query `signal`.
+
+Keep the saved `groupBy` unchanged in `signoz_update_dashboard`, including
+`{key,dataType,type}`; dry-run `groupBy` must use only
+`{name,fieldDataType,fieldContext,signal}`.
+
 Call `signoz_update_dashboard` with the dashboard UUID and the **complete** modified
 dashboard JSON.
 

@@ -83,11 +83,14 @@ alerts.
    not given.
 2. Call `signoz_get_alert` for the full rule config — needed to know
    what query, threshold, and resource scope the alert evaluated.
-3. Call `signoz_get_alert_history` with a 7d lookback and `order: "desc"`.
-   Paginate with `offset` while a page is full or its completeness note reports
-   `hasMore: true`; stop when the note reports `hasMore: false` or the page is short.
-   pattern analysis needs the full firing/inactive transition set. From the
-   response:
+3. First call `signoz_get_alert_history` with `timeRange: "7d"` and
+   `order: "desc"`; omit `state` so the timeline includes firing and inactive
+   transitions. Continue only when `data.nextCursor` exists (the completeness
+   note also reports `hasMore: true`). Pass it as `cursor`, replace `timeRange`
+   with the note's resolved absolute `start` and `end`, and preserve the same
+   state/filter (including omission) and order. Stop when `nextCursor` is absent
+   / the note reports `hasMore: false`; never use `offset` or page fullness.
+   Pattern analysis needs the complete transition set. From the response:
    - **Pick the fire window**. Default to the most recent fire. If the
      user passed an explicit time window via `$ARGUMENTS[1]`, honor it.
    - **Note the fire pattern**:
@@ -165,7 +168,8 @@ specific failing operations.
      the top 3 by frequency with a representative trace ID for each.
    - Optionally call `signoz_get_trace_details` on one representative
      to extract specific span attributes (DB statement, downstream URL,
-     status code).
+     status code). Search results expose `trace_id`; pass that returned value
+     to the details tool as `traceId`.
 
 2. **Logs** for the fire window:
    - Call `signoz_search_logs` with filter:

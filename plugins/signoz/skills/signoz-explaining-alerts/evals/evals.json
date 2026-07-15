@@ -5,7 +5,12 @@
       "id": 0,
       "eval_name": "fuzzy-match-audit",
       "prompt": "Explain my checkout error rate alert. Is it configured correctly?",
-      "expected_output": "Agent paginates signoz_list_alert_rules to find candidates (multiple 'checkout-svc Error Rate > 3%' rules + eval-1 alerts exist on staging). Surfaces ambiguity and either asks user or picks closest with a clear assumption note. Then signoz_get_alert + paginated signoz_get_alert_history (7d, state=firing, order=desc), leads with an audit verdict, explains the A*100/B query, threshold, evaluation, notifications, and labels, and includes the complete fire-frequency summary.",
+      "expected_output": "Agent paginates signoz_list_alert_rules to find candidates (multiple 'checkout-svc Error Rate > 3%' rules + eval-1 alerts exist on staging). Surfaces ambiguity and either asks user or picks closest with a clear assumption note. Then signoz_get_alert + cursor-paginated signoz_get_alert_history (first call timeRange=7d, state=firing, order=desc), leads with an audit verdict, explains the A*100/B query, threshold, evaluation, notifications, and labels, and includes the complete fire-frequency summary.",
+      "expectations": [
+        "The first signoz_get_alert_history call uses timeRange=7d, state=firing, and order=desc",
+        "Each history continuation uses data.nextCursor as cursor plus the resolved absolute start/end and preserves state, filter, and order",
+        "History pagination never uses offset or page fullness as the continuation signal"
+      ],
       "files": []
     },
     {

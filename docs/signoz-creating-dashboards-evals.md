@@ -74,6 +74,7 @@ plugins/signoz/skills/signoz-creating-dashboards/evals/evals.json
 | Value panel must NOT have `groupBy` | 14, 16 |
 | Pie panel must have `groupBy` AND `legend` | 16 |
 | Error-rate formula `A*100/B` with `disabled:true` on base queries | 9, 16 |
+| Dashboard `groupBy` aliases stay in create payloads; dry-runs use canonical v5 fields | 10 |
 | Non-default time range for SLO windows (28d) | 9 |
 | Variable-application prompt before injecting `$var` into panels | 17 |
 | Selected-panel variable wiring and dry-run | 19 |
@@ -96,7 +97,7 @@ plugins/signoz/skills/signoz-creating-dashboards/evals/evals.json
 | 7 | `custom-build-kafka-consumer-pressure` | "Don't ask questions, I'm in incident" — agent must still discover + probe | metrics | graph | discovery + probe under pressure, real attribute keys (e.g. `client-id`), reject invented shorthand |
 | 8 | `custom-build-checkout-funnel-span-attributes` | Span-attribute-driven business KPIs (orders, revenue, card-type) | traces | graph, pie | `signoz_get_field_keys signal=traces` discovery, `signoz_aggregate_traces` (not metrics), `sum(app.order.amount)`, span-tag groupBy |
 | 9 | `custom-build-slo-error-budget-formula` | SLO availability + error-budget burn-rate; builder mode only | metrics | graph, value | error-rate formula, non-default 28d time range, `service.name` (dotted, resource), no PromQL |
-| 10 | `custom-build-multi-service-user-journey` | Per-hop latency + error rate across multiple services | traces | graph | `service.name` discovery (`signoz_list_services` / `signoz_get_field_values`), IN-list filter, per-service `groupBy=service.name`, error-rate formula |
+| 10 | `custom-build-multi-service-user-journey` | Per-hop latency + error rate across multiple services | traces | graph | `service.name` discovery, IN-list filter, per-service `groupBy`, error-rate formula, dashboard-to-v5 dry-run field translation |
 | 11 | `duplicate-modify-hands-off` | Existing dashboard + user picks "modify" → handoff | (any) | n/a | scope boundary — no `signoz_update_dashboard` from this skill |
 | 12 | `shape-check-no-stringify` | Top-level fields are native JSON, every widget has required keys | traces | graph | `layout` / `widgets` / `variables` not stringified, query has `queryType` + complete active Builder payload |
 | 13 | `import-failure-falls-back-to-custom` | Duplicate-check → "create new" → template import fails → surface error + fallback | metrics | (template) | no silent retry, no fabricated payload, custom-build fallback or stop |

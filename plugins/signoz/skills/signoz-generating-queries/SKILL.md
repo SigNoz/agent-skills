@@ -102,7 +102,8 @@ from context (e.g., from a dashboard or @mention), skip redundant discovery.
 
 | Question type | Tool | When to use |
 |---|---|---|
-| Metric time series or scalar | `signoz_query_metrics` | Any metrics query. Handles aggregation defaults automatically. Supports formulas via `formula` + `formulaQueries` params. |
+| Metric time series or scalar | `signoz_query_metrics` | Ordinary metrics queries, plus Cost Meter trends or per-second rates. Handles aggregation defaults automatically and supports formulas via `formula` + `formulaQueries` params. |
+| Cost Meter total or grouped total attribution | `signoz_execute_builder_query` | Use the discovered meter metric with raw `timeAggregation: "sum"`; sum complete hourly buckets. Do not use `signoz_query_metrics` for totals. |
 | Log search (find matching entries) | `signoz_search_logs` | Finding specific log lines. Use `searchText` for body text, `filter` for field filters, `severity` for level filtering. |
 | Trace search (find matching spans) | `signoz_search_traces` | Finding specific traces/spans. Use `service`, `operation`, `error`, `minDuration`/`maxDuration` shortcuts plus `filter` for field filters. |
 | Log aggregation (count, avg, percentiles) | `signoz_aggregate_logs` | "How many errors?", "error count by service", "p99 response time from logs". Set `requestType` to `scalar` for totals or `time_series` for trends. |
@@ -128,10 +129,18 @@ from context (e.g., from a dashboard or @mention), skip redundant discovery.
   are ANDed together.
 - For `signoz_query_metrics`, pass `metricType`, `temporality`, and `isMonotonic`
   from the `signoz_list_metrics` response to avoid an extra auto-fetch round trip.
-- For **Cost Meter**, carry `source=meter` on `signoz_query_metrics` too (signal
-  stays `metrics`). For time series, use `stepInterval: 3600` because meter data
-  is hourly; omit it for scalar totals. Use `timeAggregation: increase` for
-  volume/count and `rate` only for a per-second rate.
+- For a **Cost Meter total or grouped total attribution**, use
+  `signoz_execute_builder_query`, not `signoz_query_metrics`. Pass the full tool arguments with
+  an outer `query` object, Unix-millisecond `start`/`end`, `requestType: "time_series"`,
+  `formatOptions`, and `variables`. The builder spec keeps `signal: "metrics"`,
+  `source: "meter"`, the discovered `metricName` and `temporality`, `stepInterval: 3600`,
+  and raw `timeAggregation: "sum"` plus `spaceAggregation: "sum"`. For grouped totals,
+  discover the meter field with `signoz_get_field_keys` and copy its `fieldContext` into
+  `groupBy` alongside `signal: "metrics"`. Exclude datapoints marked `partial: true`, then
+  sum the complete hourly buckets for each returned group.
+- `signoz_query_metrics` remains appropriate for a Cost Meter trend or rate that is not a total
+  attribution. Carry `source=meter`, use `stepInterval: 3600`, use
+  `timeAggregation: increase` for a volume trend, and `rate` only for a per-second rate.
 
 ### Step 5: Handle results
 
@@ -247,10 +256,13 @@ from context (e.g., from a dashboard or @mention), skip redundant discovery.
 
 **Agent:**
 1. Bytes by service → Cost Meter. `signoz_list_metrics(searchText: "log",
-   source: "meter")` finds `signoz.meter.log.size`.
-2. Calls `signoz_query_metrics(metricName: "signoz.meter.log.size",
-   source: "meter", timeAggregation: "increase", spaceAggregation: "sum",
-   groupBy: "service.name", timeRange: "24h", requestType: "scalar",
-   reduceTo: "sum")`.
-3. Presents per-service ingestion bytes. (Bytes live only in the meter; to slice
-   by an attribute it lacks, fall back to a direct count.)
+   source: "meter")` and selects the returned log-volume metric from its live name and unit.
+2. Calls `signoz_execute_builder_query` with the outer `query` wrapper, Unix-ms range,
+   `requestType: "time_series"`, `formatOptions`, `variables`, and a builder spec using
+   `signal: "metrics"`, `source: "meter"`, the discovered metric name and temporality,
+   `stepInterval: 3600`, raw `timeAggregation: "sum"`, `spaceAggregation: "sum"`, and
+   the `service.name` field returned by `signoz_get_field_keys`, including its
+   `fieldContext` and `signal: "metrics"` in `groupBy`.
+3. Excludes `partial: true` datapoints, sums complete hourly buckets per service, and presents
+   per-service ingestion in the discovered unit. (If the meter lacks a requested attribute,
+   fall back to a direct count and note that bytes remain meter-only.)

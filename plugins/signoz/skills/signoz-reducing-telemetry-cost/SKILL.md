@@ -16,7 +16,8 @@ argument-hint: <investigation focus, such as metrics cost or cardinality health>
 
 ## Prerequisites
 
-This skill calls SigNoz MCP server tools heavily (`signoz_execute_builder_query`,
+This skill calls SigNoz MCP server tools heavily (`signoz_list_metrics`,
+`signoz_get_field_keys`, `signoz_execute_builder_query`,
 `signoz_get_top_metrics`, `signoz_check_metric_usage`, `signoz_check_metric_cardinality`,
 `signoz_aggregate_logs`, `signoz_aggregate_traces`, `signoz_search_logs`,
 `signoz_list_alert_rules`, `signoz_get_alert`, `signoz_get_service_top_operations`). Before
@@ -38,10 +39,14 @@ metrics, logs, and traces steps for every signal with data, ordered by current c
 
 ### Step 1: Cost Meter snapshot
 
-Establish the cross-signal cost picture first. Query the Cost Meter with
-`signoz_execute_builder_query` (`source: "meter"`, `timeAggregation: "sum"`) — see
-`references/cost-meter-queries.md` for the exact template, the meter metric names, and the
-unit divisors. Do **not** use `signoz_query_metrics` for Cost Meter totals.
+Establish the cross-signal cost picture first. Always call `signoz_list_metrics` with
+`source: "meter"`; treat its returned metric names, types, temporalities, and units as the live
+source of truth because the meter set evolves. Then query each relevant discovered metric with
+`signoz_execute_builder_query` (`source: "meter"`, `requestType: "time_series"`,
+`stepInterval: 3600`, the discovered `temporality`, and `timeAggregation: "sum"`) — see
+`references/cost-meter-queries.md` for the full tool-argument template. Sum complete hourly
+buckets and exclude every datapoint marked `partial: true`. Do **not** use
+`signoz_query_metrics` for Cost Meter totals or grouped total attribution.
 Report only values returned by successful queries. If a query fails or returns no usable values
 after the MCP tools are available, show the intended query and say that the total could not be
 computed; never invent a total. If the tools are unavailable, follow the prerequisite instead.
@@ -55,11 +60,13 @@ For a rolling 7-day window (`end` = now, `start` = end − 7 days), get the per-
 - **Bytes per record.** span.size ÷ span.count and log.size ÷ log.count — tells you whether a
   signal is a payload-size problem or a volume problem.
 
-Then break the primary signal down by `deployment.environment` and by `service.name` (same
-meter query with a `groupBy`; template in the reference). Report the top ~10 per group with
-their share. If a non-prod environment (`staging`, `dev`, `test`, `qa`, `sandbox`, `preview`,
-`uat`, …) is > 40% of volume, recommend Ingestion Limits on that key before any signal-level
-change: https://signoz.io/docs/ingestion/signoz-cloud/keys/
+Then break the primary signal down by environment and service. First call
+`signoz_get_field_keys` with `signal: "metrics"` and `source: "meter"`; use only keys it returns
+and copy each key's `fieldContext` into the raw builder `groupBy` alongside
+`signal: "metrics"`. Run the same meter query with that complete `groupBy` and report the top
+~10 per group with their share. If a non-prod environment (`staging`, `dev`, `test`, `qa`,
+`sandbox`, `preview`, `uat`, …) is > 40% of volume, recommend Ingestion Limits on that key
+before any signal-level change: https://signoz.io/docs/ingestion/signoz-cloud/keys/
 
 ### Step 2: Metrics
 
@@ -130,8 +137,8 @@ Run when the Cost Meter shows log data, ordered by its cost contribution, or whe
 explicitly asks about log cost.
 
 **3a. Total + attribution decides the path.**
-- Total log GB (the absolute cost figure): `signoz_execute_builder_query`, `source: "meter"`,
-  `signoz.meter.log.size`, sum (as in Step 1).
+- Total log GB (the absolute cost figure): use `signoz_execute_builder_query` with the discovered
+  meter metric whose live unit and meaning represent log bytes, summed as in Step 1.
 - Attribution: run the **same meter query grouped by `service.name`**. This returns one group per
   service plus an unset/empty-`service.name` group for logs with no attribution. Compute the ratio
   entirely from THIS grouped result so numerator and denominator share one basis — a grouped sum can
@@ -216,8 +223,10 @@ explicitly asks about span cost.
 filter**. This surfaces auto-instrumentation noise (health checks, SQL, cache, sidecars) across
 all services at once.
 
-**4b. Cost per service + ops per service.** Span GB by service: `signoz_execute_builder_query`,
-`source: "meter"`, `signoz.meter.span.size`, sum, `groupBy: [{ "name": "service.name" }]`.
+**4b. Cost per service + ops per service.** Span GB by service: use
+`signoz_execute_builder_query` with the discovered meter metric whose live unit and meaning
+represent span bytes, summed as in Step 1 and grouped by the `service.name` field returned by
+`signoz_get_field_keys` (including its `fieldContext` and `signal: "metrics"`).
 Compute each service's % against the **grouped total (sum of all service groups from this same
 query)**, not a top-N sum and not the separately-fetched ungrouped total — keep numerator and
 denominator on one grouped basis. For each top-3
@@ -284,9 +293,10 @@ a signal the workflow already analyzed.
   `signoz_list_alert_rules` fully (through `pagination.hasMore`) before ruling out alert impact,
   and treat a non-empty `error` from `signoz_check_metric_usage` as *unknown* usage (needs a
   manual check) — not as "unused." An incomplete lookup is not a green light.
-- **Volume = GB from the Cost Meter** (`signoz.meter.span.size`, `signoz.meter.log.size`) or
-  samples (`signoz.meter.metric.datapoint.count`). Never cite span/log record counts as volume.
-- **Cost totals via `signoz_execute_builder_query`** with `timeAggregation: sum` — never
+- **Volume comes from discovered Cost Meter metrics and their live units:** bytes for span/log
+  volume or samples for metric volume. Never cite span/log record counts as volume.
+- **Cost totals and grouped total attribution use `signoz_execute_builder_query`** with raw
+  `timeAggregation: sum`, hourly `stepInterval: 3600`, and complete datapoints only — never
   `signoz_query_metrics`.
 - **Never present an Infra-page or APM metric as safe to drop** (see
   `references/infra-do-not-drop.md`), even when usage-check shows no dashboards or alerts.
@@ -308,8 +318,8 @@ a signal the workflow already analyzed.
 
 ## Additional resources
 
-- `references/cost-meter-queries.md` — `signoz_execute_builder_query` meter templates, metric
-  names, unit divisors, and the grouped-vs-ungrouped caveat.
+- `references/cost-meter-queries.md` — Cost Meter discovery, the full
+  `signoz_execute_builder_query` template, unit conversion, and the grouped-vs-ungrouped caveat.
 - `references/infra-do-not-drop.md` — the metrics behind the built-in Infrastructure and
   APM/Services pages that must never be recommended for dropping.
 - `references/otel-attribute-cardinality.md` — reference for classifying metric labels

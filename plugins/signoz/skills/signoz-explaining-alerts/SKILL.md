@@ -82,10 +82,13 @@ guesses.
 
 ### Step 3: Pull a one-line fire-frequency summary
 
-Call `signoz_get_alert_history` with a 7-day lookback, `state: "firing"`,
-`order: "desc"`, and a large limit. If a page is full or the response includes
-a completeness note with `hasMore: true`, continue with `offset`; stop when the
-note reports `hasMore: false` or the page is short.
+First call `signoz_get_alert_history` with `timeRange: "7d"`,
+`state: "firing"`, `order: "desc"`, and a large limit. Continue only when
+`data.nextCursor` exists (the completeness note also reports `hasMore: true`):
+pass that value as `cursor`, replace `timeRange` with the note's resolved
+absolute `start` and `end`, and preserve the same state, filter, and order.
+Stop when `nextCursor` is absent / the note reports `hasMore: false`. Never use
+`offset` or infer completeness from page fullness.
 Derive a single line from the complete set:
 
 > Fired N times in the last 7d (last fire: <relative-time>).
@@ -299,8 +302,8 @@ wrong chips.
 2. `signoz_get_alert id=42` → traces formula (A errored spans / B
    total spans × 100), single critical threshold at 5%, `op=1`,
    `matchType=1`, channel `pagerduty-oncall`.
-3. `signoz_get_alert_history id=42 lookback=7d` → fired 3 times,
-   last fire 2h ago.
+3. `signoz_get_alert_history id=42 timeRange=7d state=firing order=desc`
+   → fired 3 times, last fire 2h ago.
 4. Replies:
 
    > **TL;DR**: Fires when checkout error rate (errored spans / total
