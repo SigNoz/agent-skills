@@ -349,12 +349,12 @@
       "id": 24,
       "eval_name": "saved-not-in-to-execution-not-in",
       "prompt": "Create a logs table grouped by service that excludes checkout and frontend services.",
-      "expected_output": "Agent discovers the actual log-side service field, saves the panel with the dashboard groupBy key shape and filters.items op=NOT_IN, then dry-runs the canonical execution form with filter.expression using NOT IN and a non-empty groupBy name. The dry-run outer query includes absolute integer Unix-ms bounds; the saved and execution filters remain semantically identical.",
+      "expected_output": "Agent discovers the actual log-side service field, saves the panel with the dashboard groupBy key shape and filters.items op=NOT_IN, then dry-runs the canonical execution form with filter.expression using NOT IN and a non-empty groupBy name. The dry-run outer query includes absolute integer Unix-ms bounds spanning a short representative 30-60-minute window, not a multi-hour or multi-day display range; the saved and execution filters remain semantically identical.",
       "expectations": [
         "Agent calls signoz_get_field_keys with signal=logs and uses the returned service field name rather than assuming service.name exists on logs",
         "The signoz_create_dashboard payload keeps groupBy in dashboard form and filters.items uses op=NOT_IN, never the execution spelling NOT IN",
         "The actual signoz_execute_builder_query call uses filter.expression with NOT IN and sends no filters field",
-        "The actual dry-run outer query contains start and end as JSON integer Unix-millisecond values",
+        "The actual dry-run outer query contains start and end as JSON integer Unix-millisecond values and spans a short representative window (roughly the last 30-60 minutes, not a multi-hour or multi-day display range)",
         "Every execution groupBy entry has a non-empty name equal to the discovered attribute key and contains no dashboard-only key/dataType/type aliases",
         "The saved NOT_IN values and execution NOT IN values are semantically identical"
       ],

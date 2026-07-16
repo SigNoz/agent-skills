@@ -219,12 +219,12 @@
       "id": 14,
       "eval_name": "promql-envelope-timeout-retry",
       "prompt": "Using the attached offline fixture, add a PromQL 'Up Targets' graph panel using sum(up) to my Prometheus Overview dashboard. I am viewing the dashboard over the last 12 hours.",
-      "expected_output": "Agent preserves the dashboard's PromQL widget style, dry-runs the new panel with the PromQL execution envelope over a short absolute Unix-ms window, and responds to the fixture's timeout by retrying with a strictly shorter window before preparing the saved widget shape.",
+      "expected_output": "Agent preserves the dashboard's PromQL widget style, dry-runs the new panel with the PromQL execution envelope over a short absolute Unix-ms window, and responds to the fixture's timeout by retrying with a materially cheaper query before preparing the saved widget shape.",
       "files": ["evals/files/promql-timeout-retry.json"],
       "expectations": [
-        "The first and second signoz_execute_builder_query calls each use one compositeQuery.queries entry with type='promql' and spec containing name and query; neither call uses widget query.promql arrays under compositeQuery or type='promql_query'",
+        "The first and second signoz_execute_builder_query calls each use one compositeQuery.queries entry with type='promql' and a spec whose query is the requested panel's sum(up) PromQL; neither call uses widget query.promql arrays under compositeQuery or type='promql_query'",
         "Both dry-runs use absolute JSON integer Unix-ms start and end values and minutes-scale windows rather than the dashboard's 12-hour display range",
-        "After the first dry-run times out, the second call's end - start duration is strictly smaller than the first call's end - start duration; byte inequality or JSON key reordering alone does not satisfy this expectation",
+        "After the first dry-run times out, the second call is materially cheaper in an objectively comparable way: a strictly smaller end - start duration, or the same window where both calls set an explicit PromQL step and the second step is strictly larger; byte inequality or JSON key reordering alone does not satisfy this expectation",
         "The prepared saved widget keeps queryType='promql' and the dashboard/editor query.promql[] shape rather than the execution envelope",
         "Agent does not call signoz_update_dashboard (read-only eval constraint respected)"
       ]

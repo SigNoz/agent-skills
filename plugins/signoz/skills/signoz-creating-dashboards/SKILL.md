@@ -397,8 +397,10 @@ For every query-bearing panel, read the compact
 [`dashboard-to-query-builder-v5` reference](./references/dashboard-to-query-builder-v5.md).
 When the execution schema can represent the panel, call
 `signoz_execute_builder_query` with the translated payload, never widget JSON.
-Use representative variable values and keep editor aliases unchanged in
-`signoz_create_dashboard`.
+Dry-run over a short absolute Unix-ms window — usually the last 30-60 minutes,
+never the panel's display range by reflex; apply the reference's dry-run hygiene
+rules before widening or retrying after a timeout. Use representative variable
+values and keep editor aliases unchanged in `signoz_create_dashboard`.
 
 If the reference's safety gate finds an unsupported execution field, report the
 panel as unvalidated and continue only after explicit user acceptance. Server or

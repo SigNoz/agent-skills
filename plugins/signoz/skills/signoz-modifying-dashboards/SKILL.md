@@ -172,8 +172,11 @@ Merge the planned changes into the full dashboard JSON from Step 2.
 panel, read the compact
 [`dashboard-to-query-builder-v5` reference](./references/dashboard-to-query-builder-v5.md).
 When the execution schema can represent the panel, call
-`signoz_execute_builder_query` with the translated payload. Use representative
-variable values and keep editor aliases unchanged in saved state.
+`signoz_execute_builder_query` with the translated payload. Dry-run over a short
+absolute Unix-ms window — usually the last 30-60 minutes, never the panel's
+display range by reflex; apply the reference's dry-run hygiene rules before
+widening or retrying after a timeout. Use representative variable values and
+keep editor aliases unchanged in saved state.
 
 If the reference's safety gate finds an unsupported execution field, report the
 panel as unvalidated and continue only after explicit acceptance. Server or

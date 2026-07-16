@@ -30,7 +30,7 @@ plugins/signoz/skills/signoz-creating-dashboards/evals/evals.json
 |---|---|
 | metrics | 0, 1, 7, 9, 18, 21 |
 | traces | 8, 10, 12, 15, 16, 17, 19, 23 |
-| logs | 14, 20 |
+| logs | 14, 20, 24 |
 
 ### Panel types (from `PANEL_TYPES` enum in `frontend/src/constants/queryBuilder.ts`)
 
@@ -38,7 +38,7 @@ plugins/signoz/skills/signoz-creating-dashboards/evals/evals.json
 |---|---|
 | graph (timeseries) | 7, 9, 10, 12, 14, 17, 19, 21, 23 |
 | value | 9, 14, 16 |
-| table | 14, 16, 20, 22 |
+| table | 14, 16, 20, 22, 24 |
 | list | 15 |
 | bar | 16 |
 | pie | 16 |
@@ -56,7 +56,7 @@ plugins/signoz/skills/signoz-creating-dashboards/evals/evals.json
 | Duplicate found on a later page → present choices before any write | 18 |
 | Broad/ambiguous request → present multiple template options | 2 |
 | Vague request → emit `needs_input` / clarify scope | 5 |
-| No template match → custom build | 6, 7, 8, 9, 10, 12, 14, 15, 16, 17, 19, 20, 21, 22, 23 |
+| No template match → custom build | 6, 7, 8, 9, 10, 12, 14, 15, 16, 17, 19, 20, 21, 22, 23, 24 |
 
 ### Guardrails exercised
 
@@ -75,7 +75,7 @@ plugins/signoz/skills/signoz-creating-dashboards/evals/evals.json
 | Pie panel must have `groupBy` AND `legend` | 16 |
 | Error-rate formula `A*100/B` with `disabled:true` on base queries | 9, 16 |
 | Dashboard `groupBy` aliases stay in create payloads; dry-runs use canonical v5 fields | 10 |
-| Dashboard filters/limits/order/select fields/formulas translate to canonical execution fields | 9, 14, 15, 20, 22 |
+| Dashboard filters/limits/order/select fields/formulas translate to canonical execution fields | 9, 14, 15, 20, 22, 24 |
 | Non-empty dashboard HAVING arrays stay saved but block parity claims because frontend execution drops them | 20 |
 | Trace operators become raw-preserved sibling `builder_trace_operator` envelopes | 23 |
 | Unsupported execution-affecting fields block false-positive dry-run success | 20, 21, 22 |
@@ -115,6 +115,7 @@ plugins/signoz/skills/signoz-creating-dashboards/evals/evals.json
 | 21 | `unsupported-builder-function-blocks-lossy-validation` | Current execution schema cannot represent a requested Builder function | metrics | graph | surface unsupported field; never claim a stripped dry-run passed |
 | 22 | `formula-order-limit-schema-gate` | Formula order/limit unsupported by current execution schema | (builder) | table | preserve saved formula; block or explicitly accept unvalidated state |
 | 23 | `trace-operator-sibling-envelope-contract` | Trace-operator dashboard/editor JSON to V5 execution-envelope translation | traces | graph | base A/B plus raw-preserved sibling `builder_trace_operator` T1 in the actual dry-run call |
+| 24 | `saved-not-in-to-execution-not-in` | Logs table excluding checkout and frontend services | logs | table | discover the log-side service field; saved `NOT_IN` maps to execution `NOT IN`; canonical non-empty `groupBy`; short representative 30-60-minute dry-run window, not a display range |
 
 ## Intentionally uncovered
 
