@@ -23,8 +23,8 @@ Prefer the SigNoz MCP server tools when available; fall back to direct HTTP fetc
 - `signoz_search_docs` — BM25 search over the indexed docs corpus. Pass the user's natural-language query as `searchText`. Narrow with `section_slug` when the question maps cleanly to a single docs section (the tool's own schema lists valid slugs — defer to it rather than memorizing). Trust the ranking — the index handles relevance.
 - `signoz_fetch_doc` — markdown for one indexed page. Pass the canonical URL or `/docs/...` path; optionally narrow to a section with `heading`. Inspect `truncation_reason` and `available_headings` in every response rather than assuming the returned `content` is complete.
 
-Always pass the user's phrase as non-empty `searchText`. Never call
-`signoz_search_docs`, or `signoz_fetch_doc` without a URL, hoping it guesses.
+Never call `signoz_search_docs` with empty `searchText` — always pass the user's phrase.
+Never call `signoz_fetch_doc` without a URL; neither tool guesses missing input.
 `signoz://...` URIs are MCP resources: read them through the MCP resource API,
 never `signoz_fetch_doc`, which accepts only `https://signoz.io/docs/...` URLs
 or `/docs/...` paths and rejects other scopes.
