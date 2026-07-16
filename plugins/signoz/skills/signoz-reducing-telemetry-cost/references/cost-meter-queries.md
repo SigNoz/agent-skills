@@ -47,7 +47,7 @@ the example `start` and `end` integers with the requested range in Unix millisec
             "signal": "metrics",
             "source": "meter",
             "stepInterval": 3600,
-            "limit": 1000,
+            "limit": 100,
             "order": [
               {"key": {"name": "__result"}, "direction": "desc"}
             ],
@@ -73,7 +73,7 @@ the example `start` and `end` integers with the requested range in Unix millisec
 }
 ```
 
-The 1000-group bound ranks groups across the whole requested window. A group
+The 100-group bound ranks groups across the whole requested window. A group
 with a short-lived local spike can fall outside the returned top N; narrow the
 window or choose a deliberate positive override when that matters. Query Range
 uses `order`; `orderBy` is only for dashboard editor payloads.

@@ -323,7 +323,7 @@ Run the full primary query (or formula) over the last hour:
   for that.
 
 For every persisted alert and dry-run, each `builder_query` and
-`builder_formula` spec must include `limit: 1000` plus a non-empty Query
+`builder_formula` spec must include `limit: 100` plus a non-empty Query
 Builder v5 `order`. Use `__result desc` for metrics/formulas and the primary
 aggregation desc for logs/traces. This field is `order`, not dashboard editor
 `orderBy`. Preserve the fields when copying the validated query into the alert.

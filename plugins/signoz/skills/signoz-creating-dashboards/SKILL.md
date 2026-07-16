@@ -390,7 +390,7 @@ positive `limit` and non-empty editor-model `orderBy` (`columnName` +
 `order`). Raw list and trace-request panels default to 100 with timestamp-desc
 ordering (raw logs add id as a tie-breaker); a deliberately smaller positive
 list page may use the same value for `limit` and `pageSize`. Aggregate panels
-use 1000 with the primary aggregation desc; formulas use 1000 with `__result desc`.
+use 100 with the primary aggregation desc; formulas use 100 with `__result desc`.
 During dry-run translation, log/trace base queries keep the primary
 aggregation as their Query Builder v5 `order` key, while metric base queries
 translate the editor primary-aggregation `orderBy` key to v5 `__result` and

@@ -21,7 +21,7 @@
         "The actual dry-run outer query contains start and end as JSON integer Unix-millisecond values",
         "Every groupBy entry passed to signoz_execute_builder_query has a non-empty name",
         "No groupBy entry passed to signoz_execute_builder_query contains the dashboard-only key, dataType, or type fields",
-        "The new saved graph query has limit=1000 plus editor orderBy by p99(duration_nano) desc, while the translated dry-run has limit=1000 plus v5 order and no orderBy",
+        "The new saved graph query has limit=100 plus editor orderBy by p99(duration_nano) desc, while the translated dry-run has limit=100 plus v5 order and no orderBy",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
       ]
     },
@@ -116,7 +116,7 @@
         "The new panel appears exactly once in the Overview panelMap row and its x, y, w, h matches its top-level layout entry",
         "Every duplicated panelMap layout entry satisfies the same horizontal bounds and matches its top-level x, y, w, h",
         "Agent successfully dry-runs the new p99 panel with signoz_execute_builder_query before preparing the update",
-        "The new saved p99 query has limit=1000 plus editor orderBy on p99(duration_nano), and its dry-run has limit=1000 plus v5 order on p99(duration_nano) with no dashboard orderBy",
+        "The new saved p99 query has limit=100 plus editor orderBy on p99(duration_nano), and its dry-run has limit=100 plus v5 order on p99(duration_nano) with no dashboard orderBy",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
       ]
     },
@@ -173,7 +173,7 @@
         "Consumer Lag and Throughput filters reference $deployment_environment, while Broker Health does not",
         "The prepared dashboard mutates widgets and contains no legacy panels field",
         "The simulated trace successfully dry-runs both complete changed queries with deployment_environment=prod",
-        "Each changed saved metric query has limit=1000 plus editor orderBy on its primary aggregation, while each dry-run metric builder_query has limit=1000 plus v5 order by __result desc and no dashboard orderBy",
+        "Each changed saved metric query has limit=100 plus editor orderBy on its primary aggregation, while each dry-run metric builder_query has limit=100 plus v5 order by __result desc and no dashboard orderBy",
         "Existing variables, layout, Broker Health, and all unrelated supported state remain semantically unchanged",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
       ]

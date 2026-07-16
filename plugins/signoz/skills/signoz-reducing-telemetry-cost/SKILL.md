@@ -300,7 +300,7 @@ a signal the workflow already analyzed.
   `timeAggregation: sum`, hourly `stepInterval: 3600`, and complete datapoints only — never
   `signoz_query_metrics`.
 - Every Cost Meter `builder_query` sent through that raw escape hatch includes
-  `limit: 1000` and Query Builder v5 `order: [{key:{name:"__result"},
+  `limit: 100` and Query Builder v5 `order: [{key:{name:"__result"},
   direction:"desc"}]`. This is wire `order`, not dashboard `orderBy`; preserve
   it in grouped queries. The limit ranks groups over the whole window, so call
   out the possibility that a short-lived group falls outside the top N.

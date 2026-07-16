@@ -120,7 +120,7 @@ threshold tickle or flap) and quantifies the magnitude.
    - Use `signoz_execute_builder_query` for the alert's stored builder,
      formula, PromQL, or ClickHouse query envelope.
    - Preserve an existing positive bound/order. If a stored `builder_query` or
-     `builder_formula` omitted them, add `limit: 1000` plus Query Builder v5
+     `builder_formula` omitted them, add `limit: 100` plus Query Builder v5
      `order`: `__result desc` for metrics/formulas, or the primary aggregation
      desc for logs/traces. Do not use dashboard `orderBy`. Time-series top-N is
      ranked over the whole window and may omit a short-lived local spike.

@@ -202,7 +202,7 @@
           "description": "A meter view is queried on the metrics signal against the meter store; omitting source='meter' silently queries the default store, and the server rejects a meter view without it"
         },
         {
-          "text": "Every copied Cost Meter builder_query retains limit=1000 plus Query Builder v5 order by __result desc and contains no dashboard orderBy",
+          "text": "Every copied Cost Meter builder_query retains limit=100 plus Query Builder v5 order by __result desc and contains no dashboard orderBy",
           "description": "Aggregate saved views must remain explicitly bounded and ordered in the v5 wire shape"
         },
         {

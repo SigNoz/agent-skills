@@ -63,7 +63,7 @@ For each `builder_query`:
 - Every builder query needs a positive `limit` and non-empty ordering. Raw/list
   requests and trace-signal `requestType: trace` default to 100. An intentional
   smaller positive list `pageSize` may override it; scalar and time-series
-  default to 1000. Preserve a positive
+  default to 100. Preserve a positive
   saved `limit`; otherwise apply that default. Raw and trace-request traces use
   timestamp desc; raw logs add id desc; aggregate logs/traces use the primary
   aggregation desc. For those signals, map editor
@@ -84,7 +84,7 @@ For each `builder_query`:
   it; warn that the saved panel may ignore it.
 
 Formula: set `spec.name` from `queryName`, preserve `expression`/`disabled` and
-supported `legend`; require/copy positive `limit` (default 1000) and map
+supported `legend`; require/copy positive `limit` (default 100) and map
 non-empty `orderBy` to v5 `order` (default `__result desc`).
 
 Trace operator: emit a raw-preserved `builder_trace_operator` with `name` from

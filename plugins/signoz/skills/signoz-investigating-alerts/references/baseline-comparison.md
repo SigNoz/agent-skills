@@ -57,7 +57,7 @@ guide for the chosen signal. Keep the outer `query`, `formatOptions`, and
             "signal": "traces",
             "disabled": false,
             "stepInterval": 60,
-            "limit": 1000,
+            "limit": 100,
             "order": [
               {"key": {"name": "p99(duration_nano)"}, "direction": "desc"}
             ],

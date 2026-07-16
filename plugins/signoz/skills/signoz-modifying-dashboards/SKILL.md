@@ -183,7 +183,7 @@ dashboard state uses positive `limit` plus editor-model `orderBy`; the dry-run
 translation uses the same positive `limit` plus Query Builder v5 `order`. List
 and trace-request panels default to 100 rows ordered by timestamp desc (raw logs
 also id desc), but preserve a deliberate smaller positive list limit such as
-the panel pageSize. Aggregate panels/formulas default to 1000 groups. Saved
+the panel pageSize. Aggregate panels/formulas default to 100 groups. Saved
 base queries order by their primary aggregation and saved formulas by
 `__result`; during dry-run translation, log/trace base queries retain the
 primary aggregation key, metric base queries translate it to `__result`, and
