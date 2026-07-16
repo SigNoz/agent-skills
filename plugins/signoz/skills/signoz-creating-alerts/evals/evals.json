@@ -10,7 +10,8 @@
         "The data probe calls signoz_query_metrics with a concrete metricName and the cartservice filter; it never sends count() or count_distinct(service.name) as a metrics aggregation expression",
         "Every signoz_execute_builder_query dry-run carries start and end as JSON integer Unix-millisecond values in the outer query",
         "The signoz_create_alert payload puts Slack in the warning threshold channels and PagerDuty in the critical threshold channels",
-        "The threshold-rule create payload does not rely on top-level preferredChannels for its per-severity routing"
+        "The threshold-rule create payload does not rely on top-level preferredChannels for its per-severity routing",
+        "Every metric builder_query in the dry-run and create payload has limit=1000 plus Query Builder v5 order by __result desc"
       ],
       "files": []
     },
@@ -33,7 +34,8 @@
       "expectations": [
         "The log data probe calls signoz_aggregate_logs with aggregation=count, never aggregation=count()",
         "The full dry-run uses signoz_execute_builder_query with signal=logs in the builder_query spec",
-        "The signoz_create_alert payload puts the chosen Slack channel in condition.thresholds.spec[].channels"
+        "The signoz_create_alert payload puts the chosen Slack channel in condition.thresholds.spec[].channels",
+        "Every log builder_query in the dry-run and create payload has limit=1000 plus Query Builder v5 order by count() desc (not dashboard orderBy)"
       ],
       "files": []
     },
@@ -45,6 +47,7 @@
       "expectations": [
         "The metric data probe calls signoz_query_metrics with a concrete metricName and service.name='frontend'; it never uses an expression-only count() metrics aggregation",
         "The signoz_execute_builder_query dry-run validates the base metric query without claiming to validate the anomaly functions transform or anomaly score",
+        "The persisted base metric builder_query and its signoz_execute_builder_query dry-run each have limit=1000 plus Query Builder v5 order by __result desc and no dashboard orderBy",
         "The signoz_create_alert payload has top-level preferredChannels containing the selected Slack channel",
         "The anomaly create payload omits condition.thresholds, evaluation, notificationSettings, and schemaVersion"
       ],
@@ -59,7 +62,8 @@
         "The trace data probe calls signoz_aggregate_traces with aggregation=count, never aggregation=count()",
         "The full dry-run preserves having.expression=count() > 50 in the Query Builder spec",
         "The actual signoz_execute_builder_query dry-run carries start and end as JSON integer Unix-millisecond values in the outer query",
-        "The signoz_create_alert payload places both Slack and PagerDuty names in the critical threshold channels array"
+        "The signoz_create_alert payload places both Slack and PagerDuty names in the critical threshold channels array",
+        "The trace builder_query persisted and dry-run has limit=1000 plus Query Builder v5 order by p99(duration_nano) desc"
       ],
       "files": []
     },

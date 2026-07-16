@@ -57,6 +57,7 @@
         "Agent calls signoz_get_field_keys with signal=metrics and source=meter and uses the returned service.name field descriptor",
         "Agent uses signoz_execute_builder_query with an outer query object containing Unix-millisecond start and end, requestType=time_series, formatOptions, and variables",
         "The actual signoz_execute_builder_query payload uses signal=metrics, source=meter, the discovered metricName and temporality, stepInterval=3600, raw timeAggregation=sum, and spaceAggregation=sum",
+        "Every builder_query in the actual payload has limit=1000 plus Query Builder v5 order by __result desc and no dashboard orderBy",
         "Every raw builder groupBy entry in the actual payload losslessly copies name, fieldDataType, fieldContext, and signal from signoz_get_field_keys",
         "Agent does not use signoz_query_metrics for the grouped Cost Meter total attribution",
         "Agent excludes partial=true datapoints and sums complete hourly buckets per service",

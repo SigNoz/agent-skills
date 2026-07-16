@@ -25,6 +25,10 @@
           "description": "Execution and saved-view envelopes differ; the validated inner queries must be preserved while the saved wrapper is constructed explicitly"
         },
         {
+          "text": "The copied trace builder_query retains limit=100 plus Query Builder v5 order by timestamp desc and does not translate it to dashboard orderBy",
+          "description": "Saved-view queries share the execution wire shape and must remain explicitly bounded and ordered during translation"
+        },
+        {
           "text": "The actual signoz_create_view compositeQuery argument does not contain schemaVersion, start, end, requestType, formatOptions, variables, or a nested query/compositeQuery envelope",
           "description": "Execution-only range and formatting fields are invalid in the saved-view compositeQuery"
         },
@@ -165,6 +169,10 @@
           "description": "A validated execution query must be translated to the saved-view wrapper rather than copied wholesale"
         },
         {
+          "text": "Every copied builder_query/builder_formula retains its positive limit and Query Builder v5 order losslessly; no dashboard orderBy is introduced",
+          "description": "Changing a saved-view query must not drop its bounded result contract during GET-then-PUT"
+        },
+        {
           "text": "The updated view.compositeQuery excludes schemaVersion, start, end, requestType, formatOptions, variables, and nested execution query/compositeQuery fields",
           "description": "Execution-only envelope fields must not leak into the saved view"
         },
@@ -192,6 +200,10 @@
         {
           "text": "Every builder_query spec has signal='metrics' AND source='meter'",
           "description": "A meter view is queried on the metrics signal against the meter store; omitting source='meter' silently queries the default store, and the server rejects a meter view without it"
+        },
+        {
+          "text": "Every copied Cost Meter builder_query retains limit=1000 plus Query Builder v5 order by __result desc and contains no dashboard orderBy",
+          "description": "Aggregate saved views must remain explicitly bounded and ordered in the v5 wire shape"
         },
         {
           "text": "The actual signoz_create_view payload uses compositeQuery={queryType:'builder', panelType:'graph', queries:[...]} with queries copied from the validated execution query and no execution-only envelope fields",

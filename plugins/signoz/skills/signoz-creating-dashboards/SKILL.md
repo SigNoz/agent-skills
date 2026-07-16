@@ -385,6 +385,19 @@ required fields, panel-type-specific shapes, the canonical
 `filters.items[].key.id` form, operator casing, and common write-shape
 errors. Re-skim it before serialising any custom widget JSON.
 
+Every dashboard `queryData` entry and `queryFormulas` entry must carry a
+positive `limit` and non-empty editor-model `orderBy` (`columnName` +
+`order`). Raw list and trace-request panels default to 100 with timestamp-desc
+ordering (raw logs add id as a tie-breaker); a deliberately smaller positive
+list page may use the same value for `limit` and `pageSize`. Aggregate panels
+use 1000 with the primary aggregation desc; formulas use 1000 with `__result desc`.
+During dry-run translation, log/trace base queries keep the primary
+aggregation as their Query Builder v5 `order` key, while metric base queries
+translate the editor primary-aggregation `orderBy` key to v5 `__result` and
+preserve its direction. Formulas use `__result` in both models. Never pass
+dashboard `orderBy` to `signoz_execute_builder_query`. Time-series top-N ranks
+groups over the whole window and can omit a short-lived local spike.
+
 One rule `widgets-examples` does not call out, but
 `signoz_create_dashboard` enforces: **no `JSON.stringify` on
 arrays/objects** `layout`, `widgets`, `tags`, and `variables` are

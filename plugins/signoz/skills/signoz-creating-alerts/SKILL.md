@@ -322,6 +322,14 @@ Run the full primary query (or formula) over the last hour:
   PromQL is not supported here; use `signoz_execute_builder_query`
   for that.
 
+For every persisted alert and dry-run, each `builder_query` and
+`builder_formula` spec must include `limit: 1000` plus a non-empty Query
+Builder v5 `order`. Use `__result desc` for metrics/formulas and the primary
+aggregation desc for logs/traces. This field is `order`, not dashboard editor
+`orderBy`. Preserve the fields when copying the validated query into the alert.
+For time series, top-N groups are ranked over the whole evaluation window, so
+a short-lived local spike may fall outside the returned set.
+
 Compute how many evaluation points breached the proposed threshold.
 Surface in the preview as **"would have fired N times in the last 1h"**.
 A 1h window is too short to grade most alerts — only the upper extreme

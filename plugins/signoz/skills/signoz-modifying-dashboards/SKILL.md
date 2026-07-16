@@ -178,6 +178,18 @@ display range by reflex; apply the reference's dry-run hygiene rules before
 widening or retrying after a timeout. Use representative variable values and
 keep editor aliases unchanged in saved state.
 
+Preserve or add explicit result bounds on every changed builder query/formula:
+dashboard state uses positive `limit` plus editor-model `orderBy`; the dry-run
+translation uses the same positive `limit` plus Query Builder v5 `order`. List
+and trace-request panels default to 100 rows ordered by timestamp desc (raw logs
+also id desc), but preserve a deliberate smaller positive list limit such as
+the panel pageSize. Aggregate panels/formulas default to 1000 groups. Saved
+base queries order by their primary aggregation and saved formulas by
+`__result`; during dry-run translation, log/trace base queries retain the
+primary aggregation key, metric base queries translate it to `__result`, and
+formulas use `__result`. For time series, this top-N is chosen over the whole
+window, so a short-lived local spike can be omitted.
+
 If the reference's safety gate finds an unsupported execution field, report the
 panel as unvalidated and continue only after explicit acceptance. Server or
 validation errors and unexpected empty results block unless explicitly accepted.

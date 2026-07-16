@@ -12,8 +12,8 @@ the contract boundary; never pass widget JSON to the execution tool.
 Inventory every result-affecting field, including disabled dependencies. If a
 field has no exact equivalent in the current MCP tool schema, do not omit it and
 claim validation. Name the gap and write only after the user explicitly accepts
-an unvalidated panel. Treat Builder `functions` and formula `order`/`limit` as
-unsupported unless the tool schema exposes them. `legend` may remain saved-only.
+an unvalidated panel. Treat Builder `functions` as unsupported unless the tool
+schema exposes them. `legend` may remain saved-only.
 
 ## Translate one panel
 
@@ -60,8 +60,17 @@ For each `builder_query`:
 - `selectColumns[]` -> `selectFields[]`: `name` from `name` or `key`,
   `fieldDataType` from `fieldDataType` or `dataType`, `fieldContext` from
   `fieldContext` or `type`, plus `signal`. Send only canonical metadata.
-- For table/list use `limit`, falling back to `pageSize`; otherwise use `limit`.
-  `{columnName,order}` -> `{key:{name:columnName},direction:order}`.
+- Every builder query needs a positive `limit` and non-empty ordering. Raw/list
+  requests and trace-signal `requestType: trace` default to 100. An intentional
+  smaller positive list `pageSize` may override it; scalar and time-series
+  default to 1000. Preserve a positive
+  saved `limit`; otherwise apply that default. Raw and trace-request traces use
+  timestamp desc; raw logs add id desc; aggregate logs/traces use the primary
+  aggregation desc. For those signals, map editor
+  `{columnName,order}` -> v5 `{key:{name:columnName},direction:order}`. A saved
+  metric query orders by its primary aggregation in editor `orderBy`, but its
+  v5 `order` key is `__result`; preserve the direction while making that
+  special-case translation.
 - Preserve schema-supported fields such as `disabled`, `source`, and
   `stepInterval`; map `offset` only for raw/trace requests.
 - Metrics: emit one V5 aggregation from `aggregations[0]`, falling back to
@@ -75,8 +84,8 @@ For each `builder_query`:
   it; warn that the saved panel may ignore it.
 
 Formula: set `spec.name` from `queryName`, preserve `expression`/`disabled` and
-supported `legend`; map `orderBy` -> `order` and copy `limit` only when the tool
-schema accepts them.
+supported `legend`; require/copy positive `limit` (default 1000) and map
+non-empty `orderBy` to v5 `order` (default `__result desc`).
 
 Trace operator: emit a raw-preserved `builder_trace_operator` with `name` from
 `queryName`, `expression`, applicable mappings above, and trace V5 aggregations
@@ -104,6 +113,6 @@ the matching `signoz://dashboard/clickhouse-*` resources for ClickHouse schema.
 ## Saved payload invariant
 
 Dashboard writes keep editor aliases: `queryName`, `dataSource`, `filters`,
-`pageSize`, `orderBy`, `selectColumns`, clause-array HAVING,
+positive `limit`, `pageSize`, non-empty `orderBy`, `selectColumns`, clause-array HAVING,
 `queryTraceOperator`, and `groupBy[].key/dataType/type`. Canonical names belong
 only in `signoz_execute_builder_query`.

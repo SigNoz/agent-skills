@@ -143,6 +143,16 @@ default aggregation-expression descending order; explicit ordering should use a
 `groupBy` key or the aggregation expression. Custom aliases or formulas require
 `signoz_execute_builder_query`.
 
+For every `signoz_execute_builder_query` payload, put a positive `limit` and
+non-empty Query Builder v5 `order` on each `builder_query` and
+`builder_formula` spec. Raw requests and trace-signal `requestType: trace`
+default to 100 rows: traces order by timestamp desc, while raw logs order by
+timestamp desc then id desc. Scalar/time-series requests default to 1000 groups
+ordered by `__result` desc for metrics/formulas or the primary aggregation desc
+for logs/traces. This wire field is `order`, not dashboard editor `orderBy`.
+Time-series top-N ranks groups over the whole window, so a short-lived local
+spike may fall outside the returned set.
+
 **`requestType` decision for aggregations:**
 - `scalar` (default): "How many?", "What is the p99?", "Which service has the most?"
 - `time_series`: "When did errors spike?", "How did latency change?", "Show trend"

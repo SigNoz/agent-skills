@@ -57,6 +57,10 @@ guide for the chosen signal. Keep the outer `query`, `formatOptions`, and
             "signal": "traces",
             "disabled": false,
             "stepInterval": 60,
+            "limit": 1000,
+            "order": [
+              {"key": {"name": "p99(duration_nano)"}, "direction": "desc"}
+            ],
             "having": { "expression": "" },
             "filter": { "expression": "service.name = 'checkout'" },
             "aggregations": [
@@ -75,6 +79,11 @@ guide for the chosen signal. Keep the outer `query`, `formatOptions`, and
   }
 }
 ```
+
+Keep the same positive limit and Query Builder v5 `order` in the fire and
+baseline requests. For time series, the limit ranks groups over the whole
+window, so a short-lived local spike can be outside the top N. Dashboard
+`orderBy` is not valid in this execution payload.
 
 ## Computing the delta
 

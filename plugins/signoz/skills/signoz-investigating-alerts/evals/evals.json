@@ -13,6 +13,7 @@
         "The rule incident is bounded by distinct overallStateChanged transitions, while group-specific transitions are partitioned by fingerprint and require stateChanged=true",
         "The agent never infers flapping by alternating rows from different fingerprints",
         "Each Tier-2 signoz_execute_builder_query call has an outer query object with Unix-ms start/end, requestType=time_series, compositeQuery, formatOptions, variables, and stepInterval",
+        "Every Tier-1/Tier-2 builder_query or builder_formula has a positive limit plus Query Builder v5 order (not dashboard orderBy); metrics/formulas use __result desc and log/trace aggregations use their primary aggregation desc",
         "Trace drill-down groups by status_message rather than nonexistent error_message",
         "When drilling into a searched trace, signoz_get_trace_details receives the returned trace_id as traceId plus the same absolute start/end used for the fire-window trace search"
       ],

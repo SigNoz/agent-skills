@@ -21,6 +21,7 @@
         "The actual dry-run outer query contains start and end as JSON integer Unix-millisecond values",
         "Every groupBy entry passed to signoz_execute_builder_query has a non-empty name",
         "No groupBy entry passed to signoz_execute_builder_query contains the dashboard-only key, dataType, or type fields",
+        "The new saved graph query has limit=1000 plus editor orderBy by p99(duration_nano) desc, while the translated dry-run has limit=1000 plus v5 order and no orderBy",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
       ]
     },
@@ -67,6 +68,7 @@
         "A new Error Rate widget is present with all required v5 fields and groupBy contains 'service.name'",
         "Net widget count equals original count (one removed, one added)",
         "Agent dry-runs the new Error Rate panel with builder_query envelopes named A and B plus a sibling builder_formula envelope named F1 before preparing the update",
+        "Every new saved base query/formula has a positive limit plus editor orderBy, and every dry-run builder_query/builder_formula has the same positive limit plus v5 order and no dashboard orderBy; formulas order by __result",
         "Transcript indicates a single planned update_dashboard call (changes batched, not iterative)",
         "All supported non-target widget, variable, and panelMap semantics are preserved",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
@@ -114,6 +116,7 @@
         "The new panel appears exactly once in the Overview panelMap row and its x, y, w, h matches its top-level layout entry",
         "Every duplicated panelMap layout entry satisfies the same horizontal bounds and matches its top-level x, y, w, h",
         "Agent successfully dry-runs the new p99 panel with signoz_execute_builder_query before preparing the update",
+        "The new saved p99 query has limit=1000 plus editor orderBy on p99(duration_nano), and its dry-run has limit=1000 plus v5 order on p99(duration_nano) with no dashboard orderBy",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
       ]
     },
@@ -151,6 +154,7 @@
       "files": ["evals/files/dry-run-validation-error.json"],
       "expectations": [
         "Agent does not ignore or downplay the dry-run error",
+        "Every attempted new builder_query/builder_formula remains explicitly bounded with a positive limit plus v5 order and contains no dashboard orderBy, even when another validation error blocks the dry-run",
         "Agent either corrects and successfully re-runs the exact panel query or stops with the failure explained",
         "Agent does not call signoz_update_dashboard with a panel whose dry-run failed"
       ]
@@ -169,6 +173,7 @@
         "Consumer Lag and Throughput filters reference $deployment_environment, while Broker Health does not",
         "The prepared dashboard mutates widgets and contains no legacy panels field",
         "The simulated trace successfully dry-runs both complete changed queries with deployment_environment=prod",
+        "Each changed saved metric query has limit=1000 plus editor orderBy on its primary aggregation, while each dry-run metric builder_query has limit=1000 plus v5 order by __result desc and no dashboard orderBy",
         "Existing variables, layout, Broker Health, and all unrelated supported state remain semantically unchanged",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
       ]
@@ -186,6 +191,7 @@
         "Capacity moves from y:7 to y:13 in top-level layout; CPU moves from y:8 to y:14 in both top-level layout and panelMap",
         "Overview panelMap contains Request Rate and the new Error Rate panel only; Capacity panelMap still contains CPU only",
         "The simulated trace successfully dry-runs the supplied complete Error Rate query before accepting the mutation plan",
+        "Every new saved Error Rate base query/formula has a positive limit plus editor orderBy, and every dry-run builder_query/builder_formula has the same positive limit plus v5 order and no dashboard orderBy; the formula orders by __result",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
       ]
     },
@@ -204,13 +210,13 @@
       "id": 13,
       "eval_name": "list-panel-execution-and-update-wrapper-contract",
       "prompt": "Using the attached offline fixture, change the Recent Errors list on Error Explorer to 25 rows and sort oldest first, then apply the update.",
-      "expected_output": "Agent fetches the complete dashboard, changes only pageSize and orderBy in saved dashboard state, executes the canonical V5 equivalent against the stub, and calls the stubbed update tool with the required {id,dashboard} wrapper.",
+      "expected_output": "Agent fetches the complete dashboard, changes limit, pageSize, and orderBy together in saved dashboard state, executes the canonical V5 equivalent against the stub, and calls the stubbed update tool with the required {id,dashboard} wrapper.",
       "files": ["evals/files/update-payload-contract.json"],
       "expectations": [
         "The actual signoz_execute_builder_query call maps filters.items to filter.expression, pageSize=25 to limit=25, orderBy to order with key.name='timestamp' and direction='asc', and selectColumns to canonical selectFields",
         "The dry-run builder_query.spec contains none of filters, pageSize, orderBy, selectColumns, queryName, or dataSource, and no groupBy/selectFields entry contains dashboard-only key/dataType/type; canonical order[].key is allowed",
         "The actual signoz_update_dashboard call has top-level id='66666666-6666-4666-8666-666666666666' and a nested dashboard object; title, widgets, layout, and variables are not flattened beside id",
-        "The nested dashboard is the complete fetched state and retains dashboard/editor filters, pageSize=25, orderBy=[{columnName:'timestamp',order:'asc'}], and selectColumns",
+        "The nested dashboard is the complete fetched state and retains dashboard/editor filters, limit=25, pageSize=25, orderBy=[{columnName:'timestamp',order:'asc'}], and selectColumns",
         "The fetched and updated widget contextLinks is an object with linksData=[] and is never converted to a bare array",
         "The update is called only after the canonical dry-run succeeds"
       ]
