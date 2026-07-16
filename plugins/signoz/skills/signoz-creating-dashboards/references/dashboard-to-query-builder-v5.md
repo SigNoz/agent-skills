@@ -20,8 +20,21 @@ unsupported unless the tool schema exposes them. `legend` may remain saved-only.
 Saved panels persist no time range. Build the complete outer `query` with
 absolute `start` / `end` as JSON integer Unix-ms (for example, the last hour),
 request type, composite queries, format options, and representative variable
-values; omitted bounds fail with `missing start or end timestamp`. Dashboard
-request types are: graph/bar/histogram -> `time_series`;
+values; omitted bounds fail with `missing start or end timestamp`.
+Start every dry-run with the shortest representative window likely to contain
+data, usually the last 30-60 minutes; never use the panel's display range by reflex.
+If empty, widen according to signal cadence and report the exact windows tested
+rather than concluding telemetry is absent. A dry-run validates execution only
+for that window, not correctness across every dashboard range. A PromQL range
+selector looks backward from each evaluation timestamp: widening outer `start` /
+`end` adds evaluations rather than "covering" a long selector, and long selectors
+such as `[12h]` remain costly even with short outer bounds.
+
+On a timeout, never resend the identical payload. Shrink the window, coarsen the
+type-appropriate interval when available (PromQL `step`; Builder
+`stepInterval`; ClickHouse has no equivalent), or reduce query cost first.
+
+Dashboard request types are: graph/bar/histogram -> `time_series`;
 table/pie/value -> `scalar`; trace -> `trace`; list -> `raw`. These are the only
 execution values; never invent `aggregate`, `table`, or `timeseries`. MCP
 dashboard writes validate `panelTypes` against
@@ -70,8 +83,23 @@ Trace operator: emit a raw-preserved `builder_trace_operator` with `name` from
 (`count()` for a count panel; omit for raw). Never coerce it to `builder_query`,
 copy dashboard aliases, or invent `signal`, `filter`, `functions`, or `disabled`.
 
-PromQL and ClickHouse bypass this Builder crosswalk; build their current MCP
-envelopes from the corresponding resources without dropping fields.
+## PromQL and ClickHouse panels
+
+These bypass the Builder crosswalk, but their execution envelopes are fixed. Saved
+widgets use `query.promql[]` / `query.clickhouse_sql[]` with `queryType`; never
+copy those arrays under execution `compositeQuery`.
+Map each saved `query.promql[]` item to one `compositeQuery.queries[]` entry:
+`{"type": "promql", "spec": {"name": "A", "query": "<promql>"}}`. Optional
+spec fields are `disabled`, `step`, `stats`, and `legend`. The type is exactly
+`promql`, never `promql_query`.
+Map each saved `query.clickhouse_sql[]` item to one `compositeQuery.queries[]`
+entry: `{"type": "clickhouse_sql", "spec": {"name": "A", "query": "<sql>"}}`;
+optional spec fields are `disabled` and `legend`.
+Always set `requestType` with the Builder panel mapping above. The server's
+`time_series` default when PromQL omits it is fallback only; ClickHouse has no
+default. Substitute representative literals for `$var` in dry-runs only; saved
+panels keep `$var`. Read `signoz://promql/instructions` for selector syntax and
+the matching `signoz://dashboard/clickhouse-*` resources for ClickHouse schema.
 
 ## Saved payload invariant
 
