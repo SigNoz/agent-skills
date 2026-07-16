@@ -89,8 +89,9 @@ pass that value as `cursor`, replace `timeRange` with the note's resolved
 absolute `start` and `end`, and preserve the same state, filter, and order.
 Stop when `nextCursor` is absent / the note reports `hasMore: false`. Never use
 `offset` or infer completeness from page fullness.
-History `state` accepts only `firing` or `inactive`; when intentionally filtering
-for "resolved" / "recovered", use `state: "inactive"`, never `resolved`.
+History `state` accepts `inactive`, `pending`, `recovering`, `firing`, `nodata`,
+or `disabled`. For "resolved" / "recovered", use `state: "inactive"`;
+`resolved` is not a value; `recovering` is a transient keep-firing state, not resolution.
 Derive a single rule-level line from the complete set. History rows are emitted
 per label-group `fingerprint`, so never equate row count with alert-fire count.
 Count distinct rule transitions where `overallStateChanged: true` and
