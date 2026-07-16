@@ -86,6 +86,7 @@
       "expectations": [
         "Agent discovers every trace field used in filters or groupBy with signoz_get_field_keys signal=traces",
         "The actual signoz_execute_builder_query call contains two trace builder_query siblings and a builder_formula sibling whose expression computes error count divided by total count",
+        "Both trace builder_query formula inputs use limit=10000 with v5 order by count() desc, while the builder_formula result uses limit=100 with v5 order by __result desc",
         "The actual outer query has schemaVersion=v1 and start/end as JSON integer Unix-millisecond values",
         "Every execution groupBy entry has a non-empty discovered name and contains no dashboard-only key alias",
         "Agent does not use signoz_aggregate_traces alone to answer the error-rate ranking"
@@ -100,6 +101,7 @@
       "expectations": [
         "Agent calls signoz_get_field_keys with signal=logs before using service or severity fields and uses returned dot-notation names verbatim",
         "The actual signoz_execute_builder_query call contains two log builder_query siblings and a builder_formula sibling computing A / B * 100 or an equivalent percentage",
+        "Both log builder_query formula inputs use limit=10000 with v5 order by count() desc, while the builder_formula result uses limit=100 with v5 order by __result desc",
         "The actual outer query has absolute start/end JSON integer Unix-ms values and every execution groupBy name is non-empty",
         "Agent does not claim signoz_aggregate_logs alone computes the requested per-service percentage"
       ],

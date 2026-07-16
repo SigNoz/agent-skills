@@ -390,13 +390,17 @@ positive `limit` and non-empty editor-model `orderBy` (`columnName` +
 `order`). Raw list and trace-request panels default to 100 with timestamp-desc
 ordering (raw logs add id as a tie-breaker); a deliberately smaller positive
 list page may use the same value for `limit` and `pageSize`. Aggregate panels
-use 100 with the primary aggregation desc; formulas use 100 with `__result desc`.
-During dry-run translation, log/trace base queries keep the primary
+use 100 with the primary aggregation desc. Formula outputs use 100 with
+`__result desc`, while every base query referenced by a formula uses 10000;
+base limits are applied before formula evaluation, so independently top-100
+inputs can drop the group with the highest formula result. During dry-run
+translation, log/trace base queries keep the primary
 aggregation as their Query Builder v5 `order` key, while metric base queries
 translate the editor primary-aggregation `orderBy` key to v5 `__result` and
 preserve its direction. Formulas use `__result` in both models. Never pass
 dashboard `orderBy` to `signoz_execute_builder_query`. Time-series top-N ranks
-groups over the whole window and can omit a short-lived local spike.
+groups over the whole window and can omit a short-lived local spike. Narrow
+filters/grouping if formula-input cardinality can exceed 10000.
 
 One rule `widgets-examples` does not call out, but
 `signoz_create_dashboard` enforces: **no `JSON.stringify` on

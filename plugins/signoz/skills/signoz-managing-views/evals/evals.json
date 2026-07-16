@@ -169,7 +169,7 @@
           "description": "A validated execution query must be translated to the saved-view wrapper rather than copied wholesale"
         },
         {
-          "text": "Every copied builder_query/builder_formula retains its positive limit and Query Builder v5 order losslessly; no dashboard orderBy is introduced",
+          "text": "Every copied builder_query/builder_formula retains its positive limit and Query Builder v5 order losslessly; formula inputs remain at 10000 and formula results at 100, with no dashboard orderBy introduced",
           "description": "Changing a saved-view query must not drop its bounded result contract during GET-then-PUT"
         },
         {

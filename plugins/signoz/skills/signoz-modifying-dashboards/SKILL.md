@@ -183,12 +183,16 @@ dashboard state uses positive `limit` plus editor-model `orderBy`; the dry-run
 translation uses the same positive `limit` plus Query Builder v5 `order`. List
 and trace-request panels default to 100 rows ordered by timestamp desc (raw logs
 also id desc), but preserve a deliberate smaller positive list limit such as
-the panel pageSize. Aggregate panels/formulas default to 100 groups. Saved
-base queries order by their primary aggregation and saved formulas by
+the panel pageSize. Standalone aggregate queries and formula outputs default to
+100 groups. Every base query referenced by a formula uses 10000 because base
+limits are applied before formula evaluation; raise an existing smaller bound
+unless it was an intentional pre-formula top-N selection. Saved base queries
+order by their primary aggregation and saved formulas by
 `__result`; during dry-run translation, log/trace base queries retain the
 primary aggregation key, metric base queries translate it to `__result`, and
 formulas use `__result`. For time series, this top-N is chosen over the whole
-window, so a short-lived local spike can be omitted.
+window, so a short-lived local spike can be omitted. Narrow filters/grouping if
+formula-input cardinality can exceed 10000.
 
 If the reference's safety gate finds an unsupported execution field, report the
 panel as unvalidated and continue only after explicit acceptance. Server or

@@ -68,7 +68,7 @@
         "A new Error Rate widget is present with all required v5 fields and groupBy contains 'service.name'",
         "Net widget count equals original count (one removed, one added)",
         "Agent dry-runs the new Error Rate panel with builder_query envelopes named A and B plus a sibling builder_formula envelope named F1 before preparing the update",
-        "Every new saved base query/formula has a positive limit plus editor orderBy, and every dry-run builder_query/builder_formula has the same positive limit plus v5 order and no dashboard orderBy; formulas order by __result",
+        "Every new saved and dry-run base query referenced by the formula uses limit=10000 with the signal-specific aggregation order; every formula result uses limit=100 with __result ordering, and no dry-run spec contains dashboard orderBy",
         "Transcript indicates a single planned update_dashboard call (changes batched, not iterative)",
         "All supported non-target widget, variable, and panelMap semantics are preserved",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
@@ -191,7 +191,7 @@
         "Capacity moves from y:7 to y:13 in top-level layout; CPU moves from y:8 to y:14 in both top-level layout and panelMap",
         "Overview panelMap contains Request Rate and the new Error Rate panel only; Capacity panelMap still contains CPU only",
         "The simulated trace successfully dry-runs the supplied complete Error Rate query before accepting the mutation plan",
-        "Every new saved Error Rate base query/formula has a positive limit plus editor orderBy, and every dry-run builder_query/builder_formula has the same positive limit plus v5 order and no dashboard orderBy; the formula orders by __result",
+        "Every new saved and dry-run Error Rate base query uses limit=10000 with the signal-specific aggregation order; the formula result uses limit=100 with __result ordering, and no dry-run spec contains dashboard orderBy",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
       ]
     },

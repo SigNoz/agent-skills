@@ -119,9 +119,13 @@ threshold tickle or flap) and quantifies the magnitude.
    start: `[fire_start - 30m, fire_start + 30m]`.
    - Use `signoz_execute_builder_query` for the alert's stored builder,
      formula, PromQL, or ClickHouse query envelope.
-   - Preserve an existing positive bound/order. If a stored `builder_query` or
-     `builder_formula` omitted them, add `limit: 100` plus Query Builder v5
-     `order`: `__result desc` for metrics/formulas, or the primary aggregation
+   - First preserve existing positive bounds/order so Tier 1 reproduces the
+     stored alert exactly. If a stored formula input uses less than 10000,
+     record pre-formula truncation as a correctness risk and run a comparison
+     with that input raised to 10000 before ruling groups out. If bounds were
+     omitted, add `limit: 10000` to each `builder_query` referenced by a formula
+     and `limit: 100` to standalone queries/formula results. Use Query Builder
+     v5 `order`: `__result desc` for metrics/formulas, or the primary aggregation
      desc for logs/traces. Do not use dashboard `orderBy`. Time-series top-N is
      ranked over the whole window and may omit a short-lived local spike.
 2. Compute:

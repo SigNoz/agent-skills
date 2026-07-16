@@ -118,7 +118,7 @@
         "Agent uses service.name (dotted, OTel resource attribute) in builder-mode filters and variables — not the underscored span-metric label 'service_name' (this skill builds in builder mode only, never PromQL) and not the bare shorthand 'service'",
         "Agent emits a plain-language summary before creation that explains the formulas and tells the user to select the 28d global viewer range",
         "The actual signoz_execute_builder_query call contains builder_query envelopes named A and B plus a sibling builder_formula envelope named F1 with its expression; no execution spec contains dashboard-only queryName or dataSource",
-        "Every saved dashboard base metric query has limit=100 plus editor orderBy on its primary aggregation, while every translated metric builder_query has limit=100 plus v5 order by __result desc and no orderBy; saved and translated formulas each have limit=100 and use __result desc in their respective orderBy/order shapes",
+        "Every saved dashboard base metric query referenced by the formula has limit=10000 plus editor orderBy on its primary aggregation, while every translated formula-input builder_query has limit=10000 plus v5 order by __result desc and no orderBy; saved and translated formulas each have limit=100 and use __result desc in their respective orderBy/order shapes",
         "Each dry-run base query carries the service restriction under filter.expression and does not send the dashboard filters alias",
         "Agent runs signoz_execute_builder_query as a per-panel dry-run for every authored panel before signoz_create_dashboard",
         "The actual signoz_create_dashboard call keeps queryName/dataSource in queryData, queryName in queryFormulas, and the service filter in dashboard/editor form"
@@ -182,7 +182,7 @@
         "For every authored grouped panel, the actual signoz_execute_builder_query call maps queryName to name and dataSource='traces' to signal='traces', and maps groupBy to name='service.name', fieldDataType='string', fieldContext='resource', signal='traces'",
         "No groupBy entry passed to signoz_execute_builder_query contains the dashboard-only key, dataType, or type fields",
         "Agent calls signoz_create_dashboard only after every query-bearing panel has an actual signoz_execute_builder_query dry-run",
-        "Every saved trace base query/formula has a positive limit plus editor orderBy, and every dry-run builder_query/builder_formula has the same positive limit plus v5 order and no dashboard orderBy; formulas order by __result"
+        "Every saved trace base query referenced by a formula and its dry-run sibling uses limit=10000 plus count() ordering in the editor/v5 shape; every formula result uses limit=100 plus __result ordering, and no dry-run spec contains dashboard orderBy"
       ],
       "files": []
     },
@@ -248,7 +248,7 @@
         "panelMap has exactly the Overview and Breakdowns row entries; Overview contains only the three KPI widget IDs, Breakdowns only the pie, bar, and table widget IDs, and every child's x, y, w, h matches its top-level layout entry",
         "Agent emits a plain-language summary (no JSON dump) before signoz_create_dashboard",
         "Agent runs signoz_execute_builder_query as a per-panel dry-run for every authored panel (rows excluded — they have no query) before signoz_create_dashboard",
-        "Every saved queryData/queryFormulas entry has a positive limit plus editor orderBy, and every corresponding dry-run builder_query/builder_formula has the same positive limit plus v5 order and no dashboard orderBy"
+        "The error-rate formula's saved and dry-run base queries use limit=10000 with count() ordering, its formula result uses limit=100 with __result ordering, and no dry-run spec contains dashboard orderBy; standalone panels remain at limit=100"
       ],
       "files": []
     },
@@ -332,10 +332,10 @@
       "expected_output": "Agent authors formula F1 in dashboard/editor form with its deliberate top-5 bound, translates every base query and the formula into bounded Query Builder v5 sibling envelopes, runs the complete builder_formula dry-run with canonical order, and creates only after that bounded execution succeeds.",
       "expectations": [
         "The dashboard/editor draft keeps queryFormulas queryName='F1', expression='A / B * 100', limit=5, and orderBy=[{columnName:'__result',order:'desc'}]",
-        "Every saved base queryData entry has a positive limit plus editor orderBy on its primary aggregation",
+        "Every saved base queryData entry uses limit=10000 plus editor orderBy on its primary aggregation so the deliberate top-5 bound is applied only after the formula",
         "The actual signoz_execute_builder_query call contains bounded builder_query siblings A and B plus builder_formula F1 in the same compositeQuery.queries array",
         "The actual builder_formula spec is named F1, preserves expression='A / B * 100', has limit=5 and order=[{key:{name:'__result'},direction:'desc'}], and contains no queryName or orderBy",
-        "Every execution builder_query has a positive limit plus non-empty v5 order and contains no dashboard orderBy",
+        "Every execution builder_query formula input uses limit=10000 plus non-empty v5 order and contains no dashboard orderBy",
         "Agent calls signoz_create_dashboard only after the complete bounded formula dry-run succeeds"
       ],
       "files": []

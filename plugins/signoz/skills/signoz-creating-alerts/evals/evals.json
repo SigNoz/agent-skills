@@ -22,7 +22,8 @@
       "expected_output": "TRACES_BASED_ALERT with formula F1 = A*100/B (A = count of error spans, B = count of all spans) on service.name='checkoutservice', threshold target 3, targetUnit percent. CRITICAL: must paginate signoz_list_alert_rules and detect existing 'checkout-svc Error Rate > 3%' alert, surface it as a duplicate, and ask whether to proceed/modify/cancel rather than silently creating another one.",
       "expectations": [
         "The trace data probe calls signoz_aggregate_traces with aggregation=count, never aggregation=count()",
-        "If creation proceeds after duplicate resolution, the direct channel is in condition.thresholds.spec[].channels"
+        "If creation proceeds after duplicate resolution, the direct channel is in condition.thresholds.spec[].channels",
+        "If creation proceeds, trace builder_query inputs A and B use limit=10000 plus v5 order by count() desc in both the dry-run and persisted alert, while builder_formula F1 uses limit=100 plus v5 order by __result desc"
       ],
       "files": []
     },

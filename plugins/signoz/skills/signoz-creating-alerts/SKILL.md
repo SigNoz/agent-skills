@@ -323,12 +323,16 @@ Run the full primary query (or formula) over the last hour:
   for that.
 
 For every persisted alert and dry-run, each `builder_query` and
-`builder_formula` spec must include `limit: 100` plus a non-empty Query
-Builder v5 `order`. Use `__result desc` for metrics/formulas and the primary
-aggregation desc for logs/traces. This field is `order`, not dashboard editor
-`orderBy`. Preserve the fields when copying the validated query into the alert.
-For time series, top-N groups are ranked over the whole evaluation window, so
-a short-lived local spike may fall outside the returned set.
+`builder_formula` spec must include a positive `limit` plus a non-empty Query
+Builder v5 `order`. Standalone queries and formula results use `limit: 100`.
+Every `builder_query` referenced by a formula uses `limit: 10000`, because
+SigNoz limits each component before formula evaluation; independently ranking
+the top 100 numerator and denominator groups can silently prevent an alert from
+firing. Use `__result desc` for metrics/formulas and the primary aggregation
+desc for logs/traces. This field is `order`, not dashboard editor `orderBy`.
+Preserve the fields when copying the validated query into the alert. If expected
+formula-input cardinality can exceed 10000, narrow the filters/grouping and tell
+the user completeness cannot otherwise be guaranteed.
 
 Compute how many evaluation points breached the proposed threshold.
 Surface in the preview as **"would have fired N times in the last 1h"**.

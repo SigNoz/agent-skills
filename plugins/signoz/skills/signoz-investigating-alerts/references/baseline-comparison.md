@@ -83,7 +83,11 @@ guide for the chosen signal. Keep the outer `query`, `formatOptions`, and
 Keep the same positive limit and Query Builder v5 `order` in the fire and
 baseline requests. For time series, the limit ranks groups over the whole
 window, so a short-lived local spike can be outside the top N. Dashboard
-`orderBy` is not valid in this execution payload.
+`orderBy` is not valid in this execution payload. For a formula alert, first
+replay the stored component limits exactly. If any formula input is below
+10000, run a second fire/baseline comparison with that input raised to 10000;
+base limits are applied before formula evaluation, so independent top-N inputs
+can hide the group that should have fired.
 
 ## Computing the delta
 
