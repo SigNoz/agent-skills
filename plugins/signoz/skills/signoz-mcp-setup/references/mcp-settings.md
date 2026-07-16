@@ -106,12 +106,17 @@ the endpoint, that value can override this default. If this setup skill updates
 the default but the client still connects to the old endpoint, tell the user to
 clear the explicit plugin setting and reload the client.
 
-### Update behavior
+### Update behavior and durable Codex config
 
 These bundled files live inside the installed plugin. Plugin updates can reset
 them to the placeholder. If the `signoz` server returns to **not-setup** after
 an update, rerun `signoz-mcp-setup`. For durable native client configuration,
 use the client-specific recipes in `client-configs.md`.
+
+For Codex users who report repeated resets or ask for a persistent setup, add
+or update the native Codex MCP entry as well as the bundled `.mcp.json`. Use
+`codex mcp add signoz --url <resolved-mcp-url>` or the equivalent
+`[mcp_servers.signoz]` TOML entry, then verify with `codex mcp get signoz`.
 
 ## Endpoint Mapping
 

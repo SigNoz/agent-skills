@@ -168,6 +168,12 @@ TOML:
 url = "https://mcp.us.signoz.cloud/mcp"
 ```
 
+Use the native Codex entry when the user wants a durable setup or reports that
+the bundled plugin `.mcp.json` keeps resetting after updates. The bundled file
+is copied into a versioned plugin cache, but `codex mcp add` writes the
+user-level Codex config. Verify the effective server with
+`codex mcp get signoz` or `codex mcp list`.
+
 ### Gemini CLI
 
 CLI:

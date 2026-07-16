@@ -104,6 +104,18 @@ Then, in a Codex session started from your project:
    or run `/mcp` in a session, then call any `signoz_*` tool. Restart Codex if
    the `signoz` server does not appear.
 
+The bundled `.mcp.json` lives inside Codex's versioned plugin cache, so plugin
+updates reinstall that file from this repository and can reset it to the
+placeholder. If you want the endpoint to persist across plugin updates, also
+add a native Codex MCP entry after resolving the endpoint:
+
+```sh
+codex mcp add signoz --url http://localhost:8000/mcp
+```
+
+Replace the URL with your SigNoz Cloud MCP URL or self-hosted HTTP `/mcp`
+endpoint. Verify with `codex mcp get signoz`.
+
 The Codex plugin declares `mcpServers: "./.mcp.json"`, so normal plugin installs
 do not need a separate native Codex MCP entry. To use in another repo, copy
 `plugins/signoz` into the target repo's `plugins/` directory, add a marketplace

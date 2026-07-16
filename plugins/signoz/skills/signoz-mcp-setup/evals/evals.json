@@ -63,6 +63,31 @@
         }
       ],
       "files": []
+    },
+    {
+      "id": 3,
+      "eval_name": "codex-repeated-cache-reset-durable-config",
+      "prompt": "My Codex SigNoz plugin keeps resetting back to not-setup after plugin updates. Fix it for http://localhost:8000/mcp and make it durable.",
+      "expected_output": "Agent updates the active bundled Codex plugin .mcp.json to http://localhost:8000/mcp and also creates or updates the native Codex MCP server named signoz using `codex mcp add signoz --url http://localhost:8000/mcp` or the equivalent `[mcp_servers.signoz]` TOML entry. It explains that plugin cache files are versioned and can be regenerated from repository placeholders, while the native Codex MCP entry persists across plugin updates. It verifies the effective URL with `codex mcp get signoz` or `codex mcp list`.",
+      "assertions": [
+        {
+          "text": "Agent identifies versioned plugin cache refresh as the reason the bundled .mcp.json reset to not-setup",
+          "description": "The root cause is cache regeneration from source defaults, not an MCP runtime bug"
+        },
+        {
+          "text": "Agent updates the current bundled Codex plugin .mcp.json to the resolved endpoint",
+          "description": "The immediate plugin install is repaired"
+        },
+        {
+          "text": "Agent creates or updates native Codex MCP config for signoz using codex mcp add or [mcp_servers.signoz]",
+          "description": "The durable fix lives outside the versioned plugin cache"
+        },
+        {
+          "text": "Agent verifies the effective signoz URL with codex mcp get or codex mcp list",
+          "description": "The outcome is checked through Codex's resolved server view"
+        }
+      ],
+      "files": []
     }
   ]
 }

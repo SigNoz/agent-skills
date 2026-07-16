@@ -162,6 +162,18 @@ Bundled registration files live inside the installed plugin. Plugin updates can
 reset them to the placeholder; if that happens, rerun this setup skill. For a
 more durable native-client setup, use the relevant recipe in `client-configs.md`.
 
+For Codex, if the user says the endpoint reset again, keeps resetting, or asks
+for a durable/persistent setup, also create or update the native Codex MCP
+server entry after resolving the endpoint:
+
+```sh
+codex mcp add signoz --url <resolved-mcp-url>
+```
+
+This writes the user-level `[mcp_servers.signoz]` entry in Codex config and
+survives plugin cache updates. If editing TOML directly, preserve unrelated
+config and only set `url` for `mcp_servers.signoz`.
+
 For native client setup, use `client-configs.md`:
 
 - Edit an existing native client config only when the user named that client or
