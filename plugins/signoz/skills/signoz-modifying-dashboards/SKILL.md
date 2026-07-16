@@ -104,10 +104,10 @@ Merge the planned changes into the full dashboard JSON from Step 2.
   what the user requested, and compare semantics after MCP normalization. Do not
   drop unrelated widgets, variables, layout items, or panelMap entries.
 
-- **Preserve widget/layout identity.** Every `widgets[].id` appears exactly once
-  in `layout[].i` and vice versa. Reuse existing widget IDs verbatim; add/remove
-  widget and layout entries together. Strip any literal `"__dropping-elem__"`
-  widget/layout id leaked by the UI drag state.
+- **Preserve widget/layout identity.** Keep non-row widget/layout IDs bijective;
+  add/remove both entries together. Row widgets need no layout entry; preserve
+  matching row layout entries when present. Reuse widget IDs verbatim. Strip any
+  literal `"__dropping-elem__"` widget/layout id leaked by the UI drag state.
 
 - **Read schemas before every update.** Read all required and applicable
   conditional resources named by `signoz_update_dashboard`. For Query Builder,

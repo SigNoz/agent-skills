@@ -139,9 +139,9 @@ For `signoz_aggregate_logs` / `signoz_aggregate_traces`, `aggregation` is one
 bare token: `count`, `count_distinct`, `avg`, `sum`, `min`, `max`, `p50`, `p75`,
 `p90`, `p95`, `p99`, or `rate`. Never include parentheses or a column; put the
 column in `aggregateOn` (`count` and `rate` need none). Omit `orderBy` for the
-default aggregation-expression descending order; explicit ordering must name a
-`groupBy` key or the aggregation expression per the tool schema. Custom aliases
-or formulas require `signoz_execute_builder_query`.
+default aggregation-expression descending order; explicit ordering should use a
+`groupBy` key or the aggregation expression. Custom aliases or formulas require
+`signoz_execute_builder_query`.
 
 **`requestType` decision for aggregations:**
 - `scalar` (default): "How many?", "What is the p99?", "Which service has the most?"
@@ -166,10 +166,11 @@ not apply to PromQL or ClickHouse SQL envelopes.
   result relevance.
 - Respect the requested range; otherwise use 1h. Search/aggregate log and trace
   tools accept relative `timeRange` strings (`"1h"`, `"24h"`; default `1h`) —
-  prefer them. Valid Unix-ms `start`/`end` override `timeRange`; malformed values
-  error with `use timeRange instead`. `signoz_execute_builder_query` has no
-  relative option: its outer `query` requires absolute `start` and `end` as JSON
-  integer Unix-ms or fails with `missing start or end timestamp`.
+  prefer them. Valid Unix-ms `start`/`end` override `timeRange`; malformed explicit
+  timestamps return validation guidance pointing to `timeRange`.
+  `signoz_execute_builder_query` has no relative option: its outer `query` requires
+  absolute `start` and `end` as JSON integer Unix-ms or fails with
+  `missing start or end timestamp`.
 - Use shortcut parameters (`service`, `severity`, `operation`, `error`) when they
   match the user's filters — they are simpler and less error-prone than building
   `filter` expressions.

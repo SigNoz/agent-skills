@@ -23,7 +23,11 @@ request type, composite queries, format options, and representative variable
 values; omitted bounds fail with `missing start or end timestamp`. Dashboard
 request types are: graph/bar/histogram -> `time_series`;
 table/pie/value -> `scalar`; trace -> `trace`; list -> `raw`. These are the only
-values; never invent `aggregate`, `table`, or `timeseries`.
+execution values; never invent `aggregate`, `table`, or `timeseries`. MCP
+dashboard writes validate `panelTypes` against
+graph/value/table/list/bar/pie/histogram only; never author a new trace panel.
+Use a list panel with raw trace rows instead; keep `trace` -> `trace` only when
+executing an existing saved panel.
 
 Put every dependency in one `compositeQuery.queries` array: `queryData[]` ->
 `builder_query`; `queryFormulas[]` -> sibling `builder_formula`;

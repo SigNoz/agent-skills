@@ -300,9 +300,11 @@ Step 4 confirmed data flows. Step 6 does two things:
 Run the full primary query (or formula) over the last hour:
 - `signoz_execute_builder_query` for **all** builder, formula,
   and PromQL queries — set `compositeQuery.queries[].type` to
-  `builder_query` / `builder_formula` / `promql` as appropriate. For
-  PromQL specs use only `name` / `query` / `legend` / `disabled`; omit
-  builder-only fields such as `stepInterval`. Put the string in `spec.query`, read
+  `builder_query` / `builder_formula` / `promql` as appropriate. Alert PromQL
+  specs carry only `name` / `query` / `legend` / `disabled`; dry-run execution
+  PromQL specs may also carry `step` / `stats`. Still omit builder-only
+  `stepInterval`.
+  Put the string in `spec.query`, read
   `signoz://promql/instructions` for the UTF-8 quoted-selector form
   SigNoz requires (`{"metric.name.with.dots"}` — not the underscored
   or bare-dotted forms), and keep alert PromQL fully literal: no `$var`,

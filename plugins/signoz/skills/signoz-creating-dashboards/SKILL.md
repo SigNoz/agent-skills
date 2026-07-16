@@ -346,9 +346,10 @@ table and pie accept `builder` or `clickhouse_sql`; list requires `builder`.
 `softMax` / `softMin` are numbers, `contextLinks` is `{"linksData": [...]}`, and
 saved `having` is an array of clause objects; defer full shapes to the resources.
 
-Keep widget/layout IDs bijective: every `widgets[].id` appears exactly once in
-`layout[].i` and vice versa; create/remove both entries together. During import
-or rebuild, strip the UI drag artifact id `"__dropping-elem__"` from both arrays.
+Keep non-row widget/layout IDs bijective; create/remove both entries together.
+Row widgets need no layout entry; preserve matching row layout entries when
+present. During import or rebuild, strip the UI drag artifact id
+`"__dropping-elem__"` from both arrays.
 
 **Defaults the skill applies (and surfaces in the preview):**
 
