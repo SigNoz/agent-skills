@@ -328,7 +328,11 @@ Builder v5 `order`. Standalone queries and formula results use `limit: 100`.
 Every `builder_query` referenced by a formula uses `limit: 10000`, because
 SigNoz limits each component before formula evaluation; independently ranking
 the top 100 numerator and denominator groups can silently prevent an alert from
-firing. Use `__result desc` for metrics/formulas and the primary aggregation
+firing. Find those inputs from every formula expression, including formulas
+with `disabled: true`, following formula references until all `builder_query`
+leaves are found. This dependency walk determines bounds only; it does not
+guarantee formula-to-formula evaluation order, so dry-run the complete composite
+payload. Use `__result desc` for metrics/formulas and the primary aggregation
 desc for logs/traces. This field is `order`, not dashboard editor `orderBy`.
 Preserve the fields when copying the validated query into the alert. If expected
 formula-input cardinality can exceed 10000, narrow the filters/grouping and tell

@@ -186,13 +186,17 @@ also id desc), but preserve a deliberate smaller positive list limit such as
 the panel pageSize. Standalone aggregate queries and formula outputs default to
 100 groups. Every base query referenced by a formula uses 10000 because base
 limits are applied before formula evaluation; raise an existing smaller bound
-unless it was an intentional pre-formula top-N selection. Saved base queries
-order by their primary aggregation and saved formulas by
-`__result`; during dry-run translation, log/trace base queries retain the
-primary aggregation key, metric base queries translate it to `__result`, and
-formulas use `__result`. For time series, this top-N is chosen over the whole
-window, so a short-lived local spike can be omitted. Narrow filters/grouping if
-formula-input cardinality can exceed 10000.
+unless it was an intentional pre-formula top-N selection. Find the complete
+base-query set by inspecting every formula expression, including formulas with
+`disabled: true`, and following formula references to all `builder_query`
+leaves. This dependency walk chooses bounds only; it does not establish
+deterministic formula-to-formula evaluation order, so dry-run the complete
+composite payload. Saved base queries order by their primary aggregation and
+saved formulas by `__result`; during dry-run translation, log/trace base queries
+retain the primary aggregation key, metric base queries translate it to
+`__result`, and formulas use `__result`. For time series, this top-N is chosen
+over the whole window, so a short-lived local spike can be omitted. Narrow
+filters/grouping if formula-input cardinality can exceed 10000.
 
 If the reference's safety gate finds an unsupported execution field, report the
 panel as unvalidated and continue only after explicit acceptance. Server or

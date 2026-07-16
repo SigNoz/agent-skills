@@ -119,6 +119,20 @@
         "The actual query does not use timeAggregation=latest, rate, or increase"
       ],
       "files": []
+    },
+    {
+      "id": 10,
+      "eval_name": "disabled-intermediate-formula-dependency-bounds",
+      "prompt": "Run this trace error-percentage query for the last hour: A is errors by service, B is all spans by service, hidden F1 is A / B, and visible F2 is F1 * 100. Keep that formula chain and validate the complete Query Builder payload before reporting results.",
+      "expected_output": "Agent discovers the trace fields and executes one complete Query Builder v5 payload containing A, B, disabled intermediate formula F1, and visible formula F2. It treats disabled as result visibility when calculating bounds: A and B remain formula-input queries at limit 10000 even though they are reached through F1. It validates the actual composite response rather than promising a deterministic formula-to-formula evaluation order.",
+      "expectations": [
+        "Agent discovers every trace field used in filters or groupBy with signoz_get_field_keys signal=traces",
+        "The actual signoz_execute_builder_query call contains builder_query siblings A and B, disabled builder_formula F1 with expression A / B, and builder_formula F2 with expression F1 * 100 in the same compositeQuery.queries array",
+        "Builder queries A and B each use limit=10000 with v5 order by count() desc even though their direct formula F1 is disabled",
+        "Formula results F1 and F2 each use limit=100 with v5 order by __result desc, and no execution spec contains dashboard orderBy",
+        "Agent does not claim that the dependency walk proves deterministic formula-to-formula execution order; it reports data only from a successful complete-payload response or clearly reports the validation/execution failure"
+      ],
+      "files": []
     }
   ]
 }

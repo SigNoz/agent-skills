@@ -152,10 +152,14 @@ ordered by `__result` desc for metrics/formulas or the primary aggregation desc
 for logs/traces. Formula results stay at 100, but every `builder_query`
 referenced by a formula uses 10000 because each component limit is applied
 before formula evaluation; independently top-100 inputs can drop a high-ratio
-group. Narrow filters/grouping if input cardinality can exceed 10000. This wire
-field is `order`, not dashboard editor `orderBy`. Time-series top-N ranks groups
-over the whole window, so a short-lived local spike may fall outside the
-returned set.
+group. When calculating those input bounds, inspect every formula expression,
+including formulas with `disabled: true`, and follow formula references until
+all `builder_query` leaves are found. This dependency walk sets bounds only; it
+does not prove deterministic formula-to-formula evaluation order, so validate
+the complete composite payload. Narrow filters/grouping if input cardinality
+can exceed 10000. This wire field is `order`, not dashboard editor `orderBy`.
+Time-series top-N ranks groups over the whole window, so a short-lived local
+spike may fall outside the returned set.
 
 **`requestType` decision for aggregations:**
 - `scalar` (default): "How many?", "What is the p99?", "Which service has the most?"

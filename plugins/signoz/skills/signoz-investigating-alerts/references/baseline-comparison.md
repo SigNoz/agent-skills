@@ -87,7 +87,11 @@ window, so a short-lived local spike can be outside the top N. Dashboard
 replay the stored component limits exactly. If any formula input is below
 10000, run a second fire/baseline comparison with that input raised to 10000;
 base limits are applied before formula evaluation, so independent top-N inputs
-can hide the group that should have fired.
+can hide the group that should have fired. Find inputs by inspecting every
+formula expression, including formulas with `disabled: true`, and following
+formula references to all `builder_query` leaves. This dependency walk changes
+only the comparison bounds; it does not prove deterministic formula-to-formula
+evaluation order.
 
 ## Computing the delta
 

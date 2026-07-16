@@ -67,7 +67,11 @@ For each `builder_query`:
   10000 because SigNoz limits each component before formula evaluation; raise
   an existing smaller value unless it intentionally selects top N before the
   formula. Preserve other positive saved limits; otherwise apply the relevant
-  default. Raw and trace-request traces use
+  default. For bounds, inspect every formula expression, including formulas
+  with `disabled: true`, and follow formula references until all base
+  `builder_query` leaves are found. This dependency walk does not establish
+  deterministic formula-to-formula evaluation order; validate the complete
+  translated payload. Raw and trace-request traces use
   timestamp desc; raw logs add id desc; aggregate logs/traces use the primary
   aggregation desc. For those signals, map editor
   `{columnName,order}` -> v5 `{key:{name:columnName},direction:order}`. A saved
@@ -89,7 +93,8 @@ For each `builder_query`:
 Formula: set `spec.name` from `queryName`, preserve `expression`/`disabled` and
 supported `legend`; require/copy positive result `limit` (default 100) and map
 non-empty `orderBy` to v5 `order` (default `__result desc`). Keep its referenced
-base queries at 10000 so they are not independently truncated before evaluation.
+base queries at 10000 so they are not independently truncated before evaluation,
+including base-query leaves reached through a disabled formula expression.
 
 Trace operator: emit a raw-preserved `builder_trace_operator` with `name` from
 `queryName`, `expression`, applicable mappings above, and trace V5 aggregations
