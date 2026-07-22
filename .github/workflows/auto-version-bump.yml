@@ -50,7 +50,8 @@ jobs:
             'gemini-extension.json' \
             '.devin-plugin/' \
             'plugin.json' \
-            'mcp_config.json')
+            'mcp_config.json' \
+            'skills')
 
           if [[ -z "$CHANGED" ]]; then
             echo "No plugin changes detected"
@@ -64,7 +65,7 @@ jobs:
 
           # The root Gemini, Devin, and Antigravity files are ports of the
           # signoz plugin, so a root-only port change also bumps signoz.
-          if echo "$CHANGED" | grep -qE '^(gemini-extension\.json|\.devin-plugin/.*|plugin\.json|mcp_config\.json)$'; then
+          if echo "$CHANGED" | grep -qE '^(gemini-extension\.json|\.devin-plugin/.*|plugin\.json|mcp_config\.json|skills)$'; then
             PLUGIN_DIRS=$(printf '%s\n%s\n' "$PLUGIN_DIRS" 'plugins/signoz' | sort -u)
           fi
 
