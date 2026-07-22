@@ -57,16 +57,18 @@ Users of Claude Code, Codex, and Cursor receive updates based on these versions.
 
 ### Auto-bump workflow
 
-A GitHub Actions workflow (`.github/workflows/auto-version-bump.yml`) automatically bumps all three manifests on push to `main`. It detects which plugins have changed files and sets the version to today's date (or appends a micro suffix for multiple bumps in the same day). The root `gemini-extension.json` and `.devin-plugin/plugin.json` manifests mirror the `signoz` plugin and are bumped in lockstep with it.
+A GitHub Actions workflow (`.github/workflows/auto-version-bump.yml`) opens or updates a version-bump pull request after plugin changes land on `main`. It aggregates every plugin changed since the last successful bump and sets the version to today's date (or appends a micro suffix for multiple bumps in the same day). The root `gemini-extension.json` and `.devin-plugin/plugin.json` manifests mirror the `signoz` plugin and are bumped in lockstep with it. Root-only changes to the Gemini, Devin, or versionless Antigravity ports also trigger a `signoz` version bump.
 
-**You do not need to manually bump versions** — the workflow handles it when your PR is merged to `main`.
+Repository maintainers must enable **Settings → Actions → General → Allow GitHub Actions to create and approve pull requests** so the workflow's `GITHUB_TOKEN` can open the follow-up PR.
+
+**You do not need to manually bump versions** — after your PR is merged to `main`, the workflow opens or refreshes a follow-up version-bump PR.
 
 ## Pull Request Checklist
 
 - [ ] Skill follows the [Agent Skills specification](https://agentskills.io/specification)
 - [ ] `name` in SKILL.md frontmatter matches the directory name
 - [ ] `README.md` updated if a new skill was added
-- [ ] **Plugin versions bumped** in all three manifests (auto-bumped on merge to `main`)
+- [ ] **Plugin versions left unchanged** for the follow-up auto-bump PR
 - [ ] Changes tested locally with the relevant tool (Claude Code, Codex, or Cursor)
 
 ## License
