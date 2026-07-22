@@ -5,6 +5,7 @@
   "author": {
     "name": "SigNoz"
   },
+  "homepage": "https://signoz.io/privacy/",
   "repository": "https://github.com/SigNoz/agent-skills",
   "license": "MIT",
   "mcpServers": "./.signoz_claude_mcp.json",
