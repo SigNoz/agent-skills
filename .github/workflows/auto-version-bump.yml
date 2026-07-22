@@ -211,12 +211,14 @@ jobs:
 
           PR_BODY=$'Automated CalVer update for plugin changes merged to `main`.\n\nThis PR updates every versioned manifest for the affected plugin(s).'
 
-          PR_NUMBER=$(gh pr list \
-            --repo "$GITHUB_REPOSITORY" \
-            --base main \
-            --head "$BUMP_BRANCH" \
-            --state open \
-            --json number \
+          # REST's owner:branch filter prevents a fork with the same branch
+          # name from being mistaken for this repository's automation PR.
+          PR_NUMBER=$(gh api \
+            --method GET \
+            "/repos/$GITHUB_REPOSITORY/pulls" \
+            -f state=open \
+            -f base=main \
+            -f head="${GITHUB_REPOSITORY%%/*}:$BUMP_BRANCH" \
             --jq '.[0].number // empty')
 
           if [[ -n "$PR_NUMBER" ]]; then
