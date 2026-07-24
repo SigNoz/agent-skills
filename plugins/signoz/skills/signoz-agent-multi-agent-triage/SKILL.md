@@ -92,44 +92,54 @@ LIMIT 50
 
 Replace `'notch'` and `'opencode'` with the real `service_name` and `agent_id`.
 
-### 2. Classify the failure
+### 2. Check for upstream handoffs first
 
-Apply this table to the retrieved spans and take the **highest-ranked** signal
-that fires:
-
-| Signal | Threshold | Classification |
-|---|---|---|
-| `status_code = 2` (ERROR) | any error span | **Tool / process error** |
-| `duration_ms > 60000` | any turn | **LLM stall / timeout** |
-| `tokens_in > 100000` | any turn | **Context window overflow** |
-| cumulative `cost_usd` over budget | running total | **Budget overrun** |
-| `handoff_from` present, no OK turn follows | — | **Upstream bad handoff** |
-| 0 spans returned | — | **Not instrumented / never ran** |
-
-Rank when several fire: Error > Stall > Overflow > Budget > Bad handoff.
-
-### 3. Trace the upstream handoff chain (when relevant)
-
-For **Upstream bad handoff**, pull the upstream agent's final span before it
-passed the baton in:
+Before classifying, determine whether the failing agent received the baton from
+an upstream agent. Run this query **regardless of whether errors are present** —
+in a fleet, an upstream agent that errored before handing off is the most common
+real root cause, and it must be ruled in or out before you blame the downstream
+agent's own error spans:
 
 ```sql
 SELECT
-  attributes_string['gen_ai.agent.id']  AS agent_id,
-  attributes_string['notch.handoff.to'] AS handed_to,
-  status_code,
-  duration_nano / 1e6                    AS duration_ms,
-  toUnixTimestamp64Milli(timestamp)      AS ts_ms
+  attributes_string['gen_ai.agent.id']    AS upstream_agent,
+  attributes_string['notch.handoff.to']   AS handed_to,
+  status_code                             AS upstream_status,
+  duration_nano / 1e6                     AS duration_ms,
+  toUnixTimestamp64Milli(timestamp)       AS ts_ms
 FROM signoz_traces.distributed_signoz_index_v3
-WHERE `resource_string_service$$name` = 'notch'
-  AND attributes_string['notch.handoff.to'] = 'opencode'
+WHERE `resource_string_service$$name` = '<service_name>'
+  AND attributes_string['notch.handoff.to'] = '<agent_id>'
   AND timestamp >= now() - INTERVAL 1 HOUR
 ORDER BY timestamp DESC
-LIMIT 10
+LIMIT 5
 ```
 
-A `status_code = 2` on the upstream agent's last span before the handoff is the
-root cause: it passed a corrupt or incomplete payload downstream.
+If this returns rows:
+- Note the upstream agent name and its `upstream_status`.
+- If `upstream_status = 2` (STATUS_CODE_ERROR): the upstream errored *before*
+  handing off — this is the root cause, not the downstream agent. Set the
+  preliminary classification to **Upstream bad handoff**.
+- If `upstream_status = 1` (STATUS_CODE_OK): the upstream handed off cleanly, so
+  the downstream agent's errors are its own fault.
+
+### 3. Classify the failure
+
+Apply this table to the **downstream** agent's own spans from Step 1, with the
+upstream verdict from Step 2 as the top override:
+
+| Priority | Signal | Threshold | Classification |
+|---|---|---|---|
+| 0 (override) | upstream `status_code = 2` before the handoff | see Step 2 | **Upstream bad handoff** |
+| 1 | `status_code = 2` on a turn span | ≥ 1 error span | **Tool / process error** |
+| 2 | `duration_ms > 60000` on any span | any span | **LLM stall / timeout** |
+| 3 | `tokens_in > 100000` on any turn | any turn | **Context window overflow** |
+| 4 | cumulative `cost_usd` over the project budget | cumulative | **Budget overrun** |
+| 5 | 0 spans returned | — | **Not instrumented / never ran** |
+
+Priority 0 always wins: if the upstream errored, report *that* as the root cause
+even when the downstream also shows its own error spans — both are symptoms of
+the same upstream failure.
 
 ### 4. Compare token usage against the fleet baseline
 
@@ -152,7 +162,7 @@ of context bloat, an oversized baton payload, or prompt injection.
 ### 5. Produce the root-cause report
 
 ```
-Agent: <agent_id>   Classification: <from step 2>   Confidence: High / Medium / Low
+Agent: <agent_id>   Classification: <from step 3>   Confidence: High / Medium / Low
 Root cause: <one paragraph, specific to the actual span values and timestamps>
 Evidence:
   - <span name> at <ts> — status=<OK|ERROR>, <duration>ms, <N> tokens
@@ -164,8 +174,18 @@ Follow-up:
   - Prevent recurrence — signoz-creating-alerts
 ```
 
-If there are **no** error spans, report the agent as healthy (turn count, slowest
-turn) — do not invent a failure.
+Only report the agent as **healthy** when **none** of the Step 3 signals fired —
+that means all of the following are clear, not merely "no error spans":
+
+- no `status_code = 2` (error) spans,
+- no turn with `duration_ms > 60000` (a stalled turn is not healthy even at `OK`),
+- no turn with `tokens_in > 100000` (context bloat is not healthy even at `OK`),
+- no budget overrun,
+- no upstream handoff error (Step 2).
+
+If and only if all are clear, report turn count and slowest turn and stop — do not
+invent a failure. If any signal fired, classify per Step 3 even when the span's
+`status_code` is `OK`; the skill's value depends on its signal being trustworthy.
 
 ### 6. Offer prevention alerts
 
