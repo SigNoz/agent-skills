@@ -98,16 +98,17 @@ modify or create.
 ### Step 1: Check for duplicates
 
 Call `signoz_list_dashboards`. Most installs fit in the default
-page (`limit=50`); only paginate when `pagination.hasMore=true`. Use
-`pagination.nextOffset` directly for the next page; the schema accepts
+page (`limit=50`); narrow with the `filter` argument when the wording is
+distinctive (see `signoz://dashboard/list-filter-guide`), and page by `offset`
+until you have covered `total`; the schema accepts
 integer or string `limit` / `offset` values.
 
 **Match by relevance** Compare each existing
-dashboard's lowercased `name`, `description`, and `tags` against the
+dashboard's lowercased `spec.display.name`, `.description`, and `tags` against the
 user's technology/domain. Surface only matches a human would recognize
 as the same thing — a "redis" dashboard does not match a "postgresql"
 request just because both have a `database` tag. Collect each match's
-`name`, `uuid`, and `createdAt` for the next step.
+`spec.display.name`, `id`, and `createdAt` for the next step.
 
 ### Step 2: Ask the user — modify or create
 
@@ -115,7 +116,7 @@ Present exactly two options (no template-import as a separate top-level
 choice — that's an internal decision in Step 3b):
 
 - **Duplicates found:** "There are already these similar dashboards:
-  [list with name, UUID, created-at]. Want me to (a) modify one of
+  [list with name, id, created-at]. Want me to (a) modify one of
   these, (b) create a new dashboard anyway, or (c) stop?"
 - **No duplicates:** "I'll create a new dashboard for this. Proceed?"
   (No "modify" option when there's nothing to modify.)
@@ -128,9 +129,9 @@ Wait for the user's choice. "modify" → Step 3a. "create new" / confirm
 #### Step 3a: Modify an existing dashboard
 
 Hand off immediately to `signoz-modifying-dashboards` with the chosen
-dashboard UUID and the user's intent. Do not call
-`signoz_update_dashboard` from this skill — modification is out
-of scope. (See "Scope boundary" in Guardrails.)
+dashboard id and the user's intent. Do not call
+`signoz_update_dashboard` or `signoz_patch_dashboard` from this skill —
+modification is out of scope. (See "Scope boundary" in Guardrails.)
 
 #### Step 3b: Create a new dashboard
 
@@ -230,7 +231,7 @@ template path.
    (`signoz-creating-alerts`)".
 4. **Customization handling** If the user asks for any change to the
    imported dashboard, hand off to `signoz-modifying-dashboards` with
-   the new dashboard's UUID and the requested changes. Do not call
+   the new dashboard's id and the requested changes. Do not call
    `signoz_update_dashboard` from this skill.
 
 #### Step 3b-ii: Custom build (no template, or import failed)
@@ -286,26 +287,26 @@ or stop. Wait for the user's choice before building.
 
 These are the source of truth for the JSON schema, panel types, query
 builder shape, and layout rules — do not transcribe schema text into
-this skill, it will rot out of sync with the server. Read the four
-core resources before authoring widget JSON.
+this skill, it will rot out of sync with the server. Read the core
+resources before authoring panel JSON.
 
 > **Fallback when the MCP resource-reader is unavailable** Some MCP
 > client harnesses do not expose a resource-reading tool. If you
 > cannot read `signoz://...` URIs in this session, fall back to
 > `signoz_list_dashboards` + `signoz_get_dashboard` on
 > an existing dashboard of the same signal type (metrics / traces /
-> logs) and read its `widgets` array for v5 widget shapes.
+> logs) and read its `spec.panels` map for worked panel shapes.
 
 - `signoz://dashboard/instructions` — title, tags, description,
-  variables.
+  layout, variables.
 - `signoz://dashboard/widgets-instructions` — 7 panel types and layout
   rules.
-- `signoz://dashboard/widgets-examples` — complete widget configs with
-  all required fields (the most important resource — every widget
-  must include `id`, `panelTypes`, `title`, `query`, `selectedLogFields`,
-  `selectedTracesFields`, `thresholds`, `contextLinks`).
-- `signoz://dashboard/query-builder-example` — query builder reference,
-  including operator semantics for `filters.items[].op`.
+- `signoz://dashboard/widgets-examples` — complete panel configs with
+  all required fields (the most important resource — every panel must
+  include `kind`, `spec.display`, `spec.plugin`, and exactly one query).
+- `signoz://dashboard/examples` — whole create payloads with panels,
+  layouts, and variables assembled.
+- `signoz://dashboard/query-builder-example` — query builder reference.
 
 Add signal-specific resources as needed:
 
@@ -329,7 +330,7 @@ Add signal-specific resources as needed:
 
 ##### Step 3b-ii.4: Build the dashboard JSON
 
-Follow the v5 schema as documented in the resources above. Use OTel
+Follow the schema documented in the resources above. Use OTel
 semantic attribute names (not shorthand) in filters, groupBy, and
 variables. Apply the defaults below unless the user specified otherwise.
 
@@ -339,17 +340,17 @@ asks for a specific window, mention that range in the final handoff instead of
 inventing `timeRange`, `defaultTimeRange`, or `refresh` fields. Do not encode a
 PromQL range selector inside a Builder query.
 
-Use SigNoz enums and JSON types exactly. `panelTypes: "graph"` means time series
-(never Grafana `timeseries`); variable types are uppercase (`DYNAMIC`, `CUSTOM`).
-PromQL `queryType` is valid only for graph, value, bar, and histogram panels;
-table and pie accept `builder` or `clickhouse_sql`; list requires `builder`.
-`softMax` / `softMin` are numbers, `contextLinks` is `{"linksData": [...]}`, and
-saved `having` is an array of clause objects; defer full shapes to the resources.
+Use SigNoz kinds and JSON types exactly. `signoz/TimeSeriesPanel` means time series
+(never Grafana `timeseries`); variables are `ListVariable` / `TextVariable` carrying a
+`signoz/DynamicVariable`, `signoz/CustomVariable`, or `signoz/QueryVariable` plugin.
+The envelope is `schemaVersion: "v6"` plus `spec`, with no top-level `name` on create —
+the server derives that immutable machine label from `spec.display.name`. Tags are
+`{key, value}` objects; defer full shapes to the resources.
 
-Keep non-row widget/layout IDs bijective; create/remove both entries together.
-Row widgets need no layout entry; preserve matching row layout entries when
-present. During import or rebuild, strip the UI drag artifact id
-`"__dropping-elem__"` from both arrays.
+Keep panel ids and grid items bijective; create/remove both entries together.
+`spec.panels` is a map keyed by panel id, and `spec.layouts` positions those ids
+through `content.$ref`. During import or rebuild, drop any grid item whose
+`$ref` names a panel you did not carry over.
 
 **Defaults the skill applies (and surfaces in the preview):**
 
@@ -362,69 +363,65 @@ present. During import or rebuild, strip the UI drag artifact id
 | Counter render unit (rate vs. count) | per-second rate | per-interval **increase** count over a wider window (24h–7d) for any low-volume / bursty / human-paced counter — requests, **error counts**, restarts, OOM kills — where `/sec` renders as tiny decimals (e.g. `0.03/s`); gauges (CPU/mem/queue depth) are already absolute and unaffected; note `increase` rescales its y-axis with the selected range, so prefer it deliberately, not by reflex |
 | Variables (services) | `service.name`, `deployment.environment` (or `deployment.environment.name` — verify which exists via `signoz_get_field_keys`) | add `k8s.cluster.name` / `k8s.namespace.name` when k8s-flavored |
 | Variables (k8s/infra) | `k8s.cluster.name`, `k8s.namespace.name` (or `host.name` for hostmetrics) | drop `service.name` — it is rarely populated on infra signals |
-| Layout | 2-column grid (`w: 6`), 12 columns wide; every item has `0 <= x < 12`, `1 <= w <= 12`, `x + w <= 12` | full-width (`x: 0, w: 12`) for tables and time-series with many series |
+| Layout | 2-column grid (`width: 6`), 12 columns wide; every item has `0 <= x < 12`, `1 <= width <= 12`, `x + width <= 12` | full-width (`x: 0, width: 12`) for tables and time-series with many series |
 | GroupBy on per-service panels | `service.name` resource attribute | drop when filtering to a single service |
 
-**Sections and `panelMap`** A section is a `panelTypes: "row"` widget
-followed in `widgets[]` by the panels under it. Mirror that grouping in
-`panelMap`: one entry per row, keyed by the row id, listing only the
-panels that follow it up to the next row. Do not put every panel under
-a single row id — that renders on load but collapses the whole
-dashboard when one section is toggled. Each child must match its top-level
-layout entry's `x`, `y`, `w`, and `h` and satisfy the same horizontal bounds.
+**Sections** A section is one Grid entry in `spec.layouts`, with its own
+`display.title` and its own `items`. One Grid per section, in display order;
+a panel belongs to a section by having its grid item in that Grid. Item
+coordinates are per-Grid, so adding to an earlier section leaves later
+sections untouched.
 
-**Title and description** The dashboard title should name the
+**Title and description** The dashboard title (`spec.display.name`) should name the
 technology and the scope clearly: "PostgreSQL — prod-us-east-1", not
-just "PostgreSQL". Description should answer "what is this for" in one
-sentence. Tags: technology + signal types + environment when known.
+just "PostgreSQL". `spec.display.description` should answer "what is this for" in one
+sentence. Tags are `{key, value}`: technology + signal types + environment when known.
 
 ##### Step 3b-ii.5: Shape check before save
 
-`signoz://dashboard/widgets-examples` is the source of truth for widget
-required fields, panel-type-specific shapes, the canonical
-`filters.items[].key.id` form, operator casing, and common write-shape
-errors. Re-skim it before serialising any custom widget JSON.
+`signoz://dashboard/widgets-examples` is the source of truth for panel
+required fields, panel-type-specific shapes, plugin `kind` names, and
+common write-shape errors. Re-skim it before serialising any custom panel
+JSON.
 
-Every dashboard `queryData` and `queryFormulas` entry must carry a positive `limit` and non-empty editor-model
-`orderBy` (`columnName` + `order`). Raw list and trace-request panels default to 100 with timestamp-desc ordering
-(raw logs add id); a deliberately smaller list page may match `limit` to `pageSize`. Aggregate panels use 100 with
+Every builder query and formula entry must carry a positive `limit` and non-empty
+`order`. Raw list and trace-request panels default to 100 with timestamp-desc ordering
+(raw logs add id); a deliberately smaller list page may lower `limit`. Aggregate panels use 100 with
 the primary aggregation desc. Formula outputs use 100 with `__result desc`; every referenced base query uses 10000
 because base limits apply before formula evaluation. Find those inputs from every formula expression, including
 formulas with `disabled: true`, following references until every base `builder_query` leaf is reached. This dependency
 walk chooses bounds only; it does not establish deterministic formula-to-formula evaluation order, so dry-run the
-complete composite payload. During translation, log/trace bases keep the primary aggregation as their v5 `order`
-key; metric bases translate editor primary-aggregation `orderBy` to v5 `__result` while preserving direction.
-Formulas use `__result` in both models. Never pass dashboard `orderBy` to `signoz_execute_builder_query`.
+complete composite payload. A metrics `order` key is the composed `spaceAggregation(timeAggregation(metricName))`
+expression; the bare metric name is rejected, while `__result` and groupBy keys are accepted.
 Time-series top-N ranks groups over the whole window and can omit a short-lived local spike. Narrow filters/grouping
 if formula-input cardinality can exceed 10000.
 
-One rule `widgets-examples` does not call out, but
+Two rules `widgets-examples` does not call out, but
 `signoz_create_dashboard` enforces: **no `JSON.stringify` on
-arrays/objects** `layout`, `widgets`, `tags`, and `variables` are
-native JSON — stringifying them produces errors like
-`cannot unmarshal string into ... layout of type []LayoutItem`.
+arrays/objects** — `spec`, `panels`, `layouts`, `tags`, and `variables`
+are native JSON — and **one query per panel**, so a panel plotting two
+series carries a single `signoz/CompositeQuery` envelope holding both.
 
 ##### Step 3b-ii.6: Dry-run before save (mandatory)
 
 For every query-bearing panel, read the compact
 [`dashboard-to-query-builder-v5` reference](./references/dashboard-to-query-builder-v5.md).
-When the execution schema can represent the panel, call
-`signoz_execute_builder_query` with the translated payload, never widget JSON.
+The panel already stores the execution spec, so lift it into the outer envelope
+and call `signoz_execute_builder_query` with that payload, never panel JSON.
 Dry-run over a short absolute Unix-ms window — usually the last 30-60 minutes,
 never the panel's display range by reflex; apply the reference's dry-run hygiene
 rules before widening or retrying after a timeout. Use representative variable
-values and keep editor aliases unchanged in `signoz_create_dashboard`.
+values in the dry-run copy and keep `$var` in `signoz_create_dashboard`.
 
 If the reference's safety gate finds an unsupported execution field, report the
 panel as unvalidated and continue only after explicit user acceptance. Server or
 validation errors block. Unexpected empty results block unless the user already
-accepted absent telemetry. Skip row panels and validate their shape against
-`signoz://dashboard/widgets-examples`.
+accepted absent telemetry.
 
 ##### Step 3b-ii.7: Preview, save, report
 
 1. **Preview** Emit a one-paragraph plain-language summary of what
-   will be created — no JSON dump. A 20–30 widget payload is hundreds
+   will be created — no JSON dump. A 20–30 panel payload is hundreds
    of lines the user cannot meaningfully review in chat. Call out any
    validation gap the user explicitly accepted.
 
@@ -436,7 +433,7 @@ accepted absent telemetry. Skip row panels and validate their shape against
 2. **Save** Call `signoz_create_dashboard` with the payload.
 
 3. **Report** Tell the user:
-   - The created dashboard's UUID and title.
+   - The created dashboard's id and title.
    - Panel count and section breakdown.
    - Which variables are wired.
    - Two follow-up offers: "Want me to adjust panels, layout, or
@@ -477,17 +474,17 @@ accepted absent telemetry. Skip row panels and validate their shape against
 - **No metric guessing** For custom builds, verify metric names with
   `signoz_list_metrics` before authoring. Wrong names produce
   empty panels and the user only finds out later.
-- **Valid JSON shapes only** Follow the v5 schema documented in
-  `signoz://dashboard/*` MCP resources. Required widget and `queryData`
+- **Valid JSON shapes only** Follow the schema documented in
+  `signoz://dashboard/*` MCP resources. Required panel and query
   fields are listed in `signoz://dashboard/widgets-instructions` and
   `signoz://dashboard/widgets-examples`. Never wrap arrays/objects in
-  `JSON.stringify`; enforce the widget/layout bijection, field types, and enums
-  from Step 3b-ii.4.
+  `JSON.stringify`; enforce the panel/grid-item bijection, field types, and
+  plugin kinds from Step 3b-ii.4.
 - **Scope boundary** This skill creates dashboards. The moment the
   user asks to modify, edit, rearrange, or extend an existing dashboard
   — including immediately after import — hand off to
   `signoz-modifying-dashboards`. Do not call
-  `signoz_update_dashboard` from this skill.
+  `signoz_update_dashboard` or `signoz_patch_dashboard` from this skill.
 
 ## Examples
 

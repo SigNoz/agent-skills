@@ -303,7 +303,7 @@ static 5% alert will be noisy — proposing a burn-rate alert instead").
 ## Phase 6 — Build the dashboard(s)
 
 Hand off to `signoz-creating-dashboards` — it owns templates, the
-layout/variable/OTel-naming defaults, the v5 schema and its gotchas, the
+layout/variable/OTel-naming defaults, the v6 schema and its gotchas, the
 no-data probe, and the mandatory per-panel dry-run (`signoz-modifying-dashboards`
 for later edits). Do **not** restate panel JSON or grid mechanics here;
 pass intent and let that skill build.

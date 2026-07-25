@@ -38,27 +38,29 @@ Do NOT use when:
 
 ### Step 1: Identify the target dashboard
 
-Use a supplied UUID or a dashboard resource that includes its UUID directly.
+Use a supplied id or a dashboard resource that includes its id directly.
 For any name-only request, call `signoz_list_dashboards` and resolve the name to
-a UUID. **Paginate through all pages** — follow `pagination.nextOffset` while
-`pagination.hasMore` is true. Never pass a dashboard name to
-`signoz_get_dashboard` or conclude it is missing from the first page.
+an id, matching on `spec.display.name`. **Cover the whole listing** — narrow with
+the `filter` argument, re-run unfiltered when it comes back empty, and page by
+raising `offset` by `limit` until you have covered `total`. Never pass a
+dashboard name to `signoz_get_dashboard` or conclude it is missing from the
+first page.
 
 If multiple dashboards match, present the candidates and ask which one to
 explain.
 
 ### Step 2: Fetch the full dashboard configuration
 
-Call `signoz_get_dashboard` with the dashboard UUID. This is **mandatory** — you
+Call `signoz_get_dashboard` with the dashboard id. This is **mandatory** — you
 need the complete JSON to explain the dashboard accurately. Never guess based on
 the title alone.
 
 Examine the response to understand:
-- `title`, `description`, `tags` — the dashboard identity and author-provided context
-- `variables` — dashboard-level filters (dropdowns the user can change)
-- `widgets` — the panels, their types, titles, and queries
-- `layout` — how panels are arranged in the 12-column grid
-- `panelMap` — which panels belong to which row sections
+- `spec.display.name`, `.description`, `tags` — the dashboard identity and author-provided context
+- `spec.variables` — dashboard-level filters (dropdowns the user can change)
+- `spec.panels` — a map keyed by panel id: the panels, their plugin kinds, titles, and queries
+- `spec.layouts` — Grid entries placing panels in the 12-column grid via `content.$ref`
+- each Grid's `display.title` — the section a panel belongs to
 
 ### Step 3: Build the explanation
 
@@ -69,40 +71,46 @@ monitors, and what data sources it draws from (metrics, traces, logs). Mention
 the `tags` if they provide useful context.
 
 **2. Variables and filters** — Explain each variable:
-- Name and what it filters (e.g., "The `service_name` variable filters all panels
-  to a specific service")
-- Type: DYNAMIC (auto-populated from telemetry), QUERY (query-driven dropdown),
-  CUSTOM (configured choices), TEXTBOX (free-form input), or CONSTANT (fixed)
-- Whether it supports multi-select and has "ALL" option
-- Note if any panels do NOT reference a variable in their filters — changing that
-  variable dropdown would not affect those panels, which can be confusing
+- Name (`spec.name`, the `$handle` queries reference) and what it filters — for a
+  `signoz/DynamicVariable` that is `plugin.spec.name` on `plugin.spec.signal`
+- Kind: `signoz/DynamicVariable` (auto-populated from telemetry),
+  `signoz/QueryVariable` (query-driven dropdown), `signoz/CustomVariable`
+  (configured choices), or a `TextVariable` (free-form input)
+- Whether it supports multi-select (`allowMultiple`) and an "ALL" option
+- Note if any panels do NOT reference a variable in their `filter.expression` —
+  changing that variable dropdown would not affect those panels, which can be
+  confusing
 
-**3. Panel-by-panel walkthrough** — Group panels by their row sections using the
-`panelMap` structure (row widget titles are the section headers). If the dashboard
-has no rows (empty `panelMap`), walk through panels in layout order (by `y` then
-`x` position) and organize by logical theme. For each panel:
-- **Title** and **panel type** (graph, value, table, bar, pie, histogram, list,
-  trace)
-- **What it shows** — interpret the query in plain language. For builder queries,
-  explain the metric/data source, aggregation, filters, and groupBy. For formulas,
-  explain each sub-query and how the formula combines them. For ClickHouse SQL or
-  PromQL, translate the query intent into plain English.
+**3. Panel-by-panel walkthrough** — Group panels by Grid section: walk
+`spec.layouts` in order, using each Grid's `display.title` as the section header
+and following its `items` (by `y` then `x`) to the panels they `$ref`. For a
+single untitled Grid, walk panels in position order and organize by logical
+theme. For each panel:
+- **Title** and **panel type** in plain words, from the plugin `kind`:
+  `signoz/TimeSeriesPanel`, `signoz/NumberPanel` (single value),
+  `signoz/TablePanel`, `signoz/BarChartPanel`, `signoz/PieChartPanel`,
+  `signoz/HistogramPanel`, `signoz/ListPanel` (raw rows)
+- **What it shows** — interpret the panel's one query in plain language. For
+  `signoz/BuilderQuery`, explain the signal, aggregation, `filter.expression`,
+  and `groupBy`. For a `signoz/CompositeQuery`, explain each member and how the
+  formula combines them. For ClickHouse SQL or PromQL, translate the query
+  intent into plain English.
 - **What to watch for** — describe what healthy looks like and what patterns
   indicate trouble. Be specific: "sustained usage above 80% means..." not just
   "watch if it's high". Anchor advice to the actual metric being queried, not
   generic domain knowledge.
-- **Unit** — mention the y-axis unit so the user knows how to read the values
+- **Unit** — mention `plugin.spec.formatting.unit` so the user knows how to read the values
 
 For panels with complex queries:
-- **Formulas** (queryFormulas): explain each sub-query (A, B, ...) separately,
+- **Formulas** (inside a composite): explain each member (A, B, ...) separately,
   then explain what the formula computes and why
-- **Multiple queries on one panel**: explain each query and how they relate
 - **Functions** (rate, derivative, clampMin/Max, timeShift): explain the transform
   in plain terms (e.g., "rate converts the raw counter into a per-second value")
 
 **4. Dashboard health observations** — After the walkthrough, note any structural
 issues you spotted:
-- Panels with no queries or empty/disabled queries
+- Panels with no query, or a composite whose members are all disabled
+- Panels in `spec.panels` that no grid item references (they never render)
 - Variables defined but not referenced in any panel filter
 - Panels missing thresholds where they would be useful (e.g., utilization panels
   without a saturation warning line)
@@ -137,8 +145,8 @@ beat wrong chips.
 - **Anchor to actual content**: Base "what to watch for" advice on the actual metrics
   and queries in the dashboard, not on generic domain knowledge unrelated to the
   panels present.
-- **Group by sections**: Use the `panelMap` row structure to group panels, not layout
-  coordinates. The row titles are the section headers the dashboard author intended.
+- **Group by sections**: Use each Grid's `display.title` to group panels, not layout
+  coordinates. Those titles are the section headers the dashboard author intended.
 - **No data queries by default**: Do not run live queries unless the user asks. The
   explain skill is about understanding the dashboard structure, not inspecting
   current data.
@@ -158,16 +166,16 @@ beat wrong chips.
 
 **Agent:**
 1. Calls `signoz_list_dashboards` (paginates all pages) — finds "PostgreSQL
-   Overview" dashboard with UUID `abc-123`.
-2. Calls `signoz_get_dashboard` with UUID `abc-123` — gets full configuration.
+   Overview" dashboard with id `abc-123`.
+2. Calls `signoz_get_dashboard` with id `abc-123` — gets full configuration.
 3. Provides structured explanation:
    - **Overview**: "This dashboard monitors PostgreSQL database health across
      connections, query performance, buffer cache efficiency, and replication. It
      uses metrics from the OpenTelemetry PostgreSQL receiver."
-   - **Variables**: "Two variables — `host_name` (DYNAMIC, filters by
-     `host.name`) and `database` (DYNAMIC, filters by `postgresql.database.name`).
+   - **Variables**: "Two variables — `host_name` (dynamic, filters by
+     `host.name`) and `database` (dynamic, filters by `postgresql.database.name`).
      Both support multi-select."
-   - **Panels by section**: Walks through each row section, explaining every panel's
+   - **Panels by section**: Walks each Grid section, explaining every panel's
      metric, aggregation, and what to watch for.
    - **Health observations**: "The 'Connection Count' panel has no threshold
      configured — consider adding a line at 80% of your max_connections."
@@ -182,9 +190,9 @@ beat wrong chips.
 provided via @mention or auto-context)
 
 **Agent:**
-1. Extracts dashboard UUID from the provided context.
+1. Extracts the dashboard id from the provided context.
 2. Calls `signoz_get_dashboard` — gets full configuration.
-3. Provides a focused panel-by-panel walkthrough grouped by row sections,
+3. Provides a focused panel-by-panel walkthrough grouped by Grid section,
    explaining what each panel shows and what to watch for.
 4. Skips the health/gaps sections unless something notable stands out, since the
    user asked specifically about panels.

@@ -19,7 +19,7 @@ template import without data, duplicate-found choice, and custom build.
    → returns `postgresql.connections.usage`, `postgresql.commits`, etc.
    Data flowing.
 5. Calls `signoz_import_dashboard path=postgresql/postgresql.json`.
-6. Reports: "Created 'PostgreSQL Overview' (UUID `…`) — 24 panels
+6. Reports: "Created 'PostgreSQL Overview' (id `…`) — 24 panels
    across Overview / Connections / Throughput / Replication. Variables:
    `postgresql.host.name`. Probe found data for all headline panels.
    Want me to adjust anything, or wire alerts for slow queries?"
@@ -49,11 +49,11 @@ the user to choose between "create anyway" and "stop".
 **User:** "Set up monitoring for Redis" (existing "Redis - Overview"
 dashboard found)
 
-**Agent:** surfaces the existing dashboard with UUID and `createdAt`,
+**Agent:** surfaces the existing dashboard with its id and `createdAt`,
 asks the user (a) modify / (b) create new / (c) stop. If user picks
 (b), follows the PostgreSQL flow above against the `redis/redis.json`
 template. If (a), hands off to `signoz-modifying-dashboards` with the
-dashboard's UUID and the user's intent (no `signoz_get_dashboard` call
+dashboard's id and the user's intent (no `signoz_get_dashboard` call
 from this skill).
 
 ## Custom build — no template match
@@ -73,15 +73,15 @@ from this skill).
    `deployment.environment` (no `.name` suffix in this install);
    `signoz_get_field_values signal=traces name=service.name` → user picks
    `checkout`, `payments`, `inventory`, `notifications`.
-5. Reads the `signoz://dashboard/*` MCP resources. Builds sections
+5. Reads the `signoz://dashboard/*` MCP resources. Builds Grid sections
    Overview / Latency / Errors / Throughput, with headline panels
-   (request rate, p99 latency, error rate `A*100/B`, throughput) and
-   the two variables.
+   (request rate, p99 latency, an error-rate `signoz/CompositeQuery`
+   computing `A*100/B`, throughput) and the two variables.
 6. Per-panel dry-run via `signoz_execute_builder_query` for
-   **every** panel (envelope translation per Step 3b-ii.6, with
+   **every** panel (envelope lift per Step 3b-ii.6, with
    `name` preserved on each `builder_query.spec` so formulas
    resolve). Emits a one-paragraph plain-language summary — no JSON
-   dump — then calls `signoz_create_dashboard`. Reports UUID,
+   dump — then calls `signoz_create_dashboard`. Reports the id,
    panel count and section breakdown, and which variables are
    wired. Offers to wire error-rate alerts via
    `signoz-creating-alerts`.
