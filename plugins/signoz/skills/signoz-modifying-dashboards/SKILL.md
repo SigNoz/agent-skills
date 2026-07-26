@@ -128,7 +128,7 @@ both; each names its patch path.
   1. Build the panel from `signoz://dashboard/widgets-examples`, with a short,
      stable id, and `add` it at `/spec/panels/<id>`.
   2. Pick the Grid the user meant: sections are separate entries in
-     `spec.layouts`, each with its own `display.title` and its own item
+     `spec.layouts`, each with its own `spec.display.title` and its own item
      coordinates, so adding to an earlier section touches only that Grid.
   3. `add` a grid item at `/spec/layouts/<n>/spec/items/-` whose `content.$ref`
      is `#/spec/panels/<id>`, obeying the bounds below. Unless side-by-side

@@ -60,7 +60,7 @@ Examine the response to understand:
 - `spec.variables` — dashboard-level filters (dropdowns the user can change)
 - `spec.panels` — a map keyed by panel id: the panels, their plugin kinds, titles, and queries
 - `spec.layouts` — Grid entries placing panels in the 12-column grid via `content.$ref`
-- each Grid's `display.title` — the section a panel belongs to
+- each Grid's `spec.display.title` — the section a panel belongs to
 
 ### Step 3: Build the explanation
 
@@ -82,10 +82,10 @@ the `tags` if they provide useful context.
   confusing
 
 **3. Panel-by-panel walkthrough** — Group panels by Grid section: walk
-`spec.layouts` in order, using each Grid's `display.title` as the section header
-and following its `items` (by `y` then `x`) to the panels they `$ref`. For a
-single untitled Grid, walk panels in position order and organize by logical
-theme. For each panel:
+`spec.layouts` in order, using each Grid's `spec.display.title` as the section
+header and following its `spec.items` (by `y` then `x`) to the panels they
+`$ref`. For a single untitled Grid, walk panels in position order and organize
+by logical theme. For each panel:
 - **Title** and **panel type** in plain words, from the plugin `kind`:
   `signoz/TimeSeriesPanel`, `signoz/NumberPanel` (single value),
   `signoz/TablePanel`, `signoz/BarChartPanel`, `signoz/PieChartPanel`,
@@ -145,7 +145,7 @@ beat wrong chips.
 - **Anchor to actual content**: Base "what to watch for" advice on the actual metrics
   and queries in the dashboard, not on generic domain knowledge unrelated to the
   panels present.
-- **Group by sections**: Use each Grid's `display.title` to group panels, not layout
+- **Group by sections**: Use each Grid's `spec.display.title` to group panels, not layout
   coordinates. Those titles are the section headers the dashboard author intended.
 - **No data queries by default**: Do not run live queries unless the user asks. The
   explain skill is about understanding the dashboard structure, not inspecting

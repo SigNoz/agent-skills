@@ -367,8 +367,8 @@ through `content.$ref`. During import or rebuild, drop any grid item whose
 | GroupBy on per-service panels | `service.name` resource attribute | drop when filtering to a single service |
 
 **Sections** A section is one Grid entry in `spec.layouts`, with its own
-`display.title` and its own `items`. One Grid per section, in display order;
-a panel belongs to a section by having its grid item in that Grid. Item
+`spec.display.title` and its own `spec.items`. One Grid per section, in display
+order; a panel belongs to a section by having its grid item in that Grid. Item
 coordinates are per-Grid, so adding to an earlier section leaves later
 sections untouched.
 
