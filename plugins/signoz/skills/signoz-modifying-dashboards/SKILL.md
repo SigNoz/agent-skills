@@ -102,6 +102,14 @@ paths. Reach for `signoz_update_dashboard` — a full replacement merged into th
 Step 2 state — only when most of the dashboard changes. The rules below apply to
 both; each names its patch path.
 
+**Ops apply in sequence, against the document as the previous ops left it.** When
+one patch removes several entries from the same array — grid items, layouts,
+variables, tags, or a composite's member queries — order those removals by
+**descending index**. Otherwise each removal reindexes the entries after it, and a
+stale index quietly drops the wrong entry or no-ops (remove on a missing path is
+not an error). Indices planned against the Step 2 state are only valid for the
+first removal from each array.
+
 **Modification rules:**
 
 - **Time range and refresh are viewer controls.** Dashboard payloads do
