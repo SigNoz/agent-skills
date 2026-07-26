@@ -133,8 +133,16 @@ first removal from each array.
   `signoz://logs/query-builder-guide` for the signal. MCP is the source of truth.
 
 - **Adding a panel:**
-  1. Build the panel from `signoz://dashboard/widgets-examples`, with a short,
-     stable id, and `add` it at `/spec/panels/<id>`.
+  1. Build the panel with a short, stable id and `add` it at
+     `/spec/panels/<id>`. When the dashboard already holds a panel of the
+     target type, start from that panel's JSON in the Step 2 response instead
+     of composing one — the same diff-and-merge principle the update path
+     follows, and the server's own shape is known-valid. Re-point every field
+     that identifies the data (aggregation, `groupBy`, `filter.expression`,
+     `order`, `legend`, alias, `signal`); a clone with one stale field is
+     well-formed and will be accepted, so the mandatory dry-run below is what
+     catches it. Compose from `signoz://dashboard/widgets-examples` only when
+     no panel of that type exists.
   2. Pick the Grid the user meant: sections are separate entries in
      `spec.layouts`, each with its own `spec.display.title` and its own item
      coordinates, so adding to an earlier section touches only that Grid.
@@ -224,6 +232,16 @@ signoz_patch_dashboard({
   "patch": [{"op": "replace", "path": "/spec/display/name", "value": "New title"}]
 })
 ```
+
+**If the write fails, never resend the same payload.** A client-side
+`InputValidationError` never reached SigNoz, so an identical retry cannot
+succeed — and working out *why* it failed does not license another attempt.
+That reasoning is what turns two failures into twenty. Allow at most two
+attempts per approach, then change approach: clone-and-re-point rather than
+author, or split one patch into several. If two approaches have failed, stop
+and report the exact ops and error text to the user instead of trying a third.
+This bounds client-side validation failures only — a dry-run timeout is a
+server-side condition where retrying over a narrower window is correct.
 
 For a full replacement, `signoz_update_dashboard` takes the merged state **flat**
 beside `id`, not nested under a `dashboard` key. Merge into the `data` object of the

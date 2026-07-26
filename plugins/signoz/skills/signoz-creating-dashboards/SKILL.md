@@ -60,7 +60,7 @@ sensible defaults, but a few cannot be guessed:
 |---|---|---|
 | Dashboard intent (NL goal) | yes | `$ARGUMENTS` or recent user turn |
 | Technology / domain (e.g. PostgreSQL, Redis, "payment pipeline") | yes | parse from intent; otherwise ask |
-| Modify-or-create choice when duplicates exist | yes | ask the user (Step 2) |
+| Confirmation to create (plus the modify-or-create choice when duplicates exist) | yes | ask the user (Step 2); still required with zero duplicates and under stated urgency |
 | Resource scope for custom builds (service / namespace / cluster) | yes for custom builds | discover via `signoz_get_field_keys` + `signoz_get_field_values`; fall back to a dashboard variable |
 | Specific metrics / signals for custom builds | inferred | derive from technology + MCP `signoz://dashboard/*` resources; surface in preview |
 | Layout | inferred | apply defaults (see "Defaults" below) |
@@ -150,7 +150,17 @@ Branch on the result:
   yes/no.
 - **Multiple plausible matches** — present them and ask the user to
   pick. Once picked, proceed to Step 3b-i.
-- **No template** — proceed to Step 3b-ii (custom build).
+- **Template matches the technology but not the requested signals** —
+  common for any specific ask ("Kafka, but I want consumer fetch rate by
+  client"). Not "no template": import it, then hand the extra panels to
+  `signoz-modifying-dashboards` with the new id. Building from scratch
+  discards the curated baseline for no gain.
+- **No template** — proceed to Step 3b-ii (custom build). That means no
+  catalog entry for the technology, not an entry that looks imperfect or
+  aimed at a different metric family. Template bodies are not readable
+  before import, so a suspected mismatch is only a hypothesis — and the
+  Step 3b-i.1 probe sits *inside* the import path, so it cannot justify
+  leaving that path. Probe first, then decide.
 
 #### Step 3b-i: Import the template
 
