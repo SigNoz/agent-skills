@@ -218,7 +218,7 @@
         "The patch payload is {id, patch: [...]} where every path is a JSON Pointer under /spec/panels/recent-errors/spec/queries/0",
         "The ops set limit to 25 and order to [{key:{name:'timestamp'},direction:'asc'}]",
         "No op targets /name, and no full spec object is resent",
-        "If the agent falls back to signoz_update_dashboard, the payload is flat with id, schemaVersion, name, tags, and spec at the top level — no 'dashboard' wrapper, name unchanged from the fetched value, and no createdAt/createdBy/updatedAt/updatedBy/orgId/legacy/source/webUrl",
+        "If the agent falls back to signoz_update_dashboard, the payload is the fetched response's data object sent flat beside id (schemaVersion, name, tags, spec) — never the {status, data} envelope or a 'dashboard' wrapper, name unchanged from the fetched value, and no createdAt/createdBy/updatedAt/updatedBy/orgId/legacy/source/webUrl",
         "The signoz_execute_builder_query call uses requestType='raw' with limit=25 and the same ascending timestamp order",
         "The dry-run query spec contains none of filters, pageSize, orderBy, selectColumns, queryName, or dataSource",
         "The write is called only after the dry-run succeeds"

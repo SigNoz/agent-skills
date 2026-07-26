@@ -218,9 +218,10 @@ signoz_patch_dashboard({
 ```
 
 For a full replacement, `signoz_update_dashboard` takes the merged state **flat**
-beside `id`, not nested under a `dashboard` key. Send the fetched `name` — an
-immutable machine label — back unchanged, and drop the read-only fields the GET
-returns (`createdAt`, `updatedBy`, `orgId`, `webUrl`, and friends):
+beside `id`, not nested under a `dashboard` key. Merge into the `data` object of the
+Step 2 response — passing the `{status, data}` envelope itself is rejected. Send the
+fetched `name` — an immutable machine label — back unchanged, and drop the read-only
+fields the GET returns (`createdAt`, `updatedBy`, `orgId`, `webUrl`, and friends):
 
 ```text
 signoz_update_dashboard({
@@ -242,7 +243,7 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
   targeted edits. When a full replacement is warranted, `signoz_update_dashboard`
   takes the complete dashboard **flat** beside `id` (`schemaVersion`, `name`,
   `tags`, `spec`) — never nested under a `dashboard` key. Always call
-  `signoz_get_dashboard` first, merge into that state, round-trip `name`
+  `signoz_get_dashboard` first, merge into that response's `data` object, round-trip `name`
   unchanged, and never construct a payload from scratch.
 - **Preserve what you don't change**: Preserve supported mutable semantics for
   panels, variables, and grid items outside the request. Diff-and-merge;
