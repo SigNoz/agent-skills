@@ -26,7 +26,7 @@
                 "kind": "Panel",
                 "spec": {
                   "display": {"name": "Recent Errors"},
-                  "plugin": {"kind": "signoz/ListPanel", "spec": {}},
+                  "plugin": {"kind": "signoz/ListPanel", "spec": {"selectFields": [{"name": "service.name", "fieldDataType": "string", "fieldContext": "resource", "signal": "traces"}, {"name": "name", "fieldDataType": "string", "fieldContext": "span", "signal": "traces"}]}},
                   "queries": [
                     {"kind": "raw", "spec": {"name": "A", "plugin": {"kind": "signoz/BuilderQuery", "spec": {"name": "A", "signal": "traces", "filter": {"expression": "has_error = true"}, "selectFields": [{"name": "service.name", "fieldDataType": "string", "fieldContext": "resource", "signal": "traces"}, {"name": "name", "fieldDataType": "string", "fieldContext": "span", "signal": "traces"}], "order": [{"key": {"name": "timestamp"}, "direction": "desc"}], "limit": 10}}}}
                   ]

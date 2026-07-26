@@ -26,7 +26,7 @@
                 "kind": "Panel",
                 "spec": {
                   "display": {"name": "Recent Checkout Traces"},
-                  "plugin": {"kind": "signoz/ListPanel", "spec": {}},
+                  "plugin": {"kind": "signoz/ListPanel", "spec": {"selectFields": [{"name": "timestamp", "fieldContext": "span", "signal": "traces"}, {"name": "name", "fieldDataType": "string", "fieldContext": "span", "signal": "traces"}]}},
                   "queries": [
                     {"kind": "raw", "spec": {"name": "A", "plugin": {"kind": "signoz/BuilderQuery", "spec": {"name": "A", "signal": "traces", "filter": {"expression": "service.name = 'checkout' AND region IN $region"}, "selectFields": [{"name": "timestamp", "fieldContext": "span", "signal": "traces"}, {"name": "name", "fieldDataType": "string", "fieldContext": "span", "signal": "traces"}], "order": [{"key": {"name": "timestamp"}, "direction": "desc"}], "limit": 20}}}}
                   ]
