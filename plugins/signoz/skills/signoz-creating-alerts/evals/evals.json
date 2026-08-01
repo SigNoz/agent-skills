@@ -70,15 +70,14 @@
     },
     {
       "id": 5,
-      "eval_name": "absent-data-sole-trigger-omits-thresholds",
+      "eval_name": "absent-data-sole-trigger-stops-before-write",
       "prompt": "Create an alert for checkoutservice that fires only when its request metric stops arriving. Notify #staging-alerts.",
-      "expected_output": "Agent discovers and probes a concrete checkoutservice request metric, builds a threshold/PromQL-family absent-data rule whose sole trigger is alertOnAbsent, validates the full query with absolute integer Unix-ms bounds, and creates the alert without condition.thresholds. It routes #staging-alerts through top-level preferredChannels rather than inventing an empty thresholds block or numeric threshold.",
+      "expected_output": "Agent explains that the current v2 threshold/PromQL contract requires condition.thresholds, so it cannot create the requested exact absent-only alert whose sole trigger is alertOnAbsent. It stops before any write, does not invent an empty threshold spec or silently change the request, and offers a combined threshold + absence rule only if the user explicitly approves the changed semantics.",
       "expectations": [
-        "Agent discovers a concrete metric and verifies the checkoutservice filter before authoring the alert",
-        "The full signoz_execute_builder_query dry-run has start and end as JSON integer Unix-millisecond values in the outer query",
-        "The signoz_create_alert payload enables alertOnAbsent as the sole trigger",
-        "The signoz_create_alert payload omits condition.thresholds entirely rather than sending an empty or fabricated threshold spec",
-        "The signoz_create_alert payload puts #staging-alerts in top-level preferredChannels"
+        "The agent stops before signoz_create_alert and does not create a notification channel or any alert",
+        "The response says an exact absent-only rule is unavailable because current v2 threshold/PromQL rules require condition.thresholds",
+        "The agent does not send alertOnAbsent as a sole trigger, omit condition.thresholds, or fabricate an empty threshold spec",
+        "The agent does not silently choose a numeric threshold or create a combined threshold + absence rule; it asks for explicit approval of the changed semantics before creating one"
       ],
       "files": []
     },
@@ -92,6 +91,19 @@
         "The policy-routed create payload omits condition.thresholds.spec[].channels and top-level preferredChannels without asking the user to choose a direct channel",
         "The alert carries labels.team=checkout and labels.severity=critical and names the threshold critical so the confirmed policy match inputs are preserved; it does not invent different matcher labels",
         "The response does not call signoz_create_notification_channel or claim that the alert write created the org notification policy"
+      ],
+      "files": []
+    },
+    {
+      "id": 7,
+      "eval_name": "unconfirmed-org-policy-routing-stops-for-clarification",
+      "prompt": "Create a critical alert when checkoutservice error rate exceeds 5%. Route it through an org notification policy if one applies.",
+      "expected_output": "Agent stops for routing clarification because no specific existing matching policy or match criteria are confirmed. It asks the user to confirm that an existing org policy should match this threshold/PromQL rule (including the relevant labels or tier), and it does not treat the missing direct channel as permission to use policy routing.",
+      "expectations": [
+        "The agent does not set notificationSettings.usePolicy=true or imply that policy routing is confirmed",
+        "The agent does not call signoz_create_notification_channel, signoz_create_alert, or otherwise create a channel or alert before clarification",
+        "The clarification asks for confirmation of an existing matching org policy and its relevant matcher labels or threshold tier",
+        "The agent does not silently fall back to a direct channel or invent policy-match labels"
       ],
       "files": []
     }

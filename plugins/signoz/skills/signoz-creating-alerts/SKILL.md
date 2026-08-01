@@ -48,7 +48,7 @@ guesses create noisy alerts on the wrong service:
 |---|---|---|
 | Alert intent (NL goal) | yes | `$ARGUMENTS` or recent user turn |
 | Resource attribute filter (e.g. `service.name`, `k8s.namespace.name`, `host.name`) | yes | discover via `signoz_get_field_keys` + `signoz_get_field_values` |
-| Threshold value(s) | inferred from intent | derive a sensible default and surface in the preview |
+| Threshold value(s) | threshold / PromQL rules | derive a sensible default and surface in the preview; never substitute one for an absent-only request |
 | Severity | inferred from intent | default `warning`; promote to `critical` only if user said "page", "wake up", "critical" |
 | Notification routing | yes | direct: verified channel name(s); policy: confirmation that an existing org policy should route this rule |
 
@@ -173,9 +173,6 @@ result and ask the user to confirm before save. Treat this exception
 narrowly: it applies to "alert me when bad thing happens" log queries,
 not to alerts that depend on continuous data flow.
 
-This cheap probe catches no-data before the user reviews an alert that cannot
-fire.
-
 ### Step 5: Build the alert config
 
 The MCP server is the source of truth for the alert JSON schema, threshold
@@ -183,9 +180,15 @@ codes, and validation rules. Read the `signoz://alert/instructions` and
 `signoz://alert/examples` MCP resources for the canonical, version-current
 shape.
 
-Threshold/PromQL `condition.thresholds` requires `kind` (use `"basic"`) and
-non-empty `spec[]`, except when `alertOnAbsent` is the sole trigger. Anomaly
-rules omit it.
+Threshold/PromQL `condition.thresholds` requires `kind` (use `"basic"`) and a
+non-empty `spec[]`. Anomaly rules omit it.
+
+**Exact absent-only requests.** Current v2 cannot represent `alertOnAbsent` as
+the sole trigger: threshold/PromQL rules still require `condition.thresholds`.
+Stop before `signoz_create_alert`, explain that the exact alert is unavailable,
+and offer a combined threshold + absence rule only with explicit approval of
+its changed semantics; never select a threshold or substitute semantics
+silently.
 
 For most user intents, the config is one of a small number of patterns:
 
@@ -196,7 +199,7 @@ For most user intents, the config is one of a small number of patterns:
 | Trace-based count or p-tile | "p99 span duration > 2s on checkout" |
 | Error-rate formula (A/B*100) — see "Common query shapes" below | "error rate > 5%" |
 | Anomaly detection (Z-score) | "alert me on anomalous traffic" |
-| Absent-data alert | "alert if data stops arriving" |
+| Combined threshold + absence (only after approval) | "alert if data stops arriving" |
 | ClickHouse SQL alert — author SQL using the schema in `signoz://alert/examples` | non-trivial joins, custom aggregations the builder cannot express |
 | PromQL alert — delegate to `signoz-generating-queries` for the query, then return here | when user already has PromQL |
 
@@ -261,7 +264,8 @@ dotted attribute name with underscores: `service.name` → `service_name`).
 #### Common query shapes — conventions
 
 Read `signoz://alert/examples` for the authoritative JSON of all
-patterns (error rate, p99 latency, log volume, absent-data, anomaly,
+patterns (error rate, p99 latency, log volume, combined threshold + absence,
+anomaly,
 PromQL, ClickHouse SQL). The conventions that don't live in the
 schema:
 
@@ -370,10 +374,10 @@ alert that will never fire.
 Choose direct or org-policy routing after dry-run and final severity. A missing
 channel does not by itself authorize policy routing.
 
-**Org-policy routing (`threshold_rule` / `promql_rule` only):**
+**Org-policy routing (`threshold_rule` / `promql_rule` only; `anomaly_rule` is direct-only):**
 
 - Use it only when the user or trusted task context explicitly confirms that an existing org notification policy should match this rule.
-- Set `notificationSettings.usePolicy: true`. Direct references in `condition.thresholds.spec[].channels` and `preferredChannels` may be omitted; preserve the confirmed user labels and threshold tier that the policy matches.
+- Set `notificationSettings.usePolicy: true`. Omit direct references in `condition.thresholds.spec[].channels`, and always omit top-level `preferredChannels`; preserve the confirmed user labels and threshold tier that the policy matches.
 - This skill does not create org policies; they are managed in the SigNoz UI or Terraform. Never imply the alert write created one; if its existence or match is unconfirmed, stop and ask.
 - If the payload includes any channel name, verify every supplied name with fully paginated `signoz_list_notification_channels`; the backend still validates supplied names even though policy routing ignores them for delivery.
 
@@ -393,14 +397,11 @@ Place the resolved channel according to the rule schema:
 
 - `threshold_rule` / `promql_rule` (v2alpha1): attach direct-routing channels
   to each `condition.thresholds.spec[N].channels` array — typically warning →
-  Slack only, critical → Slack + PagerDuty. When `alertOnAbsent` is the sole
-  trigger and thresholds are omitted, put fallback channels in top-level
-  `preferredChannels`.
-- `anomaly_rule` (v1): thresholds are forbidden, so put channel names in the
-  top-level `preferredChannels` array.
+  Slack only, critical → Slack + PagerDuty.
+- `anomaly_rule` (v1): direct routing only; thresholds are forbidden, so put channel names in top-level `preferredChannels`.
 
-Never put a chosen anomaly or absent-only channel in a nonexistent thresholds
-block, or substitute `preferredChannels` for per-tier multi-severity routing.
+Never put a chosen anomaly channel in a nonexistent thresholds block, or
+substitute `preferredChannels` for per-tier multi-severity routing.
 
 #### Handling secret-bearing channel config
 
@@ -472,8 +473,8 @@ does).
   `LOGS_BASED_ALERT`. Mismatches fail validation.
 - **Anomaly rules are metrics-only** `anomaly_rule` + non-metric alertType
   is rejected.
-- **Routing must match the selected mode.** Direct routes use exact names from `signoz_list_notification_channels`
-  in per-threshold `channels`, or `preferredChannels` for anomaly and absent-only rules. Confirmed policy routes set
+- **Routing must match the selected mode.** Direct threshold/PromQL routes use exact names from `signoz_list_notification_channels`
+  in per-threshold `channels`; direct anomaly routes use `preferredChannels`. Confirmed policy routes (threshold/PromQL only) set
   `notificationSettings.usePolicy: true` and may omit direct channels; verify every name supplied in either mode.
 - **Never echo channel secrets.** Slack webhook URLs, PagerDuty integration
   keys, and similar webhook tokens are secrets. Pass them to
