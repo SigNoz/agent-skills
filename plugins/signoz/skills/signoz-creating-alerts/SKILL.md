@@ -50,7 +50,7 @@ guesses create noisy alerts on the wrong service:
 | Resource attribute filter (e.g. `service.name`, `k8s.namespace.name`, `host.name`) | yes | discover via `signoz_get_field_keys` + `signoz_get_field_values` |
 | Threshold value(s) | inferred from intent | derive a sensible default and surface in the preview |
 | Severity | inferred from intent | default `warning`; promote to `critical` only if user said "page", "wake up", "critical" |
-| Notification channel | yes | `signoz_list_notification_channels` + offer "create new" |
+| Notification routing | yes | direct: verified channel name(s); policy: confirmation that an existing org policy should route this rule |
 
 If a required input is missing and undiscoverable, **stop before any write**
 and ask through the host's supported clarification UI.
@@ -78,7 +78,7 @@ Extract from the user's request:
 3. **Threshold** — numeric value and comparison ("above 80%", "below 100/s").
 4. **Severity** — implicit from urgency words ("page" → critical, default
    warning otherwise).
-5. **Channel** — explicit channel name if the user provided one.
+5. **Routing** — explicit direct-channel name(s), or an explicit request to use a confirmed existing org notification policy.
 
 Map signal phrasing to alert type:
 
@@ -365,23 +365,24 @@ flow mid-stream), the no-data stop rule applies here too: empty result →
 stop and ask the user (see *Required inputs* above) instead of saving an
 alert that will never fire.
 
-### Step 7: Resolve notification channels
+### Step 7: Resolve notification routing
 
-Resolve at least one channel after dry-run and final severity; otherwise the
-alert saves but never notifies.
+Choose direct or org-policy routing after dry-run and final severity. A missing
+channel does not by itself authorize policy routing.
 
-1. Call `signoz_list_notification_channels` and follow
-   `pagination.nextOffset` while `pagination.hasMore` is true.
-2. If the user named a channel ("send to slack-infra"), use it if it exists;
-   if not, fall through.
-3. Otherwise present the user with two options:
-   - **Pick from existing** — list channels with their type (Slack, PagerDuty,
-     email, webhook) so the user can choose.
-   - **Create new inline** — call `signoz_create_notification_channel` with
-     channel parameters the user provides (name, type, type-specific config
-     like Slack webhook URL or PagerDuty integration key).
-4. If neither path resolves a channel, stop and ask the user for a
-   notification channel (see *Required inputs* above).
+**Org-policy routing (`threshold_rule` / `promql_rule` only):**
+
+- Use it only when the user or trusted task context explicitly confirms that an existing org notification policy should match this rule.
+- Set `notificationSettings.usePolicy: true`. Direct references in `condition.thresholds.spec[].channels` and `preferredChannels` may be omitted; preserve the confirmed user labels and threshold tier that the policy matches.
+- This skill does not create org policies; they are managed in the SigNoz UI or Terraform. Never imply the alert write created one; if its existence or match is unconfirmed, stop and ask.
+- If the payload includes any channel name, verify every supplied name with fully paginated `signoz_list_notification_channels`; the backend still validates supplied names even though policy routing ignores them for delivery.
+
+**Direct routing:**
+
+1. Call `signoz_list_notification_channels` and follow `pagination.nextOffset` while `pagination.hasMore` is true.
+2. If the user named a channel ("send to slack-infra"), use it if it exists; otherwise offer the available choices.
+3. If no existing channel fits, offer to call `signoz_create_notification_channel` with the user-provided name, type, and provider-specific config.
+4. If neither path resolves a channel, stop and ask the user for one (see *Required inputs* above).
 
 Channel creation is admin-gated. On `PERMISSION_DENIED`, have an admin create it
 out of band or configure a dedicated, short-lived minimum-role credential via
@@ -438,7 +439,7 @@ does).
 
 > **Summary**: This alert fires when [condition] for [resource scope],
 > evaluated every [frequency] over the last [window]. Thresholds:
-> warning at X, critical at Y. Notifications go to [channels]. Dry-run on
+> warning at X, critical at Y. Notifications route through [direct channels / confirmed org policy]. Dry-run on
 > the last hour: would have fired N times.
 
 ### Step 9: Save and report
@@ -452,13 +453,13 @@ does).
 3. On success, report:
    - The alert ID and name.
    - What it watches and at what threshold.
-   - Which channels are wired up.
+   - How notifications route (direct channels or the confirmed org policy).
    - The dry-run summary ("would have fired N times in last 1h").
 
 ## Guardrails
 
-- **Strict inputs over guessing** Resource attribute and channel are required;
-  if missing, stop and ask rather than guessing a service.
+- **Strict inputs over guessing** Resource attribute and notification routing are
+  required. Direct routing needs a channel; policy routing needs confirmation of an existing matching policy.
 - **Always paginate `signoz_list_alert_rules`** Stopping at page 1 misses
   duplicates and produces noise.
 - **Dry-run is mandatory** Complete Steps 4 and 6 before
@@ -471,10 +472,9 @@ does).
   `LOGS_BASED_ALERT`. Mismatches fail validation.
 - **Anomaly rules are metrics-only** `anomaly_rule` + non-metric alertType
   is rejected.
-- **Channels must exist and use the rule's routing field.** Use exact names
-  from `signoz_list_notification_channels`; put them in per-threshold
-  `channels` for threshold/PromQL rules, or top-level `preferredChannels` for
-  anomaly and absent-only threshold/PromQL rules without thresholds.
+- **Routing must match the selected mode.** Direct routes use exact names from `signoz_list_notification_channels`
+  in per-threshold `channels`, or `preferredChannels` for anomaly and absent-only rules. Confirmed policy routes set
+  `notificationSettings.usePolicy: true` and may omit direct channels; verify every name supplied in either mode.
 - **Never echo channel secrets.** Slack webhook URLs, PagerDuty integration
   keys, and similar webhook tokens are secrets. Pass them to
   `signoz_create_notification_channel` once and never repeat the

@@ -81,6 +81,19 @@
         "The signoz_create_alert payload puts #staging-alerts in top-level preferredChannels"
       ],
       "files": []
+    },
+    {
+      "id": 6,
+      "eval_name": "confirmed-org-policy-routing-without-direct-channels",
+      "prompt": "Create a critical alert when checkoutservice error rate exceeds 5%. Route it through our existing org notification policy — it is already configured to match critical alerts for team=checkout. Do not attach direct channels.",
+      "expected_output": "After the normal duplicate check, data probe, and full-query dry-run, creates a TRACES_BASED_ALERT whose notificationSettings.usePolicy is true and whose confirmed labels allow the existing org policy to match. It omits threshold channels and preferredChannels, does not block on choosing a direct notification channel, and says that the policy was already confirmed rather than claiming this skill created it.",
+      "expectations": [
+        "The signoz_create_alert payload sets notificationSettings.usePolicy=true",
+        "The policy-routed create payload omits condition.thresholds.spec[].channels and top-level preferredChannels without asking the user to choose a direct channel",
+        "The alert carries labels.team=checkout and labels.severity=critical and names the threshold critical so the confirmed policy match inputs are preserved; it does not invent different matcher labels",
+        "The response does not call signoz_create_notification_channel or claim that the alert write created the org notification policy"
+      ],
+      "files": []
     }
   ]
 }
