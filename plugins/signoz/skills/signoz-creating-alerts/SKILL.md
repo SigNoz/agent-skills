@@ -263,11 +263,9 @@ dotted attribute name with underscores: `service.name` → `service_name`).
 
 #### Common query shapes — conventions
 
-Read `signoz://alert/examples` for the authoritative JSON of all
-patterns (error rate, p99 latency, log volume, combined threshold + absence,
-anomaly,
-PromQL, ClickHouse SQL). The conventions that don't live in the
-schema:
+Read `signoz://alert/examples` for the authoritative JSON patterns: error rate,
+p99 latency, log volume, combined threshold + absence, anomaly, PromQL, and
+ClickHouse SQL. The conventions that don't live in the schema:
 
 - **Error-rate formula:** set `disabled: true` on the component
   queries A and B so only the formula F1 renders in the alert chart
