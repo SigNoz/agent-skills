@@ -377,11 +377,11 @@ channel does not by itself authorize policy routing.
 - Use it only when the user or trusted task context explicitly confirms that an existing org notification policy should match this rule.
 - Set `notificationSettings.usePolicy: true`. Omit direct references in `condition.thresholds.spec[].channels`, and always omit top-level `preferredChannels`; preserve the confirmed user labels and threshold tier that the policy matches.
 - This skill does not create org policies; they are managed in the SigNoz UI or Terraform. Never imply the alert write created one; if its existence or match is unconfirmed, stop and ask.
-- If the payload includes any channel name, verify every supplied name with fully paginated `signoz_list_notification_channels`; the backend still validates supplied names even though policy routing ignores them for delivery.
+- If the payload includes any channel name, reuse a fully paginated result only from the same still-current prepared operation; otherwise call `signoz_list_notification_channels`, refreshing only if state may have changed. The backend validates supplied names even though policy routing ignores them for delivery.
 
 **Direct routing:**
 
-1. Call `signoz_list_notification_channels` and follow `pagination.nextOffset` while `pagination.hasMore` is true.
+1. Reuse a fully paginated `signoz_list_notification_channels` result only from the same still-current prepared operation; otherwise call it and follow `pagination.nextOffset` while `pagination.hasMore` is true. Refresh only if state may have changed.
 2. If the user named a channel ("send to slack-infra"), use it if it exists; otherwise offer the available choices.
 3. If no existing channel fits, offer to call `signoz_create_notification_channel` with the user-provided name, type, and provider-specific config.
 4. If neither path resolves a channel, stop and ask the user for one (see *Required inputs* above).
