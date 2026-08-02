@@ -13,8 +13,10 @@ log-volume groupBy, and anomaly detection.
    on the higher level because "page me" was used.
 2. `signoz_list_metrics searchText=cpu` → confirms `system.cpu.utilization`.
 3. `signoz_list_alert_rules` (paginated) → no existing CPU alert for checkout.
-4. `signoz_list_notification_channels` → presents existing channels;
-   user picks `slack-infra` for warning and `pagerduty-oncall` for critical.
+4. Reuses a fully paginated same-operation `signoz_list_notification_channels`
+   result, or calls it through `pagination.hasMore=false`; the user picks
+   `slack-infra` and `pagerduty-oncall`. If none fits, it offers
+   `signoz_create_notification_channel` with user-provided provider config.
 5. Builds JSON: `METRIC_BASED_ALERT`, `threshold_rule`,
    `signal=metrics`, two thresholds (`op="above"`,
    `matchType="on_average"`, `targetUnit="percent"`), filter
@@ -40,7 +42,10 @@ log-volume groupBy, and anomaly detection.
    service, formula F1 = `A * 100 / B`, `selectedQueryName: "F1"`,
    threshold target 5, `targetUnit: "percent"`,
    `op: "above"`, `matchType: "at_least_once"` (catch any breach).
-5. Channel: user picks `slack-payments`.
+5. No channel was named, so it reuses a fully paginated same-operation
+   `signoz_list_notification_channels` result, or calls it through
+   `pagination.hasMore=false`; the user picks `slack-payments`. If none fits,
+   it offers `signoz_create_notification_channel` with user-provided config.
 6. Dry-run on last 1h: payments error rate hovered around 0.3%, would have
    fired 0 times. Clean — not too tight.
 7. Preview, save, report.
@@ -61,7 +66,10 @@ log-volume groupBy, and anomaly detection.
    `groupBy: [{name: "service.name", fieldContext: "resource", fieldDataType: "string"}]`,
    threshold 1000, `targetUnit: ""`, `evalWindow: 1m0s`,
    `matchType: "at_least_once"` (catch any minute that breaches).
-4. Channels: user picks slack channel.
+4. No channel was named, so it reuses a fully paginated same-operation
+   `signoz_list_notification_channels` result, or calls it through
+   `pagination.hasMore=false`; the user picks a Slack channel. If none fits,
+   it offers `signoz_create_notification_channel` with user-provided config.
 5. Dry-run: returned per-service counts, max in last 1h was 87 — would
    have fired 0 times. Within reasonable headroom.
 6. Preview, save, report.
@@ -79,7 +87,10 @@ log-volume groupBy, and anomaly detection.
 3. Builds: `anomaly_rule`, `algorithm=standard` (z-score based), `seasonality=daily`,
    threshold target 3 (3 standard deviations), `op: "above"`,
    `matchType: "at_least_once"`.
-4. Channel: user picks slack-api.
+4. No channel was named, so it reuses a fully paginated same-operation
+   `signoz_list_notification_channels` result, or calls it through
+   `pagination.hasMore=false`; the user picks `slack-api`. If none fits, it
+   offers `signoz_create_notification_channel` with user-provided config.
 5. Dry-run validates query returns data. Skip breach-count for
    anomaly alerts.
 6. Preview emphasizes that the threshold is in standard deviations, not raw

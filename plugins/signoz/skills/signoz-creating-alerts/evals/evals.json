@@ -9,6 +9,7 @@
       "expectations": [
         "The data probe calls signoz_query_metrics with a concrete metricName and the cartservice filter; it never sends count() or count_distinct(service.name) as a metrics aggregation expression",
         "Every signoz_execute_builder_query dry-run carries start and end as JSON integer Unix-millisecond values in the outer query",
+        "Before direct-routing creation, the agent reuses a fully paginated signoz_list_notification_channels result only from the same still-current prepared operation or calls it until pagination.hasMore=false; if a requested name is unavailable, it presents exact returned choices and asks the user instead of guessing",
         "The signoz_create_alert payload puts Slack in the warning threshold channels and PagerDuty in the critical threshold channels",
         "The threshold-rule create payload does not rely on top-level preferredChannels for its per-severity routing",
         "Every metric builder_query in the dry-run and create payload has limit=100 plus Query Builder v5 order by __result desc"
