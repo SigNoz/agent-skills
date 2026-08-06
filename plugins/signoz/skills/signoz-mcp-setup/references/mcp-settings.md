@@ -27,8 +27,10 @@ Silently determine `signoz-server-state`, **only after the client is known**
 2. If the call succeeds, including with an empty service list, state is
    **working**.
 3. If the call fails, returns no tools, or cannot be attempted:
+   - **Portable Agent Plugins v1 install** — read the standard `mcp.json` in
+     the installed plugin root.
    - **Claude Code, Codex, or Cursor bundled plugin install** — read the
-     plugin registration files below.
+     client-specific plugin registration file below.
    - **Any other client** — do not read or file-search for the bundled
      registration files below. They belong to a different client's plugin
      distribution and can exist on disk for unrelated reasons — most
@@ -47,10 +49,12 @@ only the plain outcome: working, not set up, or configured but not connected.
 
 ## Registration Files
 
-These bundled registration files exist only for the Claude Code, Codex, and
-Cursor plugin installs — never read or edit them for any other client, even if
-a file search finds them:
+These registration files exist only for the portable Agent Plugins package and
+the Claude Code, Codex, and Cursor compatibility packages — never read or edit
+them for any other client, even if a file search finds them:
 
+- plugin-root `mcp.json` for Agent Plugins v1 (not native `.vscode/mcp.json` or
+  `.cursor/mcp.json` files)
 - `.signoz_claude_mcp.json` for Claude Code
 - `.mcp.json` for Codex
 - `.signoz_cursor_mcp.json` for Cursor
@@ -58,26 +62,29 @@ a file search finds them:
 This reference file lives at `skills/signoz-mcp-setup/references/mcp-settings.md`,
 so the plugin root is two directories up from `skills/signoz-mcp-setup/`. That
 relative path also happens to resolve inside the `agent-skills` source repo
-itself (this plugin's own monorepo), which ships all three files side by side
-for their respective bundled installs — resolving to a real file there does
-not mean it is the active client's configuration.
+itself (this plugin's own monorepo), which ships all four files side by side for
+their respective packages — resolving to a real file there does not mean it is
+the active client's configuration.
 
-Update every registration file that exists **for the identified client only**.
-Replace only the `url` value and preserve each file's existing server key and
-`type`: the Claude Code file (`.signoz_claude_mcp.json`) ships the server key
-`mcp`, while the Codex and Cursor files ship `signoz`. Do not create duplicate
-MCP server entries, and do not rename the existing server — renaming the
-Claude Code key changes the tool namespace (`plugin:signoz:mcp`) and forces
-re-authentication.
+Update the registration file **for the identified client only**. Use the
+canonical portable shape and transport restrictions in `client-configs.md` for
+the Agent Plugins v1 file. For the compatibility files, replace only the `url`
+value and preserve each file's existing server key and `type`: the Claude Code file
+(`.signoz_claude_mcp.json`) ships the server key `mcp`, while the Codex and Cursor
+files ship `signoz`. Do not create duplicate MCP server entries, and do not
+rename the existing server — renaming the Claude Code key changes the tool
+namespace (`plugin:signoz:mcp`) and forces re-authentication.
 
 ## Editing Rules
 
 Use the client-specific shape for the registration file you are editing.
 
-### Bundled plugin MCP files
+### Portable and client-specific plugin MCP files
 
-The URL should use a concrete endpoint in all bundled registration files:
+The URL should use a concrete endpoint in the registration file for the active
+plugin package:
 
+- plugin-root `mcp.json` for Agent Plugins v1
 - `.signoz_claude_mcp.json` for Claude Code
 - `.mcp.json` for Codex
 - `.signoz_cursor_mcp.json` for Cursor
@@ -86,10 +93,11 @@ The URL should use a concrete endpoint in all bundled registration files:
 "url": "https://mcp.us.signoz.cloud/mcp"
 ```
 
-Replace the entire `url` value with the resolved MCP endpoint. Do not keep
-`${SIGNOZ_MCP_URL:-...}` in bundled plugin MCP files; Codex treats it as a
-literal URL, and Cursor documents interpolation syntax that does not include
-shell-style defaults.
+Replace the entire `url` value with the resolved MCP endpoint. For the portable
+file, follow `client-configs.md`; it is the canonical source for its complete
+shape and HTTPS restriction. Do not keep `${SIGNOZ_MCP_URL:-...}` in bundled
+plugin MCP files; Codex treats it as a literal URL, and Cursor documents
+interpolation syntax that does not include shell-style defaults.
 
 If either bundled file contains any legacy `SIGNOZ_MCP_URL` wrapper, replace
 the full value with the concrete resolved URL.
@@ -108,10 +116,10 @@ clear the explicit plugin setting and reload the client.
 
 ### Update behavior and durable Codex config
 
-These bundled files live inside the installed plugin. Plugin updates can reset
-them to the placeholder. If the `signoz` server returns to **not-setup** after
-an update, rerun `signoz-mcp-setup`. For durable native client configuration,
-use the client-specific recipes in `client-configs.md`.
+These files live inside the installed plugin. Plugin updates can reset them to
+the placeholder. If the `signoz` server returns to **not-setup** after an
+update, rerun `signoz-mcp-setup`. For durable native client configuration, use
+the client-specific recipes in `client-configs.md`.
 
 For Codex users who report repeated resets or ask for a persistent setup, add
 or update the native Codex MCP entry as well as the bundled `.mcp.json`. Use
@@ -146,6 +154,11 @@ Mapping rules:
   configuration path configures URL-based HTTP MCP. For stdio/local-binary
   mode, tell the user to register the SigNoz MCP server separately as
   `signoz`.
+- **Portable Agent Plugins restriction** — a non-loopback endpoint must use
+  `https://`. Plain `http://` is portable only when the host is exactly
+  `localhost` or an IP literal in a loopback range. For any other HTTP host,
+  leave the plugin-root `mcp.json` unchanged and use the identified client's
+  native MCP recipe from `client-configs.md`.
 - **SigNoz workspace URL** — do not infer the region from
   `https://<workspace>.signoz.cloud`. Ask the user for the region from
   **Settings -> Ingestion**.

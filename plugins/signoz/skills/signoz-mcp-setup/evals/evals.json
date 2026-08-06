@@ -88,6 +88,69 @@
         }
       ],
       "files": []
+    },
+    {
+      "id": 4,
+      "eval_name": "portable-non-loopback-http-routes-native",
+      "prompt": "I installed the portable Agent Plugins v1 package in VS Code. Configure SigNoz at http://signoz.internal:8000/mcp.",
+      "expected_output": "Agent does not write the non-loopback HTTP URL into the plugin-root mcp.json because Agent Plugins v1 requires HTTPS for non-loopback endpoints. It routes the endpoint to VS Code's native .vscode/mcp.json or user MCP configuration instead, preserving unrelated native servers.",
+      "assertions": [
+        {
+          "text": "Agent does not write http://signoz.internal:8000/mcp into the portable plugin-root mcp.json",
+          "description": "Non-loopback HTTP is invalid in the Agent Plugins v1 remote transport"
+        },
+        {
+          "text": "Agent explains that portable non-loopback endpoints must use HTTPS",
+          "description": "The user receives the contract reason rather than a silent failure"
+        },
+        {
+          "text": "Agent configures the endpoint through VS Code native MCP configuration",
+          "description": "The unsupported portable value is routed to the identified client's native surface"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": 5,
+      "eval_name": "vscode-native-mcp-json-is-not-portable-file",
+      "prompt": "My VS Code workspace already has .vscode/mcp.json. Change its SigNoz server to https://mcp.eu.signoz.cloud/mcp without touching plugin files.",
+      "expected_output": "Agent treats .vscode/mcp.json as the active native VS Code configuration rather than confusing it with the portable plugin-root mcp.json. It updates only the existing signoz server URL, preserves unrelated servers and settings, and gives the VS Code authentication finish step.",
+      "assertions": [
+        {
+          "text": "Agent reads and updates .vscode/mcp.json instead of skipping it because its basename is mcp.json",
+          "description": "The plugin-root exclusion must not hide native VS Code configuration"
+        },
+        {
+          "text": "Agent changes only the existing signoz server URL and preserves unrelated native configuration",
+          "description": "The repair avoids duplicate or destructive native entries"
+        },
+        {
+          "text": "Agent provides the VS Code approval or authentication finish step",
+          "description": "The native registration is completed through the identified client"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": 6,
+      "eval_name": "portable-https-happy-path-preserves-contract",
+      "prompt": "I installed the portable Agent Plugins v1 package. Configure its SigNoz MCP server for the eu2 region.",
+      "expected_output": "Agent resolves eu2 to https://mcp.eu2.signoz.cloud/mcp and updates only the url in the installed plugin-root mcp.json. It preserves the Agent Plugins v1 schema URL, the signoz server key, and type=streamable-http, then gives the client-specific OAuth or reload finish step.",
+      "assertions": [
+        {
+          "text": "Agent updates the installed portable plugin-root mcp.json URL to https://mcp.eu2.signoz.cloud/mcp",
+          "description": "The portable hosted-region happy path edits the correct registration file"
+        },
+        {
+          "text": "Agent preserves $schema, the signoz server key, and type streamable-http",
+          "description": "The edit retains every required part of the Agent Plugins v1 MCP contract"
+        },
+        {
+          "text": "Agent changes only the URL and provides the identified client's authentication or reload finish step",
+          "description": "The update is minimal and completes the client workflow"
+        }
+      ],
+      "files": []
     }
   ]
 }
