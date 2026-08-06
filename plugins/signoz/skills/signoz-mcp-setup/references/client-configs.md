@@ -14,9 +14,11 @@ SigNoz MCP Server docs and adds OpenCode's native config shape.
 
 ## Safety Rules
 
-- Keep each file's existing server key. The bundled Claude Code file
-  (`.signoz_claude_mcp.json`) ships `mcp`; the Codex and Cursor bundled files and
-  native client configs use `signoz`. Do not rename it.
+- Keep each file's existing server key. The plugin-root `mcp.json`, bundled
+  Codex and Cursor files, and native client configs use `signoz`; the bundled
+  Claude Code file (`.signoz_claude_mcp.json`) uses `mcp`. Do not rename either
+  key. In the portable file, also preserve the canonical `$schema` and
+  `type: "streamable-http"`.
 - Prefer SigNoz Cloud OAuth over header-based auth whenever the client supports
   interactive OAuth.
 - Do not write service account API keys, bearer tokens, or header-based auth
@@ -49,6 +51,28 @@ SigNoz MCP Server docs and adds OpenCode's native config shape.
 Use these shapes for SigNoz Cloud hosted MCP URLs such as
 `https://mcp.us.signoz.cloud/mcp` and self-hosted HTTP MCP URLs such as
 `http://localhost:8000/mcp`.
+
+### Portable Agent Plugins v1 package
+
+In `mcp.json` in the installed SigNoz plugin root, replace only the `url` value
+with the resolved MCP endpoint. Preserve the canonical `$schema`, the `signoz`
+server key, and `type: "streamable-http"`. Agent Plugins v1 does not expand
+environment variables in remote URLs and leaves OAuth to the client.
+
+Apply the portable endpoint eligibility and native-client routing rules from
+`mcp-settings.md` before editing this file.
+
+```json
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "signoz": {
+      "type": "streamable-http",
+      "url": "https://mcp.us.signoz.cloud/mcp"
+    }
+  }
+}
+```
 
 ### Bundled Claude Code plugin
 
