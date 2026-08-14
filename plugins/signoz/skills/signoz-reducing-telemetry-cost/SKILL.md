@@ -59,25 +59,11 @@ For a rolling 7-day window (`end` = now, `start` = end − 7 days), get the per-
   currently configured retention for each of the three signals before ranking which one costs
   more. This is a factual input needed to weight cost accurately, not a suggestion to change
   retention (that guardrail still applies below). If the user doesn't know, ask them to check
-  their SigNoz plan/retention settings.
-
-  | Traces / logs retention | $/GB |
-  |---|---|
-  | 15 days | 0.3 |
-  | 30 days | 0.4 |
-  | 90 days | 0.6 |
-  | 180 days | 0.8 |
-  | 1 year | 1.4 |
-
-  | Metrics retention | $/M samples |
-  |---|---|
-  | 1 month | 0.1 |
-  | 3 months | 0.12 |
-  | 6 months | 0.15 |
-  | 13 months | 0.18 |
+  their SigNoz plan/retention settings. Rates by tier are in
+  `references/retention-pricing.md`.
 
 - **Primary cost driver.** The signal with the highest *dollar* weight, using each signal's own
-  retention-matched rate from the tables above (orientation only; never quote the resulting
+  retention-matched rate from `references/retention-pricing.md` (orientation only; never quote the resulting
   dollar figure to the user — it's for ranking signals against each other, not a cost estimate).
   This picks by cost, not by raw volume.
 - **Bytes per record.** span.size ÷ span.count and log.size ÷ log.count — tells you whether a
@@ -356,12 +342,18 @@ a signal the workflow already analyzed.
   metrics, `signoz_check_metric_usage` returns both `dashboards` and `alerts` in a single call.
   No equivalent tool exists for logs or traces, so perform this check manually before marking any
   log-severity or trace-operation reduction "Safe to implement": call `signoz_list_dashboards`
-  and `signoz_list_views` (scoped to the affected signal), filter to the ones whose name, tags, or
-  description are plausibly related to the affected service or operation, then
-  `signoz_get_dashboard` / `signoz_get_view` on those candidates and read their queries —
-  including raw PromQL or ClickHouse SQL panels, not just structured builder queries — for any
-  reference to the data being reduced. If one depends on it, mark the finding **Will break
-  dashboards** (or name the saved view) instead of a clean drop.
+  and `signoz_list_views` (scoped to the affected signal), **paginating through every page**
+  (follow `pagination.nextOffset` until `pagination.hasMore` is false — the same rule as the
+  alert-rule check above). Name and tags are not a reliable filter: a dashboard called
+  "Operations Overview" can hold a panel querying the exact service/operation with no mention of
+  either in its metadata. Do not use name/tags/description to narrow which dashboards or views get
+  checked — call `signoz_get_dashboard` / `signoz_get_view` on **every** one returned (across all
+  pages) and read its persisted queries — including raw PromQL or ClickHouse SQL panels, not just
+  structured builder queries — for any reference to the data being reduced. If one depends on it,
+  mark the finding **Will break dashboards** (or name the saved view) instead of a clean drop. If
+  the dashboard/view count is too large to fully inspect in the investigation, do not mark the
+  reduction "Safe to implement" — mark it **Needs one check first** (dashboard/view dependency
+  unconfirmed) rather than reporting a false "Safe."
 - **Volume comes from discovered Cost Meter metrics and their live units:** bytes for span/log
   volume or samples for metric volume. Never cite span/log record counts as volume.
 - **Cost totals and grouped total attribution use `signoz_execute_builder_query`** with raw
@@ -408,5 +400,7 @@ a signal the workflow already analyzed.
 - `references/infra-do-not-drop.md` — the metrics behind the built-in Infrastructure and
   APM/Services pages that must never be recommended for dropping.
 - `references/otel-attribute-cardinality.md` — reference for classifying metric labels
+- `references/retention-pricing.md` — $/GB and $/M-samples rates by retention tier, used to
+  weight cost by signal in Step 1.
   (UNBOUNDED / ACCUMULATING / BOUNDED / IDENTIFIER).
 - `signoz-generating-queries` skill — for the ad-hoc follow-up queries this investigation points to.
