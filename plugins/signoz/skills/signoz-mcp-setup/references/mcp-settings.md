@@ -29,6 +29,10 @@ Silently determine `signoz-server-state`, **only after the client is known**
 3. If the call fails, returns no tools, or cannot be attempted:
    - **Claude Code, Codex, or Cursor bundled plugin install** — read the
      plugin registration files below.
+   - **Grok Build** — read `[mcp_servers.signoz]` from `./.grok/config.toml`,
+     `<repo-root>/.grok/config.toml`, then `~/.grok/config.toml`, or run
+     `grok mcp list`. Grok ships a bundled registration too, but its endpoint
+     comes from config, so the bundled file says nothing about the live state.
    - **Any other client** — do not read or file-search for the bundled
      registration files below. They belong to a different client's plugin
      distribution and can exist on disk for unrelated reasons — most
@@ -54,6 +58,12 @@ a file search finds them:
 - `.signoz_claude_mcp.json` for Claude Code
 - `.mcp.json` for Codex
 - `.signoz_cursor_mcp.json` for Cursor
+
+The plugin also ships `.signoz_grok_mcp.json` for Grok Build, but Grok is **not**
+a bundled-file-editing client: it resolves the endpoint from
+`[mcp_servers.signoz]` in its own config, which replaces the plugin-provided
+server of the same name. Never edit `.signoz_grok_mcp.json` — use the Grok Build
+CLI recipe in `client-configs.md` instead.
 
 This reference file lives at `skills/signoz-mcp-setup/references/mcp-settings.md`,
 so the plugin root is two directories up from `skills/signoz-mcp-setup/`. That
@@ -87,9 +97,15 @@ The URL should use a concrete endpoint in all bundled registration files:
 ```
 
 Replace the entire `url` value with the resolved MCP endpoint. Do not keep
-`${SIGNOZ_MCP_URL:-...}` in bundled plugin MCP files; Codex treats it as a
-literal URL, and Cursor documents interpolation syntax that does not include
-shell-style defaults.
+`${SIGNOZ_MCP_URL:-...}` in these three bundled plugin MCP files; Codex treats
+it as a literal URL, and Cursor documents interpolation syntax that does not
+include shell-style defaults.
+
+Grok Build is the one exception, which is why its registration is a separate
+file: Grok expands `${VAR}` and `${VAR:-default}` in MCP `url`, `command`,
+`args`, `env`, and `headers` at load time, so `.signoz_grok_mcp.json`
+deliberately keeps `${SIGNOZ_MCP_URL:-https://mcp.us.signoz.cloud/mcp}`. Leave
+it intact and configure Grok through `[mcp_servers.signoz]`.
 
 If either bundled file contains any legacy `SIGNOZ_MCP_URL` wrapper, replace
 the full value with the concrete resolved URL.

@@ -32,7 +32,7 @@ npx skills add https://github.com/anthropics/skills --skill skill-creator
 - **Schema reference.** The MCP server is the source of truth for tool input schemas, alert/dashboard JSON shape, and validation rules. Read the `signoz://*` resources rather than transcribing schema into a skill — duplicated schema rots out of sync.
 - **Reference files.** Move material >300 lines into `references/`, `scripts/`, or `assets/`. Any reference file longer than 100 lines must start with a `## Contents` table-of-contents.
 - **SKILL.md length.** Keep the body under 500 lines. Use progressive disclosure — link to specific reference files with a clear "read this when X" pointer rather than burying detail inline.
-- **Plugin manifests.** Keep `plugins/signoz/.codex-plugin/plugin.json` and `plugins/signoz/.cursor-plugin/plugin.json` in sync with the Claude manifest when adding or removing skills. The **Antigravity** plugin is native to the **repo root**: `plugin.json` (marker) + `mcp_config.json` (MCP registration, remote key `serverUrl`) + the root `skills` symlink. This lets `agy plugin install https://github.com/SigNoz/agent-skills` stage the repo root as a native Antigravity plugin. Antigravity's `plugin.json` schema is strict (`name` + `description` only, `additionalProperties: false`), so it intentionally carries **no `version`** and is not part of the CalVer bump. Do not point the root `mcp_config.json` at `${...}` interpolation — Antigravity does not resolve it (unlike `gemini-extension.json`, which keeps its `${SIGNOZ_MCP_URL}` prompt for Gemini CLI).
+- **Plugin manifests.** Keep `plugins/signoz/.codex-plugin/plugin.json`, `plugins/signoz/.cursor-plugin/plugin.json`, and `plugins/signoz/.grok-plugin/plugin.json` in sync with the Claude manifest when adding or removing skills. **Grok Build** reads `.grok-plugin/plugin.json` in preference to `.claude-plugin/plugin.json`, which is exactly why it exists: Claude's manifest points at `.signoz_claude_mcp.json`, whose `${user_config.SIGNOZ_MCP_URL}` placeholder is Claude-only syntax that Grok cannot expand (it fails the handshake with `RelativeUrlWithoutBase`). The Grok manifest points at `.signoz_grok_mcp.json` instead, which uses `${SIGNOZ_MCP_URL:-https://mcp.us.signoz.cloud/mcp}` — Grok expands `${VAR}` and `${VAR:-default}` in MCP `url`, `command`, `args`, `env`, and `headers` at load time. Keep the Grok server key as `signoz`: Grok's `[mcp_servers]` config **replaces** a plugin-provided server of the same name, so the shared key is what makes `grok mcp add signoz` an override instead of a duplicate. Do not give it a unique key like `signoz-grok` — that would leave two live servers and duplicate every tool. The shared key matters for de-duplication too: Grok scans `~/.claude.json`, `~/.cursor/mcp.json`, and `.mcp.json` as compatibility sources, so a user with SigNoz already configured in Claude Code or Cursor gets a second `signoz` from there, and only a same-named `[mcp_servers.signoz]` entry outranks both it and the plugin. The **Antigravity** plugin is native to the **repo root**: `plugin.json` (marker) + `mcp_config.json` (MCP registration, remote key `serverUrl`) + the root `skills` symlink. This lets `agy plugin install https://github.com/SigNoz/agent-skills` stage the repo root as a native Antigravity plugin. Antigravity's `plugin.json` schema is strict (`name` + `description` only, `additionalProperties: false`), so it intentionally carries **no `version`** and is not part of the CalVer bump. Do not point the root `mcp_config.json` at `${...}` interpolation — Antigravity does not resolve it (unlike `gemini-extension.json`, which keeps its `${SIGNOZ_MCP_URL}` prompt for Gemini CLI).
 
 ### Further reading
 
@@ -47,13 +47,14 @@ These guides and internal specs shape the conventions above. When in doubt, foll
 
 ## Plugin Versioning (CalVer)
 
-This repository uses **CalVer** (`YYYY.MM.DD`, with an optional `.N` micro suffix for same-day releases) for plugin versions. The version field lives in three manifests per plugin:
+This repository uses **CalVer** (`YYYY.MM.DD`, with an optional `.N` micro suffix for same-day releases) for plugin versions. The version field lives in four manifests per plugin:
 
 - `plugins/signoz/.claude-plugin/plugin.json`
 - `plugins/signoz/.codex-plugin/plugin.json`
 - `plugins/signoz/.cursor-plugin/plugin.json`
+- `plugins/signoz/.grok-plugin/plugin.json`
 
-Users of Claude Code, Codex, and Cursor receive updates based on these versions. If the version is not bumped, downstream users will not pick up the changes.
+Users of Claude Code, Codex, Cursor, and Grok Build receive updates based on these versions. If the version is not bumped, downstream users will not pick up the changes.
 
 ### Auto-bump workflow
 
@@ -69,7 +70,7 @@ Repository maintainers must enable **Settings → Actions → General → Allow 
 - [ ] `name` in SKILL.md frontmatter matches the directory name
 - [ ] `README.md` updated if a new skill was added
 - [ ] **Plugin versions left unchanged** for the follow-up auto-bump PR
-- [ ] Changes tested locally with the relevant tool (Claude Code, Codex, or Cursor)
+- [ ] Changes tested locally with the relevant tool (Claude Code, Codex, Cursor, or Grok Build)
 
 ## License
 

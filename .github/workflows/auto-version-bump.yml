@@ -39,6 +39,7 @@ jobs:
             ':(glob)plugins/*/.claude-plugin/plugin.json' \
             ':(glob)plugins/*/.codex-plugin/plugin.json' \
             ':(glob)plugins/*/.cursor-plugin/plugin.json' \
+            ':(glob)plugins/*/.grok-plugin/plugin.json' \
             'gemini-extension.json' \
             '.devin-plugin/plugin.json')
           if [[ -z "$BASE_SHA" ]]; then
@@ -110,12 +111,13 @@ jobs:
               continue
             fi
 
-            # Every logical plugin must ship all three versioned manifests.
+            # Every logical plugin must ship all four versioned manifests.
             # Fail instead of silently leaving one client on a stale version.
             for MANIFEST in \
               "$PLUGIN_DIR/.claude-plugin/plugin.json" \
               "$PLUGIN_DIR/.codex-plugin/plugin.json" \
-              "$PLUGIN_DIR/.cursor-plugin/plugin.json"; do
+              "$PLUGIN_DIR/.cursor-plugin/plugin.json" \
+              "$PLUGIN_DIR/.grok-plugin/plugin.json"; do
               if [[ ! -f "$MANIFEST" ]]; then
                 echo "ERROR: Required plugin manifest is missing: $MANIFEST"
                 exit 1
@@ -204,7 +206,7 @@ jobs:
 
           # The branch is automation-owned and is regenerated from current main.
           git switch -C "$BUMP_BRANCH"
-          git add plugins/**/.claude-plugin/plugin.json plugins/**/.codex-plugin/plugin.json plugins/**/.cursor-plugin/plugin.json gemini-extension.json .devin-plugin/plugin.json
+          git add plugins/**/.claude-plugin/plugin.json plugins/**/.codex-plugin/plugin.json plugins/**/.cursor-plugin/plugin.json plugins/**/.grok-plugin/plugin.json gemini-extension.json .devin-plugin/plugin.json
           PR_TITLE="chore: auto-bump CalVer for $BUMP_COUNT plugin(s)"
           git commit -m "$PR_TITLE"
           git push --force-with-lease --set-upstream origin "$BUMP_BRANCH"

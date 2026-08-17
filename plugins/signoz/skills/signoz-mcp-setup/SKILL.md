@@ -2,8 +2,8 @@
 name: signoz-mcp-setup
 description: >
   Initialize or repair SigNoz MCP server configuration for Claude Code, Codex,
-  Cursor, VS Code/GitHub Copilot, Claude Desktop, Gemini CLI, Devin CLI,
-  Windsurf, Zed, Antigravity CLI, OpenCode, or another MCP client. Use this skill before any
+  Cursor, VS Code/GitHub Copilot, Claude Desktop, Gemini CLI, Devin CLI, Grok
+  Build, Windsurf, Zed, Antigravity CLI, OpenCode, or another MCP client. Use this skill before any
   SigNoz docs, query, dashboard, alert, or view workflow when
   `signoz_*` tools are unavailable, or when the user says "setup SigNoz
   MCP", "configure SigNoz plugin", "wrong region", "change SigNoz region",
@@ -44,6 +44,9 @@ on disk):
 
 - Claude Code, Codex, or Cursor plugin install: use the bundled plugin
   registration files.
+- Grok Build: use the Grok Build CLI recipe in `client-configs.md`. It ships a
+  bundled registration file, but its endpoint is configured through
+  `[mcp_servers.signoz]`, not by editing that file.
 - VS Code / GitHub Copilot, Claude Desktop, Gemini CLI, Devin CLI, Windsurf,
   Zed, Antigravity CLI, or OpenCode: use the matching native client recipe in
   `client-configs.md`.
@@ -63,6 +66,9 @@ tools (`signoz_search_docs` or `signoz_fetch_doc`) for this check.
 
 - For a Claude Code, Codex, or Cursor bundled plugin install, the reference
   flow's registration-file fallback applies.
+- For Grok Build, read `[mcp_servers.signoz]` from Grok's config scopes (or run
+  `grok mcp list`) instead. Its bundled `.signoz_grok_mcp.json` ships a working
+  default and is overridden by config, so it never reports the live state.
 - For every other client — including Devin CLI — do not read or search for
   `.signoz_claude_mcp.json`, `.mcp.json`, or `.signoz_cursor_mcp.json`. Those
   are bundled files for a different client's plugin distribution and are
@@ -174,6 +180,22 @@ This writes the user-level `[mcp_servers.signoz]` entry in Codex config and
 survives plugin cache updates. If editing TOML directly, preserve unrelated
 config and only set `url` for `mcp_servers.signoz`.
 
+For Grok Build, do not edit the bundled `.signoz_grok_mcp.json`. Write the
+resolved endpoint to Grok's own config, which replaces the plugin-provided
+`signoz` server and survives plugin updates:
+
+```sh
+grok mcp add signoz -t http <resolved-mcp-url> -s user
+```
+
+Use `-s project` instead when the user wants the endpoint committed with the
+repo in `./.grok/config.toml`. Re-running the command updates the existing
+entry rather than adding a second server. If `signoz` is already defined in
+more than one scope, update the highest-precedence one
+(`./.grok/config.toml` > `<repo-root>/.grok/config.toml` >
+`~/.grok/config.toml`) — editing a lower one would be silently shadowed. See
+the Grok Build CLI recipe in `client-configs.md`.
+
 For native client setup, use `client-configs.md`:
 
 - Edit an existing native client config only when the user named that client or
@@ -221,6 +243,11 @@ client-specific authentication step:
   connectors originate from Anthropic's cloud. Restart Claude Desktop after a
   local stdio change so it reloads `claude_desktop_config.json`; that file is
   only for command-based registration, not a hosted URL.
+- **Grok Build** — run `/mcps` (or press Ctrl+L and open the MCP Servers tab),
+  press `r` to reload after the config change, then select `signoz` and press
+  `i` to complete the OAuth flow in the browser. Self-hosted endpoints need no
+  OAuth unless the server runs with `OAUTH_ENABLED=true`. Diagnose with
+  `grok mcp doctor signoz`.
 - **Gemini CLI** — restart Gemini CLI if needed, then run `/mcp auth signoz`.
 - **Devin CLI** — start a new session so the updated `.devin/config.json` is
   picked up. For SigNoz Cloud, run `devin mcp login signoz` to complete OAuth.

@@ -1,0 +1,24 @@
+{
+  "name": "signoz",
+  "version": "2026.08.06",
+  "description": "Official SigNoz plugin for MCP setup, docs, queries, dashboards, and alerts",
+  "author": {
+    "name": "SigNoz",
+    "url": "https://signoz.io"
+  },
+  "homepage": "https://signoz.io",
+  "repository": "https://github.com/SigNoz/agent-skills",
+  "license": "MIT",
+  "keywords": [
+    "signoz",
+    "opentelemetry",
+    "observability",
+    "mcp",
+    "clickhouse",
+    "tracing",
+    "logging"
+  ],
+  "mcpServers": "./.signoz_grok_mcp.json",
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json"
+}

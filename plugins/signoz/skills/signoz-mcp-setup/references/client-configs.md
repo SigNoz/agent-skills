@@ -174,6 +174,61 @@ is copied into a versioned plugin cache, but `codex mcp add` writes the
 user-level Codex config. Verify the effective server with
 `codex mcp get signoz` or `codex mcp list`.
 
+### Grok Build CLI
+
+Grok ships the plugin's bundled `.signoz_grok_mcp.json`, which registers
+`signoz` against the `us` SigNoz Cloud endpoint by default and expands a
+`SIGNOZ_MCP_URL` environment override when one is set. **Do not edit that
+bundled file.** Write the endpoint to Grok's own config instead: a
+`[mcp_servers.signoz]` entry replaces the plugin-provided server of the same
+name, and unlike the bundled file it survives plugin updates.
+
+CLI (preferred):
+
+```sh
+grok mcp add signoz -t http https://mcp.us.signoz.cloud/mcp -s user
+```
+
+Use `-s user` for `~/.grok/config.toml` (per-machine, the sane default for a
+personal CLI) and `-s project` for `./.grok/config.toml` (team-shared,
+committed with the repo). Re-running the command updates the existing entry in
+place instead of adding a second server.
+
+TOML equivalent:
+
+```toml
+[mcp_servers.signoz]
+url = "https://mcp.us.signoz.cloud/mcp"
+enabled = true
+```
+
+Precedence for `[mcp_servers]`, highest first: `./.grok/config.toml` >
+`<repo-root>/.grok/config.toml` > `~/.grok/config.toml` > plugin-provided
+servers. Same-name entries replace lower-priority ones, so exactly one `signoz`
+server stays live. Check each scope for an existing `signoz` entry before
+writing a new one, and edit the highest-precedence file that already defines it.
+
+Writing the config entry is also what **de-duplicates** Grok's compatibility
+sources. Grok reads `~/.claude.json`, `~/.cursor/mcp.json`, and `.mcp.json`
+alongside its own config, and a compat-sourced server does not replace the
+plugin's — both load. A user who already has SigNoz configured in Claude Code or
+Cursor therefore ends up with two live `signoz` servers pointing at different
+endpoints (for example a self-hosted `http://localhost:8000/mcp` from
+`~/.claude.json` and the plugin's Cloud default), which `grok mcp doctor` reports
+as two separate servers. A `[mcp_servers.signoz]` entry outranks both and
+collapses them to one. If the user reports duplicate or unexpectedly-routed
+SigNoz tools in Grok, check `grok mcp doctor` for a second `signoz` and write the
+config entry.
+
+For a one-off or CI run, skip config entirely and export the environment
+override that the bundled registration reads:
+
+```sh
+export SIGNOZ_MCP_URL=https://mcp.eu.signoz.cloud/mcp
+```
+
+Verify with `grok mcp list` and diagnose with `grok mcp doctor signoz`.
+
 ### Gemini CLI
 
 CLI:
@@ -466,6 +521,13 @@ Edit `opencode.json` or `opencode.jsonc`.
 - Codex (self-hosted HTTP): no OAuth step unless the server runs with
   `OAUTH_ENABLED=true`; skip `codex mcp login` and verify the already-authenticated
   `signoz` server with `/mcp`.
+- Grok Build CLI (SigNoz Cloud): run `/mcps` (or press Ctrl+L and open the MCP
+  Servers tab), select `signoz`, and press `i` to start the OAuth flow. Press
+  `r` to reload the list after a config change. Tokens are cached in
+  `~/.grok/mcp_credentials.json`.
+- Grok Build CLI (self-hosted HTTP): no OAuth step unless the server runs with
+  `OAUTH_ENABLED=true`; press `r` in `/mcps` and verify the `signoz` server is
+  connected.
 - Gemini CLI: run `/mcp auth signoz`.
 - Devin CLI (SigNoz Cloud): start a new session, then run
   `devin mcp login signoz` to complete OAuth.
