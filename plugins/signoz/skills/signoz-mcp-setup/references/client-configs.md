@@ -464,6 +464,39 @@ SIGNOZ_API_KEY = "<your-api-key>"
 LOG_LEVEL = "info"
 ```
 
+### Grok Build CLI stdio
+
+CLI (stdio is the default transport, so `-t` is not needed; everything after
+`--` is the server command):
+
+```sh
+grok mcp add signoz \
+  -e SIGNOZ_URL="<your-signoz-url>" \
+  -e SIGNOZ_API_KEY="<your-api-key>" \
+  -e LOG_LEVEL=info \
+  -s user \
+  -- "<path-to-binary>/signoz-mcp-server"
+```
+
+TOML:
+
+```toml
+[mcp_servers.signoz]
+command = "<path-to-binary>/signoz-mcp-server"
+args = []
+env = { SIGNOZ_URL = "<your-signoz-url>", SIGNOZ_API_KEY = "<your-api-key>", LOG_LEVEL = "info" }
+```
+
+Grok expands `${VAR}` and `${VAR:-default}` in `command`, `args`, and `env`
+values as well as `url`, so prefer a reference over a literal key:
+
+```sh
+grok mcp add signoz -e SIGNOZ_API_KEY='${SIGNOZ_API_KEY}' -s user -- "<path-to-binary>/signoz-mcp-server"
+```
+
+Keep the server name `signoz` here too — the stdio entry replaces the bundled
+HTTP registration of the same name rather than running alongside it.
+
 ### Zed
 
 Edit Zed settings.
