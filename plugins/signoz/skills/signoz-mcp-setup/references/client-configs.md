@@ -30,13 +30,13 @@ SigNoz MCP Server docs and adds OpenCode's native config shape.
   the user requested. If they did not choose:
   1. **Check every scope the client supports for an existing `signoz` (or
      equivalently-purposed) entry first.** If one exists anywhere, edit that
-     same file in place — do not pick a different scope for the new value.
+     same file in place; do not pick a different scope for the new value.
      This matters most for CLI clients like Devin CLI, Codex, and Claude Code
      that support multiple config layers (user/global, project, project-local):
      re-deriving the scope from scratch on every repair can silently create a
      second, shadowing or shadowed entry in a different file, or make the
      skill go looking for a project file in whatever directory the current
-     session happens to be in — even an unrelated project that has nothing to
+     session happens to be in, even an unrelated project that has nothing to
      do with the endpoint being configured.
   2. Only when no existing entry is found in any scope, choose a scope: prefer
      user/global for secrets and for CLI tools in general (they are
@@ -211,7 +211,7 @@ writing a new one, and edit the highest-precedence file that already defines it.
 Writing the config entry is also what **de-duplicates** Grok's compatibility
 sources. Grok reads `~/.claude.json`, `~/.cursor/mcp.json`, and `.mcp.json`
 alongside its own config, and a compat-sourced server does not replace the
-plugin's — both load. A user who already has SigNoz configured in Claude Code or
+plugin's; both load. A user who already has SigNoz configured in Claude Code or
 Cursor therefore ends up with two live `signoz` servers pointing at different
 endpoints (for example a self-hosted `http://localhost:8000/mcp` from
 `~/.claude.json` and the plugin's Cloud default), which `grok mcp doctor` reports
@@ -254,17 +254,17 @@ Or edit `~/.gemini/settings.json`:
 Devin merges MCP servers by name across scopes, with later-checked scopes
 overriding earlier ones: user/global is overridden by project, which is
 overridden by project-local. Check these three files in **precedence
-order — highest first** — for an existing `signoz` entry, since that is the
+order (highest first)** for an existing `signoz` entry, since that is the
 one actually in effect:
 
-1. `.devin/config.local.json` in the current project root — gitignored,
+1. `.devin/config.local.json` in the current project root: gitignored,
    project-local. Highest precedence.
-2. `.devin/config.json` in the current project root — team-shared, committed.
-3. `~/.config/devin/config.json` (`%APPDATA%\devin\config.json` on Windows) —
+2. `.devin/config.json` in the current project root: team-shared, committed.
+3. `~/.config/devin/config.json` (`%APPDATA%\devin\config.json` on Windows):
    user/global, applies to every project. Lowest precedence.
 
 Edit the **first (highest-precedence) file that already has a `signoz`
-entry** — editing a lower-precedence file while a higher one still defines
+entry**: editing a lower-precedence file while a higher one still defines
 `signoz` would be silently shadowed and the active endpoint would not change.
 If more than one scope defines `signoz`, tell the user which scope is
 currently winning and ask whether to update that one or remove the
@@ -303,7 +303,7 @@ Edit `~/.codeium/windsurf/mcp_config.json`.
 
 ### Antigravity CLI
 
-Remote servers must use the `serverUrl` key — Antigravity does not support
+Remote servers must use the `serverUrl` key; Antigravity does not support
 the legacy `url` or `httpUrl` fields.
 
 If the SigNoz plugin is installed (`agy plugin install https://github.com/SigNoz/agent-skills`),
@@ -494,7 +494,7 @@ values as well as `url`, so prefer a reference over a literal key:
 grok mcp add signoz -e SIGNOZ_API_KEY='${SIGNOZ_API_KEY}' -s user -- "<path-to-binary>/signoz-mcp-server"
 ```
 
-Keep the server name `signoz` here too — the stdio entry replaces the bundled
+Keep the server name `signoz` here too: the stdio entry replaces the bundled
 HTTP registration of the same name rather than running alongside it.
 
 ### Zed

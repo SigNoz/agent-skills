@@ -1,4 +1,4 @@
-# Examples — `signoz-creating-alerts`
+# Examples: `signoz-creating-alerts`
 
 Four canonical alert flows: simple metric threshold, error-rate formula,
 log-volume groupBy, and anomaly detection.
@@ -23,7 +23,7 @@ log-volume groupBy, and anomaly detection.
    `service.name = 'checkout'`.
 6. Dry-run via `signoz_execute_builder_query` over last 1h: returns data,
    would have fired 0 times (clean baseline).
-7. Emits a one-paragraph plain-language summary — no JSON dump.
+7. Emits a one-paragraph plain-language summary, no JSON dump.
 8. Calls `signoz_create_alert`. Reports created alert with ID, threshold
    summary, channel routing, and dry-run result.
 
@@ -47,7 +47,7 @@ log-volume groupBy, and anomaly detection.
    `pagination.hasMore=false`; the user picks `slack-payments`. If none fits,
    it offers `signoz_create_notification_channel` with user-provided config.
 6. Dry-run on last 1h: payments error rate hovered around 0.3%, would have
-   fired 0 times. Clean — not too tight.
+   fired 0 times. Clean, not too tight.
 7. Preview, save, report.
 
 ## Log-volume threshold with groupBy
@@ -70,7 +70,7 @@ log-volume groupBy, and anomaly detection.
    `signoz_list_notification_channels` result, or calls it through
    `pagination.hasMore=false`; the user picks a Slack channel. If none fits,
    it offers `signoz_create_notification_channel` with user-provided config.
-5. Dry-run: returned per-service counts, max in last 1h was 87 — would
+5. Dry-run: returned per-service counts, max in last 1h was 87, which would
    have fired 0 times. Within reasonable headroom.
 6. Preview, save, report.
 

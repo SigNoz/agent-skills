@@ -18,7 +18,7 @@ Antigravity CLI, or OpenCode, read
 ## State Check
 
 Silently determine `signoz-server-state`, **only after the client is known**
-(see `SKILL.md` Step 1 — identify the client before checking state):
+(see `SKILL.md` Step 1: identify the client before checking state):
 
 1. If `signoz_*` MCP tools are available, call
    `signoz_list_services(timeRange: "1h", limit: 1)`. Do not use
@@ -27,15 +27,15 @@ Silently determine `signoz-server-state`, **only after the client is known**
 2. If the call succeeds, including with an empty service list, state is
    **working**.
 3. If the call fails, returns no tools, or cannot be attempted:
-   - **Claude Code, Codex, or Cursor bundled plugin install** — read the
+   - **Claude Code, Codex, or Cursor bundled plugin install**: read the
      plugin registration files below.
-   - **Grok Build** — read `[mcp_servers.signoz]` from `./.grok/config.toml`,
+   - **Grok Build**: read `[mcp_servers.signoz]` from `./.grok/config.toml`,
      `<repo-root>/.grok/config.toml`, then `~/.grok/config.toml`, or run
      `grok mcp list`. Grok ships a bundled registration too, but its endpoint
      comes from config, so the bundled file says nothing about the live state.
-   - **Any other client** — do not read or file-search for the bundled
+   - **Any other client**: do not read or file-search for the bundled
      registration files below. They belong to a different client's plugin
-     distribution and can exist on disk for unrelated reasons — most
+     distribution and can exist on disk for unrelated reasons, most
      notably, if this skill is running from a local checkout of the
      `agent-skills` source repo itself (e.g. a Devin CLI local-path plugin
      install), the bundled files genuinely exist a few directories up
@@ -52,7 +52,7 @@ only the plain outcome: working, not set up, or configured but not connected.
 ## Registration Files
 
 These bundled registration files exist only for the Claude Code, Codex, and
-Cursor plugin installs — never read or edit them for any other client, even if
+Cursor plugin installs; never read or edit them for any other client, even if
 a file search finds them:
 
 - `.signoz_claude_mcp.json` for Claude Code
@@ -62,21 +62,21 @@ a file search finds them:
 The plugin also ships `.signoz_grok_mcp.json` for Grok Build, but Grok is **not**
 a bundled-file-editing client: it resolves the endpoint from
 `[mcp_servers.signoz]` in its own config, which replaces the plugin-provided
-server of the same name. Never edit `.signoz_grok_mcp.json` — use the Grok Build
+server of the same name. Never edit `.signoz_grok_mcp.json`: use the Grok Build
 CLI recipe in `client-configs.md` instead.
 
 This reference file lives at `skills/signoz-mcp-setup/references/mcp-settings.md`,
 so the plugin root is two directories up from `skills/signoz-mcp-setup/`. That
 relative path also happens to resolve inside the `agent-skills` source repo
 itself (this plugin's own monorepo), which ships all three files side by side
-for their respective bundled installs — resolving to a real file there does
+for their respective bundled installs; resolving to a real file there does
 not mean it is the active client's configuration.
 
 Update every registration file that exists **for the identified client only**.
 Replace only the `url` value and preserve each file's existing server key and
 `type`: the Claude Code file (`.signoz_claude_mcp.json`) ships the server key
 `mcp`, while the Codex and Cursor files ship `signoz`. Do not create duplicate
-MCP server entries, and do not rename the existing server — renaming the
+MCP server entries, and do not rename the existing server: renaming the
 Claude Code key changes the tool namespace (`plugin:signoz:mcp`) and forces
 re-authentication.
 
@@ -150,22 +150,22 @@ SigNoz Cloud hosted MCP URLs use the same region code shown in
 
 Mapping rules:
 
-- **Known region code** — map `us`, `us2`, `eu`, `eu2`, `in`, or `in2`
+- **Known region code**: map `us`, `us2`, `eu`, `eu2`, `in`, or `in2`
   case-insensitively.
-- **Hosted MCP URL** — accept `https://mcp.<region>.signoz.cloud/mcp` as-is
+- **Hosted MCP URL**: accept `https://mcp.<region>.signoz.cloud/mcp` as-is
   after normalizing the region to lowercase.
-- **Hosted MCP host only** — add `https://` and `/mcp`.
-- **Ingestion endpoint** — map `ingest.<region>.signoz.cloud` to the matching
+- **Hosted MCP host only**: add `https://` and `/mcp`.
+- **Ingestion endpoint**: map `ingest.<region>.signoz.cloud` to the matching
   hosted MCP URL.
-- **Self-hosted HTTP MCP URL** — accept any `http://.../mcp` or
+- **Self-hosted HTTP MCP URL**: accept any `http://.../mcp` or
   `https://.../mcp` URL that is not a SigNoz Cloud workspace URL. This plugin
   configuration path configures URL-based HTTP MCP. For stdio/local-binary
   mode, tell the user to register the SigNoz MCP server separately as
   `signoz`.
-- **SigNoz workspace URL** — do not infer the region from
+- **SigNoz workspace URL**: do not infer the region from
   `https://<workspace>.signoz.cloud`. Ask the user for the region from
   **Settings -> Ingestion**.
-- **Unknown hosted region code** — ask for confirmation before using
+- **Unknown hosted region code**: ask for confirmation before using
   `https://mcp.<region>.signoz.cloud/mcp`. New SigNoz Cloud regions may exist
   before this skill is updated.
 

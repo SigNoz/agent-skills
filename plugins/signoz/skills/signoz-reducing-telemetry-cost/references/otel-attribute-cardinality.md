@@ -20,11 +20,11 @@ For each attribute: profile, why it matters, and what to do about it.
 
 ## Profiles
 
-- **UNBOUNDED** — grows without ceiling. Every new URL, query, ID, or stack trace creates a new series permanently. These are the most dangerous.
-- **ACCUMULATING** — grows with infrastructure churn (pod restarts, deploys). Does not reflect concurrent active series — a metric with 20,000 `k8s.pod.uid` values may only have 50 active pods right now.
-- **BOUNDED** — fixed or near-fixed set of values. Safe to keep as a label dimension.
-- **DEPLOYMENT_DEPENDENT** — cardinality depends on the deployment scale. Fine at 10 services, dangerous at 500.
-- **IDENTIFIER** — always a unique ID per request/event. Should never appear as a metric label. Immediate red flag.
+- **UNBOUNDED**: grows without ceiling. Every new URL, query, ID, or stack trace creates a new series permanently. These are the most dangerous.
+- **ACCUMULATING**: grows with infrastructure churn (pod restarts, deploys). Does not reflect concurrent active series; a metric with 20,000 `k8s.pod.uid` values may only have 50 active pods right now.
+- **BOUNDED**: fixed or near-fixed set of values. Safe to keep as a label dimension.
+- **DEPLOYMENT_DEPENDENT**: cardinality depends on the deployment scale. Fine at 10 services, dangerous at 500.
+- **IDENTIFIER**: always a unique ID per request/event. Should never appear as a metric label. Immediate red flag.
 
 ---
 
@@ -49,7 +49,7 @@ For each attribute: profile, why it matters, and what to do about it.
 | `net.peer.name` | DEPLOYMENT_DEPENDENT | Hostname of remote peer. Fine if calling fixed upstream services, unbounded if calling arbitrary user-supplied hosts | Review actual cardinality |
 | `net.peer.port` | UNBOUNDED | Ephemeral client ports are unique per connection (range 32768–60999). Server ports are bounded but client ports are not. | Check if client or server port; drop client ports |
 | `net.host.port` | BOUNDED | Server-side listening port. Small fixed set | Safe |
-| `client.port` | UNBOUNDED | Client-side ephemeral port. Always unbounded | Drop — no diagnostic value |
+| `client.port` | UNBOUNDED | Client-side ephemeral port. Always unbounded | Drop (no diagnostic value) |
 | `client.address` | DEPLOYMENT_DEPENDENT | Client IP. Bounded in internal service mesh, unbounded for public-facing APIs | Check cardinality |
 | `server.address` | DEPLOYMENT_DEPENDENT | Upstream hostname. Usually bounded | Review |
 | `server.port` | BOUNDED | Server-side port. Fixed set | Safe |
@@ -83,7 +83,7 @@ For each attribute: profile, why it matters, and what to do about it.
 |-----------|---------|-------|-----|
 | `messaging.message_id` | IDENTIFIER | Unique per message. Should never be a metric label | Drop immediately |
 | `messaging.destination.name` | DEPLOYMENT_DEPENDENT | Topic/queue name. Bounded if topics are fixed, unbounded if dynamically created per user/tenant | Check cardinality |
-| `messaging.kafka.message_key` | UNBOUNDED | Message key — can be any string | Drop |
+| `messaging.kafka.message_key` | UNBOUNDED | Message key (can be any string) | Drop |
 | `messaging.kafka.partition` | BOUNDED | Partition number. Fixed per topic | Safe |
 | `messaging.kafka.consumer_group` | DEPLOYMENT_DEPENDENT | Consumer group name. Usually bounded | Usually safe |
 | `messaging.rabbitmq.routing_key` | DEPLOYMENT_DEPENDENT | Routing key. Bounded if fixed routes, unbounded if dynamic | Check cardinality |
@@ -107,7 +107,7 @@ For each attribute: profile, why it matters, and what to do about it.
 
 | Attribute | Profile | Notes | Fix |
 |-----------|---------|-------|-----|
-| `k8s.pod.uid` | ACCUMULATING | New UID per pod restart. Accumulates over time — 7-day window captures every pod that ever ran, not just current pods | Keep on Infra-page metrics; on unrelated custom metrics, aggregate only after identity and usage review |
+| `k8s.pod.uid` | ACCUMULATING | New UID per pod restart. Accumulates over time; a 7-day window captures every pod that ever ran, not just current pods | Keep on Infra-page metrics; on unrelated custom metrics, aggregate only after identity and usage review |
 | `k8s.pod.name` | ACCUMULATING | Pod names with random suffixes change on every restart/deploy. Same accumulation problem as pod.uid | Keep on Infra-page metrics; apply the generic fix only to unrelated custom metrics |
 | `k8s.pod.start_time` | ACCUMULATING | Timestamp of pod start. Unique per pod lifecycle; the Pods page uses it for Pod Age | Keep on Pod Infra metrics; remove from unrelated custom metrics only after usage review |
 | `container.id` | ACCUMULATING | Container runtime ID. New per restart; current Infra container identity uses `k8s.pod.uid` + `k8s.container.name` | Aggregate away after usage review |
@@ -189,9 +189,9 @@ For each attribute: profile, why it matters, and what to do about it.
 
 | Attribute | Profile | Notes | Fix |
 |-----------|---------|-------|-----|
-| `service.name` | BOUNDED | Service name. Fixed set — this is a required attribute | Safe, keep always |
+| `service.name` | BOUNDED | Service name. Fixed set; this is a required attribute | Safe, keep always |
 | `service.version` | DEPLOYMENT_DEPENDENT | Service version. Bounded if versioning is controlled. Can grow if CI deploys unique versions per commit | Check cardinality |
-| `service.instance.id` | DEPLOYMENT_DEPENDENT | Instance identifier. Bounded = one per running pod. But if it includes a UUID or timestamp, it becomes ACCUMULATING | Check format — if it contains hyphens/long random strings, treat as ACCUMULATING |
+| `service.instance.id` | DEPLOYMENT_DEPENDENT | Instance identifier. Bounded = one per running pod. But if it includes a UUID or timestamp, it becomes ACCUMULATING | Check format: if it contains hyphens/long random strings, treat as ACCUMULATING |
 | `service.namespace` | BOUNDED | Logical grouping of services. Fixed | Safe |
 | `deployment.environment` | BOUNDED | prod, staging, dev, uat etc. | Safe |
 | `telemetry.sdk.name` | BOUNDED | opentelemetry etc. | Safe |
@@ -210,7 +210,7 @@ If you encounter an attribute not listed above, reason through these questions:
 4. **Is it chosen from a fixed vocabulary defined at deploy time?** → Probably BOUNDED. Check actual cardinality to confirm.
 5. **Does the cardinality roughly equal the number of running instances/nodes/pods?** → DEPLOYMENT_DEPENDENT. Flag if count is high but not an immediate problem.
 
-When uncertain — report the attribute name, its observed cardinality, and the value pattern (e.g. "looks like UUIDs", "looks like IP:port pairs") and let the user verify.
+When uncertain, report the attribute name, its observed cardinality, and the value pattern (e.g. "looks like UUIDs", "looks like IP:port pairs") and let the user verify.
 
 ---
 
@@ -221,16 +221,16 @@ For Infra-page metric families, the required identity attributes and page metada
 
 | Problem | Fix | Where |
 |---------|-----|-------|
-| UNBOUNDED label on existing metric | `metricstransform` processor — aggregate the label away (merges series) | OTel Collector |
-| ACCUMULATING label | Same — `metricstransform` aggregate | OTel Collector |
-| IDENTIFIER label (span.id, trace.id, user.id) | `metricstransform` `aggregate_labels` to merge series — or stop emitting it as a metric label | OTel Collector / SDK |
-| Raw SQL / stack traces as labels | Instrument correctly — use `db.operation` not `db.query.text` | SDK / instrumentation config |
-| Client port (net.peer.port, client.port) | `metricstransform` `aggregate_labels` to merge series — or stop emitting it at the SDK | OTel Collector / SDK |
-| Too many service instances | `service.instance.id` is expected to be high — only a problem if it contains timestamps/UUIDs that don't reflect real instance count | Check format |
+| UNBOUNDED label on existing metric | `metricstransform` processor: aggregate the label away (merges series) | OTel Collector |
+| ACCUMULATING label | Same: `metricstransform` aggregate | OTel Collector |
+| IDENTIFIER label (span.id, trace.id, user.id) | `metricstransform` `aggregate_labels` to merge series, or stop emitting it as a metric label | OTel Collector / SDK |
+| Raw SQL / stack traces as labels | Instrument correctly: use `db.operation` not `db.query.text` | SDK / instrumentation config |
+| Client port (net.peer.port, client.port) | `metricstransform` `aggregate_labels` to merge series, or stop emitting it at the SDK | OTel Collector / SDK |
+| Too many service instances | `service.instance.id` is expected to be high; only a problem if it contains timestamps/UUIDs that don't reflect real instance count | Check format |
 
-**Important — cardinality reduction means fewer samples, and samples are the billable cost.**
+**Important: cardinality reduction means fewer samples, and samples are the billable cost.**
 Use the `metricstransform` processor's `aggregate_labels` action to *merge* the
-series that share the remaining labels — that is what actually cuts the series and sample count.
+series that share the remaining labels; that is what actually cuts the series and sample count.
 Do **not** use the `transform` processor's `delete_key`: removing a label key without merging
 leaves the same number of samples and produces colliding series (SigNoz sums them), so cost does
 not drop. If a label is essential to the metric's identity, drop the whole metric or stop

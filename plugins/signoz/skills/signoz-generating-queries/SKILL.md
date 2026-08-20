@@ -2,13 +2,13 @@
 name: signoz-generating-queries
 description: >
   Generate, write, or run an ad-hoc query against SigNoz observability
-  data — metrics, logs, or traces — without wrapping it in
+  data (metrics, logs, or traces) without wrapping it in
   a dashboard panel or alert. Make sure to use this skill whenever the
   user asks "show me error rates", "query logs for timeout errors",
   "what's the p99 latency for the cart service", "how many requests hit
   the payment endpoint", "find slow traces", "errors in the last hour",
   or otherwise asks an exploratory question that needs live observability
-  data — even if they don't say "query" or "search" explicitly.
+  data, even if they don't say "query" or "search" explicitly.
 ---
 
 # Query Generate
@@ -35,9 +35,9 @@ Use this skill when the user asks to:
 
 Do NOT use when:
 - User wants raw ClickHouse SQL for a dashboard panel (custom joins, window
-  functions, regex over log bodies) — that's a separate dashboard-panel SQL
+  functions, regex over log bodies); that's a separate dashboard-panel SQL
   workflow, not this skill.
-- User needs the Exceptions Explorer as an exception-specific signal — the
+- User needs the Exceptions Explorer as an exception-specific signal: the
   current MCP contract has no exception query tool. Explain that limitation and
   offer an equivalent error-trace or error-log query only if it answers their
   underlying question.
@@ -55,7 +55,7 @@ Map the user's intent to the right signal:
 | Find specific log entries, error messages, stack traces | **logs** | Text search, pattern matching, severity filtering. |
 | Find specific traces, slow requests, error spans | **traces** | Per-request detail, span attributes, duration filtering. |
 | Infrastructure metrics (CPU, memory, disk, network) | **metrics** | Always metrics for resource utilization. |
-| Ingestion volume (bytes or count), cost, or billing usage | **metrics** with `source=meter` (Cost Meter) | `signoz.meter.*` ingestion metrics (logs/spans/datapoints by count **and** bytes) live only in the meter store; bytes are unavailable on the raw signals. Dollar **cost is not a metric** — derive it from volume × per-unit price (see Step 2). groupBy/filter work like a normal metric, but only over the limited attribute set the meter retains (not arbitrary log/trace fields). For a *count* sliced by an attribute the meter doesn't carry, aggregate logs/traces directly instead. |
+| Ingestion volume (bytes or count), cost, or billing usage | **metrics** with `source=meter` (Cost Meter) | `signoz.meter.*` ingestion metrics (logs/spans/datapoints by count **and** bytes) live only in the meter store; bytes are unavailable on the raw signals. Dollar **cost is not a metric**; derive it from volume × per-unit price (see Step 2). groupBy/filter work like a normal metric, but only over the limited attribute set the meter retains (not arbitrary log/trace fields). For a *count* sliced by an attribute the meter doesn't carry, aggregate logs/traces directly instead. |
 | "How many X per Y" (count/rate grouped by dimension) | **traces** or **logs** (aggregate) | Use `signoz_aggregate_traces` or `signoz_aggregate_logs` for grouped counts. |
 
 Traces have no unqualified full-text search; use `CONTAINS` against a discovered
@@ -63,19 +63,19 @@ structured trace field. `searchText`-style body search is logs-only.
 
 If the signal is genuinely ambiguous, ask the user before proceeding. The
 host application decides how the question is surfaced (e.g. a structured
-clarification tool or an inline `<assistant_question>` tag) — follow the
+clarification tool or an inline `<assistant_question>` tag); follow the
 host's UI rendering rules.
 
 ### Step 2: Discover available data
 
-**Always discover before querying.** Use only names returned by tools — never
+**Always discover before querying.** Use only names returned by tools, never
 guess from training knowledge.
 
 Run discovery calls in parallel where possible:
 
 - **For metrics**: Call `signoz_list_metrics` with a `searchText` substring
   matching the user's intent (e.g., `searchText: "http"`, `searchText: "latency"`).
-  The response includes metric type, temporality, and isMonotonic — pass these to
+  The response includes metric type, temporality, and isMonotonic; pass these to
   `signoz_query_metrics` to avoid extra lookups. Before filtering or grouping,
   discover labels with `signoz_get_field_keys(signal: "metrics", metricName:
   <discovered-name>)`; metric labels are not trace/log attributes (`db.system`,
@@ -87,21 +87,21 @@ Run discovery calls in parallel where possible:
   |---|---|
   | gauge | `latest`, `sum`, `avg`, `min`, `max`, `count`, `count_distinct` |
   | monotonic counter/sum | `rate`, `increase` |
-  | non-monotonic sum | `avg`, `sum`, `min`, `max`, `count`, `count_distinct` — never `latest` or `rate` |
+  | non-monotonic sum | `avg`, `sum`, `min`, `max`, `count`, `count_distinct`; never `latest` or `rate` |
   | histogram / exponential histogram | omit; aggregation is automatic |
 - **For Cost Meter** (ingestion volume, cost, billing): pass `source=meter` to
-  `signoz_list_metrics` to discover the metrics (`signoz.meter.*`) — they're
+  `signoz_list_metrics` to discover the metrics (`signoz.meter.*`); they're
   invisible in the default store and the set evolves, so don't hardcode it.
   groupBy/filters/aggregations then work like any metric, with three caveats:
   *bytes exist only here* (count is also available via direct
   `signoz_aggregate_logs`/`_traces`); the meter retains only a *limited
-  attribute set* — discover groupable keys via `signoz_get_field_keys(signal:
+  attribute set*, so discover groupable keys via `signoz_get_field_keys(signal:
   "metrics", source: "meter")`, and fall back to a direct count (no bytes) to
-  slice by an attribute it lacks; and **dollar cost is not a meter metric** —
+  slice by an attribute it lacks; and **dollar cost is not a meter metric**:
   the store holds only volume, so don't `searchText: "cost"` expecting a hit.
   For a cost question, query the volume metric (bytes for logs/traces, count
   for metric datapoints) and multiply by the per-unit price from Settings →
-  Billing — ask the user for the price if you don't have it.
+  Billing; ask the user for the price if you don't have it.
 - **For traces**: Call `signoz_list_services` to confirm the service name exists,
   following `pagination.nextOffset` while `pagination.hasMore` is true before
   declaring it missing.
@@ -114,7 +114,7 @@ Run discovery calls in parallel where possible:
 
 Field keys are signal-specific: `service.name` may be absent on logs, while
 `body` is logs-only. Never carry a key across signals. Skip key discovery only
-when live output in this conversation returned it for the same signal — never
+when live output in this conversation returned it for the same signal, never
 for user text or memory. Use returned dot notation verbatim, not camelCase
 guesses such as `traceID` or `hostname`. Never assume tenant keys (`org.id`,
 `orgId`, `organization_id`, etc.); discover the actual key per signal. Call
@@ -180,19 +180,19 @@ not apply to PromQL or ClickHouse SQL envelopes.
 
 ### Step 4: Execute the query
 
-- Always include `searchContext` with the user's original question — it improves
+- Always include `searchContext` with the user's original question; it improves
   result relevance.
 - Respect the requested range; otherwise use 1h. Search/aggregate log and trace
-  tools accept relative `timeRange` strings (`"1h"`, `"24h"`; default `1h`) —
+  tools accept relative `timeRange` strings (`"1h"`, `"24h"`; default `1h`);
   prefer them. Valid Unix-ms `start`/`end` override `timeRange`; malformed explicit
   timestamps return validation guidance pointing to `timeRange`.
   `signoz_execute_builder_query` has no relative option: its outer `query` requires
   absolute `start` and `end` as JSON integer Unix-ms or fails with
   `missing start or end timestamp`.
 - Use shortcut parameters (`service`, `severity`, `operation`, `error`) when they
-  match the user's filters — they are simpler and less error-prone than building
+  match the user's filters; they are simpler and less error-prone than building
   `filter` expressions.
-- Combine shortcut params with `filter` for additional constraints — they
+- Combine shortcut params with `filter` for additional constraints; they
   are ANDed together.
 - For `signoz_query_metrics`, pass `metricType`, `temporality`, and `isMonotonic`
   from the `signoz_list_metrics` response to avoid an extra auto-fetch round trip.
@@ -219,9 +219,9 @@ not apply to PromQL or ClickHouse SQL envelopes.
   group count if truncated by `limit`.
 - For search results, summarize patterns rather than listing every entry.
 
-**No data returned — apply three-way distinction:**
+**No data returned. Apply the three-way distinction:**
 1. **Healthy zero**: The query ran successfully but the count is zero. Say so:
-   "No errors found for checkout-service in the last hour — error count is zero."
+   "No errors found for checkout-service in the last hour; error count is zero."
 2. **No data in range**: The field/metric exists but no data points fall in the
    time window. Suggest expanding: "No data in the last hour. Try a wider range?"
 3. **Missing instrumentation**: The metric, field, or service doesn't exist in
@@ -249,7 +249,7 @@ not apply to PromQL or ClickHouse SQL envelopes.
   one precise query answers the question. Use parallel discovery calls, but be
   precise for execution.
 - **Respect MCP server rules**: The MCP server enforces rules about resource
-  attribute filters, filter operators, and redundant queries. Follow them —
+  attribute filters, filter operators, and redundant queries. Follow them,
   especially preferring resource attributes in filters for faster queries.
 - **No raw ClickHouse SQL**: Always use the Query Builder tools. Never construct
   raw SQL.
@@ -268,8 +268,8 @@ not apply to PromQL or ClickHouse SQL envelopes.
   that exact query object, or skip the chip. Use the appropriate `signal`
   field (`metrics`, `logs`, or `traces`). This signals to the SigNoz UI that
   the user wants to apply the query to an explorer page. Only emit
-  `apply_filter` when the user's primary intent is to obtain a runnable query
-  — not when the user is asking a one-shot data question that the analysis text
+  `apply_filter` when the user's primary intent is to obtain a runnable query,
+  not when the user is asking a one-shot data question that the analysis text
   already answers. For a Cost Meter query keep `signal: metrics` and ensure the
   copied query spec carries `source: meter`.
 
@@ -357,8 +357,8 @@ not apply to PromQL or ClickHouse SQL envelopes.
 **Agent:**
 1. Calls `signoz_aggregate_traces(aggregation: "count", error: "true",
    service: "frontend", requestType: "time_series", timeRange: "6h")`.
-2. Presents: "Error count for frontend over the last 6 hours. Spike at 11:30 UTC
-   — error count jumped from ~5/min to ~45/min, returning to baseline by 12:15."
+2. Presents: "Error count for frontend over the last 6 hours. Spike at 11:30 UTC:
+   error count jumped from ~5/min to ~45/min, returning to baseline by 12:15."
 3. Offers: "Want me to check what error types appeared during the spike?"
 
 ---

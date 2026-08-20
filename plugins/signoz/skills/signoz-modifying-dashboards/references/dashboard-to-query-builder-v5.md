@@ -38,14 +38,14 @@ The query envelope's `kind` is the outer `requestType`, unchanged:
 graph/bar/histogram panels save `time_series`; table/pie/value save `scalar`;
 list saves `raw`; an existing trace panel saves `trace`. These are the only
 execution values; never invent `aggregate`, `table`, or `timeseries`. There is
-no trace panel plugin to author — use `signoz/ListPanel` with raw trace rows.
+no trace panel plugin to author; use `signoz/ListPanel` with raw trace rows.
 
 Put every dependency in one `compositeQuery.queries` array. A panel holds
 exactly one query envelope, and its plugin `kind` picks the execution `type`
 while `plugin.spec` becomes that entry's `spec`, unchanged:
 `signoz/BuilderQuery` -> `builder_query`; `signoz/Formula` ->
 `builder_formula`; `signoz/TraceOperator` -> `builder_trace_operator`.
-A `signoz/CompositeQuery` already holds `{type, spec}` members — lift its
+A `signoz/CompositeQuery` already holds `{type, spec}` members, so lift its
 `spec.queries` into `compositeQuery.queries` as-is.
 
 Bounds and ordering are part of the saved spec, so execute what the panel
@@ -65,7 +65,7 @@ stores rather than re-deriving it, and author them when you build the panel:
   payload. Raw and trace-request traces use timestamp desc; raw logs add id
   desc; aggregate logs/traces use the primary aggregation desc. A metrics
   `order` key is the composed `spaceAggregation(timeAggregation(metricName))`
-  expression — the bare metric name is rejected, while `__result` and groupBy
+  expression; the bare metric name is rejected, while `__result` and groupBy
   keys are accepted; a formula orders by `__result`.
 - Time-series top-N ranks groups over the whole window and can omit a
   short-lived local spike. Narrow filters or grouping if formula-input
