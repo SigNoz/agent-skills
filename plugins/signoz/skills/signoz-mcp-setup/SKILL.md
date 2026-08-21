@@ -43,6 +43,12 @@ client is named, infer it only when the active environment is obvious (which
 agent CLI or editor is running this skill, not just what files happen to exist
 on disk):
 
+If the installed plugin root contains `.signoz_claude_mcp.json`, `.mcp.json`,
+`.signoz_cursor_mcp.json`, or `.signoz_grok_mcp.json`, treat it as a
+compatibility package and route by the active client even though the same root
+also contains the portable `mcp.json`. Only use the portable path when none of
+those client-specific registration files is present.
+
 - Portable Agent Plugins v1 install: use the standard `mcp.json` in the
   installed plugin root.
 - Claude Code, Codex, or Cursor compatibility-package install: use the bundled

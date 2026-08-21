@@ -83,7 +83,7 @@ downstream users may not pick up the changes.
 
 ### Auto-bump workflow
 
-A GitHub Actions workflow (`.github/workflows/auto-version-bump.yml`) opens or updates a version-bump pull request after plugin changes land on `main`. It aggregates every plugin changed since the last successful bump and sets the version to today's date (or appends a micro suffix for multiple bumps in the same day). The root `gemini-extension.json` and `.devin-plugin/plugin.json` manifests mirror the `signoz` plugin and are bumped in lockstep with it. Root-only changes to the Gemini, Devin, versionless Antigravity ports, or portable packaging script also trigger a `signoz` version bump.
+A GitHub Actions workflow (`.github/workflows/auto-version-bump.yml`) opens or updates a version-bump pull request after plugin changes land on `main`. It aggregates every plugin changed since the last successful bump and sets the version to today's date (or appends a micro suffix for multiple bumps in the same day). The root `gemini-extension.json` and `.devin-plugin/plugin.json` manifests mirror the `signoz` plugin and are bumped in lockstep with it. Root-only changes to the Gemini, Devin, versionless Antigravity ports, portable packaging script, or `LICENSE` also trigger a `signoz` version bump.
 
 Repository maintainers must enable **Settings → Actions → General → Allow GitHub Actions to create and approve pull requests** so the workflow's `GITHUB_TOKEN` can open the follow-up PR.
 

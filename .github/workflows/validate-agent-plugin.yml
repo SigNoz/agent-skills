@@ -65,6 +65,35 @@ jobs:
             skills-ref validate "${SKILL_MD%/SKILL.md}"
           done
 
+          frontmatter_hint() {
+            local FILE="$1"
+            local INDENT="$2"
+            awk -v prefix="${INDENT}argument-hint:" '
+              NR == 1 { next }
+              $0 == "---" { exit }
+              index($0, prefix) == 1 {
+                value = substr($0, length(prefix) + 1)
+                sub(/^[[:space:]]*/, "", value)
+                print value
+                exit
+              }
+            ' "$FILE"
+          }
+
+          for SOURCE_SKILL_MD in plugins/signoz/skills/*/SKILL.md; do
+            HINT=$(frontmatter_hint "$SOURCE_SKILL_MD" "")
+            if [[ -z "$HINT" ]]; then
+              continue
+            fi
+            SKILL_NAME=$(basename "$(dirname "$SOURCE_SKILL_MD")")
+            PACKAGED_SKILL_MD="$RUNNER_TEMP/signoz/skills/$SKILL_NAME/SKILL.md"
+            PACKAGED_HINT=$(frontmatter_hint "$PACKAGED_SKILL_MD" "  ")
+            if [[ "$PACKAGED_HINT" != "$HINT" ]]; then
+              echo "Portable argument-hint mismatch: $SKILL_NAME"
+              exit 1
+            fi
+          done
+
       - name: Check portable package boundary
         run: |
           EXPECTED=$'LICENSE\nmcp.json\nplugin.json\nskills'
@@ -72,5 +101,14 @@ jobs:
           if [[ "$ACTUAL" != "$EXPECTED" ]]; then
             echo "Unexpected portable package entries:"
             echo "$ACTUAL"
+            exit 1
+          fi
+
+          INTERNAL_DIRS=$(find "$RUNNER_TEMP/signoz/skills" \
+            -mindepth 2 -maxdepth 2 -type d \
+            \( -name evals -o -name tests \) -print)
+          if [[ -n "$INTERNAL_DIRS" ]]; then
+            echo "Internal test directories leaked into the portable package:"
+            echo "$INTERNAL_DIRS"
             exit 1
           fi

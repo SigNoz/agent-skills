@@ -27,8 +27,8 @@ Silently determine `signoz-server-state`, **only after the client is known**
 2. If the call succeeds, including with an empty service list, state is
    **working**.
 3. If the call fails, returns no tools, or cannot be attempted:
-   - **Portable Agent Plugins v1 install**: read the standard `mcp.json` in
-     the installed plugin root.
+   - **Portable Agent Plugins v1 install**: after Step 1 identifies the package
+     as portable, read the standard `mcp.json` in the installed plugin root.
    - **Claude Code, Codex, or Cursor bundled plugin install**: read the
      client-specific plugin registration file below.
    - **Grok Build**: read `[mcp_servers.signoz]` from `./.grok/config.toml`,

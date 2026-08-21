@@ -17,7 +17,7 @@ PORTABLE_ROOT_FILES = ("plugin.json", "mcp.json")
 
 
 def ignore_nonportable_files(directory: str, names: list[str]) -> set[str]:
-    """Exclude caches everywhere and eval workspaces only at the skills root."""
+    """Exclude caches, eval workspaces, and immediate skill test data."""
     ignored = {
         name
         for name in names
@@ -25,6 +25,8 @@ def ignore_nonportable_files(directory: str, names: list[str]) -> set[str]:
     }
     if Path(directory) == SKILLS_ROOT:
         ignored.update(name for name in names if name.endswith("-workspace"))
+    elif Path(directory).parent == SKILLS_ROOT:
+        ignored.update({"evals", "tests"}.intersection(names))
     return ignored
 
 

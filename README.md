@@ -70,6 +70,10 @@ compatibility source tree:
 python3 scripts/package_agent_plugin.py
 ```
 
+The builder refuses to overwrite an existing output directory. Before
+rebuilding, deliberately remove or rename `dist/signoz`, or pass a different
+new output path as the command's final argument.
+
 This creates `dist/signoz` containing only `plugin.json`, `mcp.json`, `LICENSE`,
 and immediate-child Agent Skills under `skills/`. It can be loaded locally in a
 [compatible Agent Plugins client](https://agent-plugins.org/compatible-clients)
