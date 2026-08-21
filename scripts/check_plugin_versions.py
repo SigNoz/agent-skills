@@ -14,6 +14,7 @@ CLIENT_MANIFESTS = (
     Path(".claude-plugin/plugin.json"),
     Path(".codex-plugin/plugin.json"),
     Path(".cursor-plugin/plugin.json"),
+    Path(".grok-plugin/plugin.json"),
 )
 
 

@@ -32,13 +32,13 @@ SigNoz MCP Server docs and adds OpenCode's native config shape.
   the user requested. If they did not choose:
   1. **Check every scope the client supports for an existing `signoz` (or
      equivalently-purposed) entry first.** If one exists anywhere, edit that
-     same file in place — do not pick a different scope for the new value.
+     same file in place; do not pick a different scope for the new value.
      This matters most for CLI clients like Devin CLI, Codex, and Claude Code
      that support multiple config layers (user/global, project, project-local):
      re-deriving the scope from scratch on every repair can silently create a
      second, shadowing or shadowed entry in a different file, or make the
      skill go looking for a project file in whatever directory the current
-     session happens to be in — even an unrelated project that has nothing to
+     session happens to be in, even an unrelated project that has nothing to
      do with the endpoint being configured.
   2. Only when no existing entry is found in any scope, choose a scope: prefer
      user/global for secrets and for CLI tools in general (they are
@@ -198,6 +198,61 @@ is copied into a versioned plugin cache, but `codex mcp add` writes the
 user-level Codex config. Verify the effective server with
 `codex mcp get signoz` or `codex mcp list`.
 
+### Grok Build CLI
+
+Grok ships the plugin's bundled `.signoz_grok_mcp.json`, which registers
+`signoz` against the `us` SigNoz Cloud endpoint by default and expands a
+`SIGNOZ_MCP_URL` environment override when one is set. **Do not edit that
+bundled file.** Write the endpoint to Grok's own config instead: a
+`[mcp_servers.signoz]` entry replaces the plugin-provided server of the same
+name, and unlike the bundled file it survives plugin updates.
+
+CLI (preferred):
+
+```sh
+grok mcp add signoz -t http https://mcp.us.signoz.cloud/mcp -s user
+```
+
+Use `-s user` for `~/.grok/config.toml` (per-machine, the sane default for a
+personal CLI) and `-s project` for `./.grok/config.toml` (team-shared,
+committed with the repo). Re-running the command updates the existing entry in
+place instead of adding a second server.
+
+TOML equivalent:
+
+```toml
+[mcp_servers.signoz]
+url = "https://mcp.us.signoz.cloud/mcp"
+enabled = true
+```
+
+Precedence for `[mcp_servers]`, highest first: `./.grok/config.toml` >
+`<repo-root>/.grok/config.toml` > `~/.grok/config.toml` > plugin-provided
+servers. Same-name entries replace lower-priority ones, so exactly one `signoz`
+server stays live. Check each scope for an existing `signoz` entry before
+writing a new one, and edit the highest-precedence file that already defines it.
+
+Writing the config entry is also what **de-duplicates** Grok's compatibility
+sources. Grok reads `~/.claude.json`, `~/.cursor/mcp.json`, and `.mcp.json`
+alongside its own config, and a compat-sourced server does not replace the
+plugin's; both load. A user who already has SigNoz configured in Claude Code or
+Cursor therefore ends up with two live `signoz` servers pointing at different
+endpoints (for example a self-hosted `http://localhost:8000/mcp` from
+`~/.claude.json` and the plugin's Cloud default), which `grok mcp doctor` reports
+as two separate servers. A `[mcp_servers.signoz]` entry outranks both and
+collapses them to one. If the user reports duplicate or unexpectedly-routed
+SigNoz tools in Grok, check `grok mcp doctor` for a second `signoz` and write the
+config entry.
+
+For a one-off or CI run, skip config entirely and export the environment
+override that the bundled registration reads:
+
+```sh
+export SIGNOZ_MCP_URL=https://mcp.eu.signoz.cloud/mcp
+```
+
+Verify with `grok mcp list` and diagnose with `grok mcp doctor signoz`.
+
 ### Gemini CLI
 
 CLI:
@@ -223,17 +278,17 @@ Or edit `~/.gemini/settings.json`:
 Devin merges MCP servers by name across scopes, with later-checked scopes
 overriding earlier ones: user/global is overridden by project, which is
 overridden by project-local. Check these three files in **precedence
-order — highest first** — for an existing `signoz` entry, since that is the
+order (highest first)** for an existing `signoz` entry, since that is the
 one actually in effect:
 
-1. `.devin/config.local.json` in the current project root — gitignored,
+1. `.devin/config.local.json` in the current project root: gitignored,
    project-local. Highest precedence.
-2. `.devin/config.json` in the current project root — team-shared, committed.
-3. `~/.config/devin/config.json` (`%APPDATA%\devin\config.json` on Windows) —
+2. `.devin/config.json` in the current project root: team-shared, committed.
+3. `~/.config/devin/config.json` (`%APPDATA%\devin\config.json` on Windows):
    user/global, applies to every project. Lowest precedence.
 
 Edit the **first (highest-precedence) file that already has a `signoz`
-entry** — editing a lower-precedence file while a higher one still defines
+entry**: editing a lower-precedence file while a higher one still defines
 `signoz` would be silently shadowed and the active endpoint would not change.
 If more than one scope defines `signoz`, tell the user which scope is
 currently winning and ask whether to update that one or remove the
@@ -272,7 +327,7 @@ Edit `~/.codeium/windsurf/mcp_config.json`.
 
 ### Antigravity CLI
 
-Remote servers must use the `serverUrl` key — Antigravity does not support
+Remote servers must use the `serverUrl` key; Antigravity does not support
 the legacy `url` or `httpUrl` fields.
 
 If the SigNoz plugin is installed (`agy plugin install https://github.com/SigNoz/agent-skills`),
@@ -433,6 +488,39 @@ SIGNOZ_API_KEY = "<your-api-key>"
 LOG_LEVEL = "info"
 ```
 
+### Grok Build CLI stdio
+
+CLI (stdio is the default transport, so `-t` is not needed; everything after
+`--` is the server command):
+
+```sh
+grok mcp add signoz \
+  -e SIGNOZ_URL="<your-signoz-url>" \
+  -e SIGNOZ_API_KEY="<your-api-key>" \
+  -e LOG_LEVEL=info \
+  -s user \
+  -- "<path-to-binary>/signoz-mcp-server"
+```
+
+TOML:
+
+```toml
+[mcp_servers.signoz]
+command = "<path-to-binary>/signoz-mcp-server"
+args = []
+env = { SIGNOZ_URL = "<your-signoz-url>", SIGNOZ_API_KEY = "<your-api-key>", LOG_LEVEL = "info" }
+```
+
+Grok expands `${VAR}` and `${VAR:-default}` in `command`, `args`, and `env`
+values as well as `url`, so prefer a reference over a literal key:
+
+```sh
+grok mcp add signoz -e SIGNOZ_API_KEY='${SIGNOZ_API_KEY}' -s user -- "<path-to-binary>/signoz-mcp-server"
+```
+
+Keep the server name `signoz` here too: the stdio entry replaces the bundled
+HTTP registration of the same name rather than running alongside it.
+
 ### Zed
 
 Edit Zed settings.
@@ -490,6 +578,13 @@ Edit `opencode.json` or `opencode.jsonc`.
 - Codex (self-hosted HTTP): no OAuth step unless the server runs with
   `OAUTH_ENABLED=true`; skip `codex mcp login` and verify the already-authenticated
   `signoz` server with `/mcp`.
+- Grok Build CLI (SigNoz Cloud): run `/mcps` (or press Ctrl+L and open the MCP
+  Servers tab), select `signoz`, and press `i` to start the OAuth flow. Press
+  `r` to reload the list after a config change. Tokens are cached in
+  `~/.grok/mcp_credentials.json`.
+- Grok Build CLI (self-hosted HTTP): no OAuth step unless the server runs with
+  `OAUTH_ENABLED=true`; press `r` in `/mcps` and verify the `signoz` server is
+  connected.
 - Gemini CLI: run `/mcp auth signoz`.
 - Devin CLI (SigNoz Cloud): start a new session, then run
   `devin mcp login signoz` to complete OAuth.

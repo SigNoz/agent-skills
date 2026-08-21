@@ -1,9 +1,9 @@
-# Examples — `signoz-creating-dashboards`
+# Examples: `signoz-creating-dashboards`
 
 Walkthroughs of the four canonical flows: template import with data,
 template import without data, duplicate-found choice, and custom build.
 
-## Template import — happy path
+## Template import: happy path
 
 **User:** "Create a dashboard for my PostgreSQL database"
 
@@ -19,18 +19,18 @@ template import without data, duplicate-found choice, and custom build.
    → returns `postgresql.connections.usage`, `postgresql.commits`, etc.
    Data flowing.
 5. Calls `signoz_import_dashboard path=postgresql/postgresql.json`.
-6. Reports: "Created 'PostgreSQL Overview' (id `…`) — 24 panels
+6. Reports: "Created 'PostgreSQL Overview' (id `…`) with 24 panels
    across Overview / Connections / Throughput / Replication. Variables:
    `postgresql.host.name`. Probe found data for all headline panels.
    Want me to adjust anything, or wire alerts for slow queries?"
 
-*Variant — no PG data ingested:* the probe in step 4 returns empty;
+*Variant, no PG data ingested:* the probe in step 4 returns empty;
 agent emits the verbatim no-data warning from Step 3b-i.1 and waits for
 the user to choose between "create anyway" and "stop".
 
 ## Template choice when several match
 
-**User:** "I need an APM dashboard — what do you have?"
+**User:** "I need an APM dashboard. What do you have?"
 
 **Agent:**
 1. `signoz_list_dashboards` (paginated) → no APM dashboard.
@@ -44,7 +44,7 @@ the user to choose between "create anyway" and "stop".
 6. Imports, reports panels and variables. Offers to wire latency
    alerts via `signoz-creating-alerts`.
 
-## Duplicate found — modify-or-create
+## Duplicate found: modify-or-create
 
 **User:** "Set up monitoring for Redis" (existing "Redis - Overview"
 dashboard found)
@@ -56,10 +56,10 @@ template. If (a), hands off to `signoz-modifying-dashboards` with the
 dashboard's id and the user's intent (no `signoz_get_dashboard` call
 from this skill).
 
-## Custom build — no template match
+## Custom build: no template match
 
 **User:** "Create a dashboard to track our payment processing pipeline"
-(custom build — no template match)
+(custom build, no template match)
 
 **Agent:**
 1. Duplicate check (none) and creation confirmation as above.
@@ -80,8 +80,8 @@ from this skill).
 6. Per-panel dry-run via `signoz_execute_builder_query` for
    **every** panel (envelope lift per Step 3b-ii.6, with
    `name` preserved on each `builder_query.spec` so formulas
-   resolve). Emits a one-paragraph plain-language summary — no JSON
-   dump — then calls `signoz_create_dashboard`. Reports the id,
+   resolve). Emits a one-paragraph plain-language summary, no JSON
+   dump, then calls `signoz_create_dashboard`. Reports the id,
    panel count and section breakdown, and which variables are
    wired. Offers to wire error-rate alerts via
    `signoz-creating-alerts`.

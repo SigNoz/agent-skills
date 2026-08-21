@@ -1,19 +1,19 @@
 # SigNoz Agent Skills
 
 Official SigNoz skills and MCP configuration for Claude Code, Codex, Cursor,
-Gemini CLI, Devin CLI, Antigravity CLI, and the
+Gemini CLI, Devin CLI, Grok Build, Antigravity CLI, and the
 [skills.sh](https://skills.sh) ecosystem. The repository also includes an
 experimental [Agent Plugins v1](https://agent-plugins.org/) package for local
 conformance testing. The MCP setup skill
 includes client-specific recipes for VS Code/GitHub Copilot, Claude Desktop,
-Gemini CLI, Devin CLI, Windsurf, Zed, Antigravity CLI, OpenCode, and generic
-HTTP MCP clients.
+Gemini CLI, Devin CLI, Grok Build, Windsurf, Zed, Antigravity CLI, OpenCode, and
+generic HTTP MCP clients.
 
 ## Skills
 
 | Skill | Description |
 |-------|-------------|
-| [signoz-mcp-setup](plugins/signoz/skills/signoz-mcp-setup/SKILL.md) | Initialize or repair the SigNoz Agent Plugins v1 or client-specific MCP server configuration for Claude Code, Codex, Cursor, VS Code/GitHub Copilot, Claude Desktop, Gemini CLI, Devin CLI, Windsurf, Zed, Antigravity CLI, OpenCode, or another MCP client. |
+| [signoz-mcp-setup](plugins/signoz/skills/signoz-mcp-setup/SKILL.md) | Initialize or repair the SigNoz Agent Plugins v1 or client-specific MCP server configuration for Claude Code, Codex, Cursor, VS Code/GitHub Copilot, Claude Desktop, Gemini CLI, Devin CLI, Grok Build, Windsurf, Zed, Antigravity CLI, OpenCode, or another MCP client. |
 | [signoz-creating-alerts](plugins/signoz/skills/signoz-creating-alerts/SKILL.md) | Create SigNoz alert rules for threshold breaches, error rates, latency, anomaly detection, and absent-data conditions across metrics, logs, and traces. |
 | [signoz-explaining-alerts](plugins/signoz/skills/signoz-explaining-alerts/SKILL.md) | Explain and interpret an existing SigNoz alert rule's configuration, evaluation behavior, notification routing, and recent fire frequency. |
 | [signoz-investigating-alerts](plugins/signoz/skills/signoz-investigating-alerts/SKILL.md) | Diagnose why a SigNoz alert fired by correlating its signal with neighbor metrics, traces, and logs around the fire window, and ranking likely causes. |
@@ -34,12 +34,20 @@ files. Claude Code asks for the MCP endpoint URL during install; Codex and
 Cursor can use `signoz-mcp-setup` to initialize or repair it. The setup skill
 accepts a SigNoz Cloud region
 such as `us`, `us2`, `eu`, `eu2`, `in`, or `in2`, any hosted MCP URL, or a
-self-hosted `/mcp` endpoint. Plugin updates can reset bundled MCP registration
-files to the placeholder; if that happens, rerun `signoz-mcp-setup`.
+self-hosted HTTP `/mcp` endpoint. Plugin updates can reset bundled MCP
+registration files to the placeholder; if that happens, rerun
+`signoz-mcp-setup`.
 
 The Devin CLI plugin ships skills only — Devin's plugin system does not bundle
 MCP servers or prompt for install-time config. Run `signoz-mcp-setup` after
 installing to write the `signoz` MCP server into `.devin/config.json`.
+
+The Grok Build plugin bundles an MCP registration that works out of the box on
+the SigNoz Cloud `us` endpoint. Grok has no install-time prompt, but unlike the
+other bundled registrations it expands `${SIGNOZ_MCP_URL}`, and a
+`[mcp_servers.signoz]` entry in Grok's own config replaces the bundled server
+rather than duplicating it — so the endpoint survives plugin updates instead of
+resetting.
 
 The skills are authored against the current SigNoz MCP server contract. If a
 tool call fails because a parameter or schema looks different from what a skill
@@ -66,16 +74,15 @@ This creates `dist/signoz` containing only `plugin.json`, `mcp.json`, `LICENSE`,
 and immediate-child Agent Skills under `skills/`. It can be loaded locally in a
 [compatible Agent Plugins client](https://agent-plugins.org/compatible-clients)
 for testing. The source tree at [`plugins/signoz`](plugins/signoz) intentionally
-also contains native Claude, Codex, and Cursor files and is not itself a
+also contains native Claude, Codex, Cursor, and Grok files and is not itself a
 portable package.
 
-The portable MCP registration intentionally starts at
-`https://not-setup/mcp`, because Agent Plugins v1 does not define portable
-install-time configuration or credential fields. After installing, run
-`signoz-mcp-setup <region-or-mcp-url>` and complete the client's OAuth flow for
-SigNoz Cloud. Portable non-loopback endpoints must use HTTPS; for a self-hosted
-HTTP endpoint on another host, the skill configures the named client's native
-MCP surface instead.
+The portable MCP registration starts at `https://not-setup/mcp`, because Agent
+Plugins v1 does not define portable install-time configuration or credential
+fields. After installing, run `signoz-mcp-setup <region-or-mcp-url>` and complete
+the client's OAuth flow for SigNoz Cloud. Portable non-loopback endpoints must
+use HTTPS; for a self-hosted HTTP endpoint on another host, the skill configures
+the named client's native MCP surface instead.
 
 ### Claude Code
 
@@ -224,6 +231,63 @@ For SigNoz Cloud, start a new session and run `devin mcp login signoz` to
 complete OAuth. For self-hosted SigNoz, no OAuth step is needed unless the
 server runs with `OAUTH_ENABLED=true`.
 
+### Grok Build
+
+```sh
+grok plugin marketplace add SigNoz/agent-skills
+grok plugin install signoz --trust
+```
+
+`--trust` is required for the bundled MCP server and hooks to activate; without
+it the skills load but the `signoz` server stays inactive. To skip the
+marketplace source, install the plugin subdirectory directly with
+`grok plugin install SigNoz/agent-skills#plugins/signoz --trust`.
+
+The plugin registers the `signoz` MCP server against the SigNoz Cloud `us`
+endpoint by default, so `us` users need no further configuration.
+
+**Set the endpoint.** For any other region, or for self-hosted SigNoz:
+
+```sh
+grok mcp add signoz -t http https://mcp.<region>.signoz.cloud/mcp -s user
+```
+
+Replace `<region>` with `us`, `us2`, `eu`, `eu2`, `in`, or `in2`. Find your
+region under **Settings -> Ingestion** in SigNoz, or see the
+[region reference](https://signoz.io/docs/ingestion/signoz-cloud/keys/). For
+self-hosted SigNoz, pass your own HTTP `/mcp` URL, for example
+`http://localhost:8000/mcp`. You can also run `/signoz-mcp-setup <region>` in a
+Grok session and let the skill do it.
+
+Use `-s user` to write `~/.grok/config.toml` (per machine, the default) or
+`-s project` to commit the endpoint to `./.grok/config.toml` for the whole team.
+Re-running the command updates the entry in place, so switching regions later is
+the same command again. A `[mcp_servers.signoz]` entry **replaces** the
+plugin-provided server of the same name, so you always end up with exactly one
+`signoz` server rather than a duplicate. For a one-off or CI run, skip config
+entirely and export `SIGNOZ_MCP_URL` instead — the bundled registration reads it.
+
+**Authenticate (SigNoz Cloud).** Run `/mcps` (or press Ctrl+L and open the MCP
+Servers tab), press `r` to reload after a config change, then select `signoz`
+and press `i` to start the OAuth flow. Self-hosted endpoints need no OAuth
+unless the server runs with `OAUTH_ENABLED=true`. Verify with
+`grok mcp doctor signoz`, which should report `1 healthy`.
+
+Update:
+
+```sh
+grok plugin marketplace update
+grok plugin update signoz
+```
+
+> **Already using SigNoz in Claude Code or Cursor?** Grok also reads
+> `~/.claude.json`, `~/.cursor/mcp.json`, and `.mcp.json` as compatibility
+> sources. If one of them already defines a `signoz` server, Grok loads it
+> *alongside* the plugin's — two live servers with the same name pointing at
+> different endpoints, which `grok mcp doctor` reports as two. Setting
+> `[mcp_servers.signoz]` with the `grok mcp add` command above outranks both
+> and collapses them to one.
+
 ### Antigravity CLI
 
 Install directly from this repository — Antigravity CLI stages the repo root as
@@ -260,8 +324,8 @@ with `OAUTH_ENABLED=true`). You can also edit the `serverUrl` value directly.
 ### Other MCP Clients
 
 The setup skill includes native config recipes for VS Code/GitHub Copilot,
-Claude Desktop, Gemini CLI, Devin CLI, Windsurf, Zed, Antigravity CLI, OpenCode,
-and generic HTTP MCP clients. These clients do not all consume this plugin
+Claude Desktop, Gemini CLI, Devin CLI, Grok Build, Windsurf, Zed, Antigravity
+CLI, OpenCode, and generic HTTP MCP clients. These clients do not all consume this plugin
 automatically; install or copy the skill where your client supports skills, or
 use the client-specific setup snippets in the skill as a reference.
 
@@ -284,6 +348,7 @@ npx skills add SigNoz/agent-skills --skill signoz-writing-clickhouse-queries    
 ├── .agents/plugins/marketplace.json        # Codex marketplace
 ├── .claude-plugin/marketplace.json         # Claude Code marketplace
 ├── .cursor-plugin/marketplace.json         # Cursor marketplace
+├── .grok-plugin/marketplace.json           # Grok Build marketplace
 ├── .devin-plugin/plugin.json               # Devin CLI plugin manifest
 ├── .github/workflows/
 │   ├── auto-version-bump.yml               # Follow-up version PR automation
@@ -299,9 +364,11 @@ npx skills add SigNoz/agent-skills --skill signoz-writing-clickhouse-queries    
 │   ├── .codex-plugin/plugin.json           # Codex plugin manifest
 │   ├── .claude-plugin/plugin.json          # Claude Code plugin manifest
 │   ├── .cursor-plugin/plugin.json          # Cursor plugin manifest
+│   ├── .grok-plugin/plugin.json            # Grok Build plugin manifest
 │   ├── .signoz_claude_mcp.json             # Claude Code MCP config
 │   ├── .mcp.json                           # Codex MCP config
 │   ├── .signoz_cursor_mcp.json             # Cursor MCP config
+│   ├── .signoz_grok_mcp.json               # Grok Build MCP config (env-interpolated)
 │   ├── hooks/                              # Auto-allow hooks
 │   └── skills/
 │       ├── signoz-mcp-setup/
@@ -314,7 +381,7 @@ npx skills add SigNoz/agent-skills --skill signoz-writing-clickhouse-queries    
 │       ├── signoz-modifying-dashboards/
 │       ├── signoz-searching-docs/
 │       ├── signoz-generating-queries/
-│       └── ...                             # See the complete Skills table
+│       └── signoz-managing-views/
 └── README.md
 ```
 
@@ -323,7 +390,7 @@ npx skills add SigNoz/agent-skills --skill signoz-writing-clickhouse-queries    
 | Marketplace | `signoz-skills` |
 | Plugin | `signoz` |
 | Repository | `SigNoz/agent-skills` |
-| Versioning | Client CalVer `YYYY.MM.DD`; portable/Devin SemVer `YYYY.M.<DD*100+micro>` — auto-bumped |
+| Versioning | Client CalVer `YYYY.MM.DD`; portable/Devin SemVer `YYYY.M.<DD*100+micro>`; auto-bumped |
 
 ## Contributing
 

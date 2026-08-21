@@ -6,6 +6,7 @@ on:
       - 'plugins/signoz/.claude-plugin/plugin.json'
       - 'plugins/signoz/.codex-plugin/plugin.json'
       - 'plugins/signoz/.cursor-plugin/plugin.json'
+      - 'plugins/signoz/.grok-plugin/plugin.json'
       - 'plugins/signoz/plugin.json'
       - 'plugins/signoz/mcp.json'
       - 'plugins/signoz/skills/**'

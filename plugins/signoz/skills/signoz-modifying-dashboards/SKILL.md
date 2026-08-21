@@ -1,7 +1,7 @@
 ---
 name: signoz-modifying-dashboards
 description: >
-  Modify an existing SigNoz dashboard — add or remove panels, edit a
+  Modify an existing SigNoz dashboard: add or remove panels, edit a
   panel's query, threshold, or unit, rename the dashboard, change a
   panel type (graph ↔ table ↔ value), rearrange the layout, add or edit
   variables, or update tags. Make sure to use this skill whenever the
@@ -9,7 +9,7 @@ description: >
   panel", "remove the latency widget", "rename my dashboard", "update
   the filters", "rearrange the layout", "add a variable", "change panel
   type from graph to table", or otherwise asks to change something on a
-  dashboard that already exists — even if they don't say "modify" or
+  dashboard that already exists, even if they don't say "modify" or
   "edit" explicitly.
 ---
 
@@ -22,7 +22,7 @@ This skill calls SigNoz MCP server tools (`signoz_get_dashboard`,
 `signoz_list_metrics`, `signoz_get_field_keys`, `signoz_get_field_values`,
 `signoz_execute_builder_query`).
 Before running the workflow, confirm the `signoz_*` tools are available.
-If they are not, the SigNoz MCP server is not installed or configured —
+If they are not, the SigNoz MCP server is not installed or configured;
 run `signoz-mcp-setup` first to initialize or repair the MCP connection. Do not
 fall back to raw HTTP calls or hand-edit dashboard JSON without the MCP tools.
 
@@ -56,7 +56,7 @@ its id.
 ### Step 2: Fetch the current dashboard state
 
 Call `signoz_get_dashboard` with the dashboard id to retrieve its full
-configuration. This is **mandatory** — `signoz_update_dashboard` requires the
+configuration. This is **mandatory**: `signoz_update_dashboard` requires the
 complete post-update state, and a patch still needs the real panel ids and grid
 item indices. Never skip this step.
 
@@ -65,23 +65,23 @@ Examine the response to understand:
 - Current grid item positions (x, y, width, height in the 12-column grid)
 - Current variables
 - Current query on each panel (exactly one per panel)
-- The `spec.layouts` structure — one Grid per section, each with its own items
+- The `spec.layouts` structure: one Grid per section, each with its own items
 
 ### Step 3: Plan the modification
 
 Based on the user's request, plan the changes.
 
 **Confirm with the user before applying if:**
-- The modification is **destructive** — removing panels, deleting variables,
+- The modification is **destructive**: removing panels, deleting variables,
   replacing an entire query with a different one, changing a query's `signal`
   (e.g., traces → logs), or fundamentally altering what data is shown (changing
   aggregation from p99 to avg, removing groupBy dimensions)
-- The request is **ambiguous** — multiple panels could match "the latency panel"
-- The change is **large** — restructuring sections, adding many panels at once
+- The request is **ambiguous**: multiple panels could match "the latency panel"
+- The change is **large**: restructuring sections, adding many panels at once
 
 **Destructive means data loss or silent behavior change.** Even if the user says
 "just do it quickly," a brief confirmation ("I'll remove 'Memory Fragmentation'
-permanently — OK?") takes seconds and prevents irreversible mistakes. User urgency
+permanently. OK?") takes seconds and prevents irreversible mistakes. User urgency
 does not override this guardrail.
 
 **Non-destructive changes need no destructive confirmation:** renaming, adding a
@@ -90,7 +90,7 @@ thresholds. Variable additions still require the panel-applicability prompt belo
 
 **Compound modifications:** When a request involves multiple changes (e.g., remove a
 panel + add a panel + rename), plan all changes against the fetched state and apply
-them as a single write — one patch array may carry many ops. Do not apply and
+them as a single write: one patch array may carry many ops. Do not apply and
 re-fetch between changes.
 
 ### Step 4: Apply the modification
@@ -98,13 +98,13 @@ re-fetch between changes.
 **Pick the write tool first.** Default to `signoz_patch_dashboard` (RFC 6902):
 it sends only the changed ops, so it cannot drop a panel that was never in
 question. Read `signoz://dashboard/patch-instructions` for the JSON Pointer
-paths. Reach for `signoz_update_dashboard` — a full replacement merged into the
-Step 2 state — only when most of the dashboard changes. The rules below apply to
+paths. Reach for `signoz_update_dashboard` (a full replacement merged into the
+Step 2 state) only when most of the dashboard changes. The rules below apply to
 both; each names its patch path.
 
 **Ops apply in sequence, against the document as the previous ops left it.** When
-one patch removes several entries from the same array — grid items, layouts,
-variables, tags, or a composite's member queries — order those removals by
+one patch removes several entries from the same array (grid items, layouts,
+variables, tags, or a composite's member queries), order those removals by
 **descending index**. Otherwise each removal reindexes the entries after it, and a
 stale index quietly drops the wrong entry or no-ops (remove on a missing path is
 not an error). Indices planned against the Step 2 state are only valid for the
@@ -123,7 +123,7 @@ first removal from each array.
 
 - **Preserve panel/grid-item identity.** Every panel id in `spec.panels` needs
   exactly one grid item whose `content.$ref` names it; add or remove both
-  together. Reuse existing panel ids verbatim — a rename is a display change,
+  together. Reuse existing panel ids verbatim: a rename is a display change,
   not a new id.
 
 - **Read schemas before every write.** Read all required and applicable
@@ -136,8 +136,8 @@ first removal from each array.
   1. Build the panel with a short, stable id and `add` it at
      `/spec/panels/<id>`. When the dashboard already holds a panel of the
      target type, start from that panel's JSON in the Step 2 response instead
-     of composing one — the same diff-and-merge principle the update path
-     follows, and the server's own shape is known-valid. Re-point every field
+     of composing one (the same diff-and-merge principle the update path
+     follows, and the server's own shape is known-valid). Re-point every field
      that identifies the data (aggregation, `groupBy`, `filter.expression`,
      `order`, `legend`, alias, `signal`); a clone with one stale field is
      well-formed and will be accepted, so the mandatory dry-run below is what
@@ -152,13 +152,13 @@ first removal from each array.
      Grid. A panel with no grid item is accepted and never renders.
 - **Removing a panel:** Remove the grid item (0-based index within its Grid) and
   the `/spec/panels/<id>` entry together; an item left pointing at a removed panel is rejected.
-  **Do not** try to auto-compact or shift `y` positions of remaining panels — the
+  **Do not** try to auto-compact or shift `y` positions of remaining panels; the
   SigNoz frontend grid engine handles gap-closing automatically. Simply remove the
   two references (panel entry, grid item) and leave all other positions
   unchanged.
 
 - **Editing a panel's query:** Replace the query at `/spec/panels/<id>/spec/queries/0`
-  and keep all other panel fields intact — never append a second one, since a
+  and keep all other panel fields intact; never append a second one, since a
   panel holds exactly one query.
 
 - **Changing panel type:** Update the plugin `kind` and the query envelope `kind`
@@ -196,7 +196,7 @@ panel, read the compact
 [`dashboard-to-query-builder-v5` reference](./references/dashboard-to-query-builder-v5.md).
 The panel already stores the execution spec, so lift it into the outer envelope and
 call `signoz_execute_builder_query` with that payload. Dry-run over a short
-absolute Unix-ms window — usually the last 30-60 minutes, never the panel's
+absolute Unix-ms window, usually the last 30-60 minutes, never the panel's
 display range by reflex; apply the reference's dry-run hygiene rules before
 widening or retrying after a timeout. Use representative variable values in the
 dry-run copy and keep `$var` in saved state.
@@ -235,18 +235,18 @@ signoz_patch_dashboard({
 
 **If the write fails, never resend the same payload.** A client-side
 `InputValidationError` never reached SigNoz, so an identical retry cannot
-succeed — and working out *why* it failed does not license another attempt.
+succeed, and working out *why* it failed does not license another attempt.
 That reasoning is what turns two failures into twenty. Allow at most two
 attempts per approach, then change approach: clone-and-re-point rather than
 author, or split one patch into several. If two approaches have failed, stop
 and report the exact ops and error text to the user instead of trying a third.
-This bounds client-side validation failures only — a dry-run timeout is a
+This bounds client-side validation failures only; a dry-run timeout is a
 server-side condition where retrying over a narrower window is correct.
 
 For a full replacement, `signoz_update_dashboard` takes the merged state **flat**
 beside `id`, not nested under a `dashboard` key. Merge into the `data` object of the
-Step 2 response — passing the `{status, data}` envelope itself is rejected. Send the
-fetched `name` — an immutable machine label — back unchanged, and drop the read-only
+Step 2 response; passing the `{status, data}` envelope itself is rejected. Send the
+fetched `name` (an immutable machine label) back unchanged, and drop the read-only
 fields the GET returns (`createdAt`, `updatedBy`, `orgId`, `webUrl`, and friends):
 
 ```text
@@ -268,14 +268,14 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
 - **Patch first; full state on update**: prefer `signoz_patch_dashboard` for
   targeted edits. When a full replacement is warranted, `signoz_update_dashboard`
   takes the complete dashboard **flat** beside `id` (`schemaVersion`, `name`,
-  `tags`, `spec`) — never nested under a `dashboard` key. Always call
+  `tags`, `spec`), never nested under a `dashboard` key. Always call
   `signoz_get_dashboard` first, merge into that response's `data` object, round-trip `name`
   unchanged, and never construct a payload from scratch.
 - **Preserve what you don't change**: Preserve supported mutable semantics for
   panels, variables, and grid items outside the request. Diff-and-merge;
   do not rebuild or promise byte-for-byte equality after MCP normalization.
 - **Confirm destructive changes**: Before removing panels, replacing queries, or
-  deleting variables, confirm with the user — even if they say "just do it" or
+  deleting variables, confirm with the user, even if they say "just do it" or
   express urgency. Additions, renames, type changes, and variable additions do not
   need confirmation.
 - **Validate changed queries** Follow the mandatory dry-run step above before
@@ -308,9 +308,9 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
 **User:** "Add an error rate panel to my Redis dashboard"
 
 **Agent:**
-1. Calls `signoz_list_dashboards` with `filter="redis"` — finds "Redis Overview"
+1. Calls `signoz_list_dashboards` with `filter="redis"`; finds "Redis Overview"
    dashboard with id `abc-123`.
-2. Calls `signoz_get_dashboard` with id `abc-123` — gets full configuration with
+2. Calls `signoz_get_dashboard` with id `abc-123`; gets full configuration with
    8 existing panels across two Grid sections.
 3. Calls `signoz_list_metrics` to find available Redis error metrics.
 4. Creates a new timeseries panel (a `signoz/CompositeQuery` holding the two
@@ -318,8 +318,8 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
    the last item in the Overview Grid.
 5. Dry-runs the new panel with `signoz_execute_builder_query`; fixes any error or
    unexpected empty result.
-6. Calls `signoz_patch_dashboard` with two ops — `add /spec/panels/error-rate` and
-   `add /spec/layouts/0/spec/items/-` — rather than re-sending all 9 panels.
+6. Calls `signoz_patch_dashboard` with two ops (`add /spec/panels/error-rate` and
+   `add /spec/layouts/0/spec/items/-`) rather than re-sending all 9 panels.
 7. Reports: "Added an 'Error Rate' timeseries panel to your Redis Overview dashboard
    under the Overview section. Want me to adjust anything?"
 
@@ -330,7 +330,7 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
 **Agent:**
 1. Resolves "API Monitoring" through a filtered `signoz_list_dashboards`, then calls
    `signoz_get_dashboard` with its id.
-2. Finds the panel titled "Request Latency" — if multiple panels could match,
+2. Finds the panel titled "Request Latency"; if multiple panels could match,
    confirms with user: "I found 'Request Latency'. Convert that one to a table?"
 3. Changes the plugin `kind` to `signoz/TablePanel` and the query `kind` to
    `scalar`, matches the table shape in `widgets-examples`, and keeps the query
@@ -348,7 +348,7 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
 **Agent:**
 1. Fetches the dashboard via `signoz_get_dashboard`.
 2. Finds the "CPU Usage" panel. Confirms: "I'll remove the 'CPU Usage' panel and
-   rename the dashboard to 'Service Health'. Proceed?" (Removal is destructive —
+   rename the dashboard to 'Service Health'. Proceed?" (Removal is destructive;
    always confirm.)
 3. User confirms.
 4. Removes the panel entry and its grid item. Leaves all other panel positions
