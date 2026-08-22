@@ -15,6 +15,8 @@ on:
       - 'LICENSE'
       - 'scripts/check_plugin_versions.py'
       - 'scripts/package_agent_plugin.py'
+      - '.github/plugin/marketplace.json'
+      - '.github/workflows/publish-agent-plugin.yml'
       - '.github/workflows/validate-agent-plugin.yml'
   workflow_dispatch:
 
@@ -40,6 +42,9 @@ jobs:
 
       - name: Check plugin version parity
         run: python3 scripts/check_plugin_versions.py check plugins/signoz
+
+      - name: Validate Copilot marketplace JSON
+        run: python3 -m json.tool .github/plugin/marketplace.json >/dev/null
 
       - name: Build clean portable package
         run: python3 scripts/package_agent_plugin.py "$RUNNER_TEMP/signoz"

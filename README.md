@@ -1,10 +1,10 @@
 # SigNoz Agent Skills
 
 Official SigNoz skills and MCP configuration for Claude Code, Codex, Cursor,
-Gemini CLI, Devin CLI, Grok Build, Antigravity CLI, and the
-[skills.sh](https://skills.sh) ecosystem. The repository also includes an
-experimental [Agent Plugins v1](https://agent-plugins.org/) package for local
-conformance testing. The MCP setup skill
+VS Code/GitHub Copilot, Gemini CLI, Devin CLI, Grok Build, Antigravity CLI, and
+the [skills.sh](https://skills.sh) ecosystem. The repository publishes an
+[Agent Plugins v1](https://agent-plugins.org/) package for compatible clients.
+The MCP setup skill
 includes client-specific recipes for VS Code/GitHub Copilot, Claude Desktop,
 Gemini CLI, Devin CLI, Grok Build, Windsurf, Zed, Antigravity CLI, OpenCode, and
 generic HTTP MCP clients.
@@ -56,15 +56,28 @@ workflow.
 
 See the full setup guide in the [SigNoz MCP Server docs](https://signoz.io/docs/ai/signoz-mcp-server/).
 
-### Agent Plugins v1 (experimental)
+### Agent Plugins v1
 
 Agent Plugins v1 standardizes the portable package format but leaves
-distribution and installation to individual clients. SigNoz does not currently
-publish this package as a public installation path; the client-specific packages
-below remain the supported user-facing integrations.
+distribution and installation to individual clients. SigNoz publishes the clean
+package from this repository's generated
+[`agent-plugin`](https://github.com/SigNoz/agent-skills/tree/agent-plugin)
+branch. The client-specific packages below remain supported.
 
-For local development and conformance testing, build the clean package from the
-compatibility source tree:
+#### VS Code / GitHub Copilot
+
+1. Run **Chat: Install Plugin From Source** from the Command Palette.
+2. Enter `https://github.com/SigNoz/agent-skills` and install `signoz`.
+3. In Copilot Chat Agent mode, run
+   `/signoz:signoz-mcp-setup <region-or-mcp-url>`. Use your SigNoz Cloud region
+   (`us`, `us2`, `eu`, `eu2`, `in`, or `in2`) or a self-hosted HTTP `/mcp` URL.
+4. Approve the `signoz` MCP server and complete authentication when prompted.
+
+The repository's Copilot marketplace resolves `signoz` to the generated branch,
+so users do not need to clone this repository or build the package themselves.
+
+For local development, build the same clean package from the compatibility
+source tree:
 
 ```sh
 python3 scripts/package_agent_plugin.py
@@ -353,9 +366,11 @@ npx skills add SigNoz/agent-skills --skill signoz-writing-clickhouse-queries    
 ├── .claude-plugin/marketplace.json         # Claude Code marketplace
 ├── .cursor-plugin/marketplace.json         # Cursor marketplace
 ├── .grok-plugin/marketplace.json           # Grok Build marketplace
+├── .github/plugin/marketplace.json          # VS Code and GitHub Copilot marketplace
 ├── .devin-plugin/plugin.json               # Devin CLI plugin manifest
 ├── .github/workflows/
 │   ├── auto-version-bump.yml               # Follow-up version PR automation
+│   ├── publish-agent-plugin.yml             # Publishes the generated agent-plugin branch
 │   └── validate-agent-plugin.yml           # Portable schema and skill checks
 ├── gemini-extension.json                   # Gemini CLI extension manifest
 ├── plugin.json                             # Antigravity plugin manifest (native, repo root)
