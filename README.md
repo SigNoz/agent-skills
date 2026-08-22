@@ -72,9 +72,11 @@ branch. The client-specific packages below remain supported.
 3. In Copilot Chat Agent mode, run
    `/signoz:signoz-mcp-setup <region-or-mcp-url>`, then complete authentication.
 
-If you previously added `SigNoz/agent-skills#agent-plugin` to
-`chat.plugins.marketplaces`, remove that entry before retrying. The generated
-branch is a standalone package, not a marketplace.
+If you previously tried `SigNoz/agent-skills#agent-plugin`, uninstalling the
+plugin is not enough. Run **Preferences: Open User Settings (JSON)**, remove
+that exact entry from `chat.plugins.marketplaces`, and run **Developer: Reload
+Window** before retrying. The generated branch is a standalone package, not a
+marketplace.
 
 For local development, build the same clean package from the compatibility
 source tree:
