@@ -43,22 +43,26 @@ client is named, infer it only when the active environment is obvious (which
 agent CLI or editor is running this skill, not just what files happen to exist
 on disk):
 
-If the installed plugin root contains `.signoz_claude_mcp.json`, `.mcp.json`,
-`.signoz_cursor_mcp.json`, or `.signoz_grok_mcp.json`, treat it as a
-compatibility package and route by the active client even though the same root
-also contains the portable `mcp.json`. Only use the portable path when none of
-those client-specific registration files is present.
+Classify the install from the format the active client loaded, not from other
+files that happen to coexist in the plugin root. An Agent Plugins v1 install
+uses the portable `mcp.json` when its root `plugin.json` declares the canonical
+Agent Plugins schema, even if the same root contains registration files for
+Claude Code, Codex, Cursor, or Grok Build. Use a client-specific registration
+file only when that client loaded the corresponding compatibility package.
 
-- Portable Agent Plugins v1 install: use the standard `mcp.json` in the
-  installed plugin root.
+- Portable Agent Plugins v1 install, including a VS Code installation whose
+  root manifest declares the Agent Plugins schema: use the standard `mcp.json`
+  in the installed plugin root.
 - Claude Code, Codex, or Cursor compatibility-package install: use the bundled
   client-specific registration files.
 - Grok Build: use the Grok Build CLI recipe in `client-configs.md`. It ships a
   bundled registration file, but its endpoint is configured through
   `[mcp_servers.signoz]`, not by editing that file.
-- VS Code / GitHub Copilot, Claude Desktop, Gemini CLI, Devin CLI, Windsurf,
-  Zed, Antigravity CLI, or OpenCode: use the matching native client recipe in
-  `client-configs.md`.
+- VS Code / GitHub Copilot native MCP setup: use the native recipe only when no
+  Agent Plugins v1 install is active, the user explicitly requests native
+  config, or the endpoint is not eligible for portable `mcp.json`.
+- Claude Desktop, Gemini CLI, Devin CLI, Windsurf, Zed, Antigravity CLI, or
+  OpenCode: use the matching native client recipe in `client-configs.md`.
 - Unknown or unsupported client: use the generic HTTP MCP recipe and point the
   user to the SigNoz MCP Server docs for their client's exact config surface.
 
@@ -73,14 +77,15 @@ Silently determine the SigNoz MCP server state using the reference flow,
 Probe with `signoz_list_services(timeRange: "1h", limit: 1)`. Do not use docs
 tools (`signoz_search_docs` or `signoz_fetch_doc`) for this check.
 
-- For a portable Agent Plugins v1 install or a Claude Code, Codex, or Cursor
-  bundled plugin install, the reference flow's registration-file fallback
-  applies.
+- For a portable Agent Plugins v1 install, including one active in VS Code, or
+  a Claude Code, Codex, or Cursor bundled plugin install, the reference flow's
+  registration-file fallback applies.
 - For Grok Build, read `[mcp_servers.signoz]` from Grok's config scopes (or run
   `grok mcp list`) instead. Its bundled `.signoz_grok_mcp.json` ships a working
   default and is overridden by config, so it never reports the live state.
-- For every other client, including Devin CLI, do not read or search for the
-  plugin-root `mcp.json`, `.signoz_claude_mcp.json`, `.mcp.json`, or
+- For every other client, including native VS Code setup and Devin CLI, do not
+  read or search for the plugin-root `mcp.json`, `.signoz_claude_mcp.json`,
+  `.mcp.json`, or
   `.signoz_cursor_mcp.json`. Those are bundled files for a different plugin
   distribution and are irrelevant here even if a file-search tool happens to
   find them (for example when this skill is linked from a local checkout of
@@ -141,6 +146,15 @@ rules:
    `mcp-settings.md` and the canonical file shape in `client-configs.md`. When
    the endpoint is not portable, follow the reference routing to the identified
    client's native MCP configuration instead.
+   When configuring an installed Agent Plugins v1 package in VS Code, the
+   endpoint is portable, and the user did not explicitly request native config,
+   update only the plugin-root `mcp.json`. Do not create a native `signoz`
+   entry; it would register a second server alongside the plugin server. If the
+   user explicitly reports that an earlier plugin setup created a duplicate
+   native `signoz`, remove only that confirmed accidental entry from the VS Code
+   workspace or user MCP config and preserve every unrelated server and setting.
+   Never infer that an existing native entry is accidental solely because both
+   registrations exist.
 2. In `.signoz_claude_mcp.json` for Claude Code, replace only the `url` value
    with the resolved MCP endpoint. Preserve the existing server key and `type`:
    this file ships the server key `mcp`, and renaming it changes the tool
@@ -249,7 +263,9 @@ client-specific authentication step:
 - **Cursor**: reload the window, then authenticate the `signoz` MCP server in
   Tools & MCP if prompted.
 - **VS Code / GitHub Copilot**: open Copilot Chat in Agent mode, approve the
-  `signoz` server if prompted, then complete the authentication flow.
+  `signoz` server if prompted, then complete the authentication flow for SigNoz
+  Cloud. A self-hosted endpoint needs no OAuth unless its MCP server runs with
+  `OAUTH_ENABLED=true`.
 - **Codex**: restart Codex if the server does not appear. For SigNoz Cloud,
   run `codex mcp login signoz` to complete OAuth, then verify with `/mcp`. For a
   self-hosted HTTP endpoint (no OAuth unless the server runs with

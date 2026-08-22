@@ -137,10 +137,16 @@ Use `.cursor/mcp.json` in the project root.
 }
 ```
 
-### VS Code / GitHub Copilot
+### VS Code / GitHub Copilot native fallback
 
-Use `.vscode/mcp.json` in the workspace, or the user-level MCP config opened
-by the `MCP: Open User Configuration` command.
+Use this native configuration only when no Agent Plugins v1 install is active,
+the user explicitly requests native configuration, or the resolved endpoint is
+not eligible for portable `mcp.json`. For an eligible endpoint in an active
+Agent Plugins v1 install, update the plugin-root `mcp.json` instead; creating a
+native entry would register a second `signoz` server.
+
+For native setup, use `.vscode/mcp.json` in the workspace, or the user-level MCP
+config opened by the `MCP: Open User Configuration` command.
 
 ```json
 {
@@ -568,7 +574,9 @@ Edit `opencode.json` or `opencode.jsonc`.
 - Cursor: reload the window, then authenticate the `signoz` MCP server in
   Tools & MCP if prompted.
 - VS Code / GitHub Copilot: open Copilot Chat in Agent mode, approve the
-  `signoz` server, and complete authentication.
+  `signoz` server if prompted, and complete authentication for SigNoz Cloud.
+  A self-hosted endpoint needs no OAuth unless its MCP server runs with
+  `OAUTH_ENABLED=true`.
 - Claude Desktop hosted/public HTTP: reconnect the custom connector, then
   complete authentication when applicable.
 - Claude Desktop local stdio: restart Claude Desktop so it reloads the local

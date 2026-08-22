@@ -156,11 +156,11 @@
       "id": 7,
       "eval_name": "compatibility-package-wins-over-portable-files",
       "prompt": "I installed the SigNoz marketplace plugin in Claude Code. Its plugin root contains mcp.json as well as .signoz_claude_mcp.json. Configure it for the eu region.",
-      "expected_output": "Agent recognizes the client-specific registration file as evidence that this is the Claude Code compatibility package, despite the colocated portable mcp.json. It updates only .signoz_claude_mcp.json to https://mcp.eu.signoz.cloud/mcp, preserves the mcp server key and type=http, and leaves the portable mcp.json unchanged.",
+      "expected_output": "Agent uses the explicit Claude Code marketplace installation to identify the Claude Code compatibility package, despite the colocated portable mcp.json. It updates only .signoz_claude_mcp.json to https://mcp.eu.signoz.cloud/mcp, preserves the mcp server key and type=http, and leaves the portable mcp.json unchanged.",
       "assertions": [
         {
           "text": "Agent treats the install as the Claude Code compatibility package rather than a portable package",
-          "description": "Client-specific registration files take precedence over the colocated portable files"
+          "description": "The explicit Claude Code marketplace installation identifies the active package format"
         },
         {
           "text": "Agent updates only .signoz_claude_mcp.json and leaves the plugin-root mcp.json unchanged",
@@ -169,6 +169,31 @@
         {
           "text": "Agent preserves the mcp server key and type http",
           "description": "The compatibility package keeps its client-specific MCP contract"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": 8,
+      "eval_name": "vscode-agent-plugin-repairs-native-duplicate",
+      "prompt": "I'm running this from the SigNoz plugin in VS Code. I installed it with Chat: Install Plugin From Source from https://github.com/SigNoz/agent-skills. The installed plugin root's plugin.json declares the canonical Agent Plugins schema, and the root also contains mcp.json, .signoz_claude_mcp.json, .mcp.json, and .signoz_cursor_mcp.json. A previous run of this setup skill accidentally created a second signoz server in my VS Code user MCP config for http://localhost:8000/mcp. Configure the plugin for that URL and remove the duplicate. There is no .vscode/mcp.json in this workspace.",
+      "expected_output": "Agent treats the explicit VS Code Install Plugin From Source installation as Agent Plugins v1 even though client-specific compatibility files coexist. It updates only mcpServers.signoz.url in the plugin-root mcp.json to http://localhost:8000/mcp, preserves the portable schema, signoz server key, and type=streamable-http, and leaves the compatibility files unchanged. Because the user explicitly identified the VS Code user signoz entry as an accidental duplicate, it removes only that entry while preserving unrelated user configuration and does not create .vscode/mcp.json. It then tells the user to reload or approve the plugin-provided signoz server without requiring OAuth unless the self-hosted server enables it.",
+      "assertions": [
+        {
+          "text": "Agent treats the VS Code Install Plugin From Source installation as the portable Agent Plugins v1 package even though client-specific compatibility files are present",
+          "description": "Explicit installation provenance identifies the package format"
+        },
+        {
+          "text": "Agent changes only mcpServers.signoz.url in the plugin-root mcp.json to http://localhost:8000/mcp and preserves $schema, the signoz server key, and type streamable-http",
+          "description": "The active portable registration is updated without changing its contract"
+        },
+        {
+          "text": "Agent removes only the explicitly confirmed accidental signoz entry from VS Code user MCP configuration, preserves unrelated user settings, does not create .vscode/mcp.json, and leaves .signoz_claude_mcp.json, .mcp.json, and .signoz_cursor_mcp.json unchanged",
+          "description": "The repair removes the known duplicate without modifying unrelated config or inactive compatibility packages"
+        },
+        {
+          "text": "Agent tells the user to reload or approve the plugin-provided signoz server and does not require OAuth for self-hosted MCP unless OAUTH_ENABLED is true",
+          "description": "The finish step matches self-hosted VS Code authentication behavior"
         }
       ],
       "files": []
