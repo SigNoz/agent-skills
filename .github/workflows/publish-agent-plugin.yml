@@ -4,14 +4,9 @@ on:
   push:
     branches:
       - main
+    # Package changes publish only after the auto-bump PR updates this manifest's version.
     paths:
       - 'plugins/signoz/plugin.json'
-      - 'plugins/signoz/mcp.json'
-      - 'plugins/signoz/skills/**'
-      - 'LICENSE'
-      - 'scripts/package_agent_plugin.py'
-      - '.github/workflows/publish-agent-plugin.yml'
-  workflow_dispatch:
 
 concurrency:
   group: publish-agent-plugin
@@ -55,9 +50,13 @@ jobs:
 
           PUBLISH_DIR="$RUNNER_TEMP/published-agent-plugin"
           REPOSITORY_URL="https://github.com/${GITHUB_REPOSITORY}.git"
+          PUBLISHED_VERSION=""
 
           if git ls-remote --exit-code --heads "$REPOSITORY_URL" "$PUBLISH_BRANCH" >/dev/null 2>&1; then
             git clone --branch "$PUBLISH_BRANCH" --single-branch "$REPOSITORY_URL" "$PUBLISH_DIR"
+            if [[ -f "$PUBLISH_DIR/plugin.json" ]]; then
+              PUBLISHED_VERSION=$(jq -r '.version // empty' "$PUBLISH_DIR/plugin.json")
+            fi
           else
             mkdir -p "$PUBLISH_DIR"
             git -C "$PUBLISH_DIR" init
@@ -74,6 +73,20 @@ jobs:
           if git -C "$PUBLISH_DIR" diff --cached --quiet; then
             echo "Published package is already current"
             exit 0
+          fi
+
+          SOURCE_VERSION=$(jq -er '.version | select(type == "string" and length > 0)' "$RUNNER_TEMP/signoz/plugin.json")
+          if [[ -n "$PUBLISHED_VERSION" ]]; then
+            if [[ "$SOURCE_VERSION" == "$PUBLISHED_VERSION" ]]; then
+              echo "::error::Refusing to publish changed package without a version bump ($SOURCE_VERSION)"
+              exit 1
+            fi
+
+            OLDEST_VERSION=$(printf '%s\n%s\n' "$SOURCE_VERSION" "$PUBLISHED_VERSION" | sort -V | head -1)
+            if [[ "$OLDEST_VERSION" == "$SOURCE_VERSION" ]]; then
+              echo "::error::Refusing to replace $PUBLISHED_VERSION with older version $SOURCE_VERSION"
+              exit 1
+            fi
           fi
 
           SOURCE_SHA="${GITHUB_SHA:0:12}"
