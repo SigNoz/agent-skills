@@ -67,10 +67,14 @@ branch. The client-specific packages below remain supported.
 #### VS Code / GitHub Copilot
 
 1. Run **Chat: Install Plugin From Source** from the Command Palette.
-2. Enter `SigNoz/agent-skills#agent-plugin` to install the portable package
-   directly from its generated branch.
+2. Enter `https://github.com/SigNoz/agent-skills` and install `signoz` if
+   prompted.
 3. In Copilot Chat Agent mode, run
    `/signoz:signoz-mcp-setup <region-or-mcp-url>`, then complete authentication.
+
+If you previously added `SigNoz/agent-skills#agent-plugin` to
+`chat.plugins.marketplaces`, remove that entry before retrying. The generated
+branch is a standalone package, not a marketplace.
 
 For local development, build the same clean package from the compatibility
 source tree:
