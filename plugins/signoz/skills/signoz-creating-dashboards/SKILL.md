@@ -16,11 +16,6 @@ argument-hint: <natural-language dashboard intent>
 
 # Dashboard Create
 
-Build a SigNoz dashboard from a user's natural-language intent. The skill
-targets two consumers: an autonomous AI SRE agent that runs without a
-human in the loop, and a human at a Claude Code / Codex / Cursor prompt.
-Both go through the same flow.
-
 ## Prerequisites
 
 This skill calls SigNoz MCP server tools (`signoz_create_dashboard`,
