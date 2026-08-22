@@ -64,18 +64,6 @@ package from this repository's generated
 [`agent-plugin`](https://github.com/SigNoz/agent-skills/tree/agent-plugin)
 branch. The client-specific packages below remain supported.
 
-#### VS Code / GitHub Copilot
-
-1. Run **Chat: Install Plugin From Source** from the Command Palette.
-2. Enter `https://github.com/SigNoz/agent-skills` and install `signoz`.
-3. In Copilot Chat Agent mode, run
-   `/signoz:signoz-mcp-setup <region-or-mcp-url>`. Use your SigNoz Cloud region
-   (`us`, `us2`, `eu`, `eu2`, `in`, or `in2`) or a self-hosted HTTP `/mcp` URL.
-4. Approve the `signoz` MCP server and complete authentication when prompted.
-
-The repository's Copilot marketplace resolves `signoz` to the generated branch,
-so users do not need to clone this repository or build the package themselves.
-
 For local development, build the same clean package from the compatibility
 source tree:
 
@@ -366,7 +354,6 @@ npx skills add SigNoz/agent-skills --skill signoz-writing-clickhouse-queries    
 ├── .claude-plugin/marketplace.json         # Claude Code marketplace
 ├── .cursor-plugin/marketplace.json         # Cursor marketplace
 ├── .grok-plugin/marketplace.json           # Grok Build marketplace
-├── .github/plugin/marketplace.json          # VS Code and GitHub Copilot marketplace
 ├── .devin-plugin/plugin.json               # Devin CLI plugin manifest
 ├── .github/workflows/
 │   ├── auto-version-bump.yml               # Follow-up version PR automation
