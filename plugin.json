@@ -1,0 +1,22 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "signoz",
+  "version": "2026.8.2100",
+  "description": "Official SigNoz plugin for MCP setup, docs, queries, dashboards, and alerts",
+  "author": {
+    "name": "SigNoz",
+    "url": "https://signoz.io"
+  },
+  "homepage": "https://signoz.io",
+  "repository": "https://github.com/SigNoz/agent-skills",
+  "license": "MIT",
+  "keywords": [
+    "signoz",
+    "opentelemetry",
+    "observability",
+    "mcp",
+    "clickhouse",
+    "tracing",
+    "logging"
+  ]
+}
