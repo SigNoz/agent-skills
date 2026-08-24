@@ -27,8 +27,10 @@ Silently determine `signoz-server-state`, **only after the client is known**
 2. If the call succeeds, including with an empty service list, state is
    **working**.
 3. If the call fails, returns no tools, or cannot be attempted:
-   - **Portable Agent Plugins v1 install**: after Step 1 identifies the package
-     as portable, read the standard `mcp.json` in the installed plugin root.
+   - **Portable Agent Plugins v1 install**: after Step 1 identifies the format
+     loaded by the active client as portable, read the standard `mcp.json` in
+     the installed plugin root. Ignore neighboring compatibility files; their
+     presence does not change the active package format.
    - **Claude Code, Codex, or Cursor bundled plugin install**: read the
      client-specific plugin registration file below.
    - **Grok Build**: read `[mcp_servers.signoz]` from `./.grok/config.toml`,
@@ -54,8 +56,9 @@ only the plain outcome: working, not set up, or configured but not connected.
 ## Registration Files
 
 These registration files exist only for the portable Agent Plugins package and
-the Claude Code, Codex, and Cursor compatibility packages; never read or edit
-them for any other client, even if a file search finds them:
+the Claude Code, Codex, and Cursor compatibility packages. Select one from the
+format loaded by the active client, not from file presence alone. Never read or
+edit them for any other client, even if a file search finds them:
 
 - plugin-root `mcp.json` for Agent Plugins v1 (not native `.vscode/mcp.json` or
   `.cursor/mcp.json` files)
