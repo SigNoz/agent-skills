@@ -14,11 +14,13 @@ SigNoz MCP Server docs and adds OpenCode's native config shape.
 
 ## Safety Rules
 
-- Keep each file's existing server key. The plugin-root `mcp.json`, bundled
-  Codex and Cursor files, and native client configs use `signoz`; the bundled
-  Claude Code file (`.signoz_claude_mcp.json`) uses `mcp`. Do not rename either
-  key. In the portable file, also preserve the canonical `$schema` and
-  `type: "streamable-http"`.
+- Keep each file's existing server key. The plugin-root `mcp.json` used by
+  Agent Plugins v1 and Codex, the bundled Cursor file, and native client
+  configs use `signoz`; the bundled Claude Code file
+  (`.signoz_claude_mcp.json`) uses `mcp`. Do not rename either key. Leave the
+  Claude file's `${user_config.SIGNOZ_MCP_URL}` placeholder intact and update
+  the persisted plugin option instead. In the portable file, also preserve the
+  canonical `$schema` and `type: "streamable-http"`.
 - Prefer SigNoz Cloud OAuth over header-based auth whenever the client supports
   interactive OAuth.
 - Do not write service account API keys, bearer tokens, or header-based auth
@@ -76,31 +78,60 @@ Apply the portable endpoint eligibility and native-client routing rules from
 
 ### Bundled Claude Code plugin
 
-In `.signoz_claude_mcp.json` in the SigNoz plugin root, replace only the `url`
-value with the resolved MCP endpoint (concrete URL rule from `mcp-settings.md`).
-Leave the server key (`mcp`), the `type` field, and other settings unchanged.
+Do not edit `.signoz_claude_mcp.json` in the installed plugin cache. It must
+keep the server key (`mcp`), `type: "http"`, and the user-configuration
+placeholder:
 
 ```json
 {
   "mcpServers": {
     "mcp": {
       "type": "http",
-      "url": "https://mcp.us.signoz.cloud/mcp"
+      "url": "${user_config.SIGNOZ_MCP_URL}"
     }
   }
 }
 ```
 
-### Bundled Codex plugin
-
-In `.mcp.json` in the SigNoz plugin root, replace only the `url` value with the
-resolved MCP endpoint (concrete URL rule from `mcp-settings.md`). Codex does not
-reliably expand shell-style environment defaults in plugin MCP URLs.
+Use `claude plugin list --json` to identify the exact enabled SigNoz plugin ID.
+Update only `pluginConfigs[<plugin-id>].options.SIGNOZ_MCP_URL` in
+`~/.claude/settings.json`, regardless of the plugin's installation scope, and
+preserve every unrelated setting and option. Claude ignores `pluginConfigs` in
+project and local settings. For example, with the actual marketplace suffix in
+place of `<marketplace>`:
 
 ```json
 {
+  "pluginConfigs": {
+    "signoz@<marketplace>": {
+      "options": {
+        "SIGNOZ_MCP_URL": "https://mcp.us.signoz.cloud/mcp"
+      }
+    }
+  }
+}
+```
+
+If managed settings or a `--settings` source supplies this option, it outranks
+user settings; report the controlling source and have its owner change it.
+Otherwise `/plugin` -> installed SigNoz plugin -> **Customize** writes the same
+user setting. Persisted plugin options survive plugin updates; cached plugin
+files do not.
+
+### Codex Agent Plugins v1 package
+
+Use the Agent Plugins v1 `mcp.json` in the SigNoz plugin root. The root
+`plugin.json` selects this file, and `.codex-plugin/plugin.json` points at it for
+compatibility. Replace only the `url` value with the resolved MCP endpoint
+(concrete URL rule from `mcp-settings.md`), preserving the `signoz` server key
+and `type: streamable-http`. Do not create a fallback if the file is missing.
+
+```json
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
   "mcpServers": {
     "signoz": {
+      "type": "streamable-http",
       "url": "https://mcp.us.signoz.cloud/mcp"
     }
   }
@@ -199,9 +230,9 @@ url = "https://mcp.us.signoz.cloud/mcp"
 ```
 
 Use the native Codex entry when the user wants a durable setup or reports that
-the bundled plugin `.mcp.json` keeps resetting after updates. The bundled file
-is copied into a versioned plugin cache, but `codex mcp add` writes the
-user-level Codex config. Verify the effective server with
+the bundled plugin `mcp.json` keeps resetting after updates. The
+bundled file is copied into a versioned plugin cache, but `codex mcp add` writes
+the user-level Codex config. Verify the effective server with
 `codex mcp get signoz` or `codex mcp list`.
 
 ### Grok Build CLI
@@ -581,7 +612,8 @@ Edit `opencode.json` or `opencode.jsonc`.
   complete authentication when applicable.
 - Claude Desktop local stdio: restart Claude Desktop so it reloads the local
   command entry in `claude_desktop_config.json`; do not add a remote URL there.
-- Claude Code: run `/mcp`, select `signoz`, and complete authentication.
+- Claude Code: run `/reload-plugins`, then `/mcp`; select the `signoz` plugin's
+  `mcp` server (`plugin:signoz:mcp`) and complete authentication.
 - Codex (SigNoz Cloud): run `codex mcp login signoz`, then verify with `/mcp`.
 - Codex (self-hosted HTTP): no OAuth step unless the server runs with
   `OAUTH_ENABLED=true`; skip `codex mcp login` and verify the already-authenticated

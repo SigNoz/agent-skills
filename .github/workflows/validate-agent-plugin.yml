@@ -7,12 +7,15 @@ on:
       - 'plugins/signoz/.codex-plugin/plugin.json'
       - 'plugins/signoz/.cursor-plugin/plugin.json'
       - 'plugins/signoz/.grok-plugin/plugin.json'
+      - 'plugins/signoz/.signoz_claude_mcp.json'
+      - 'plugins/signoz/.mcp.json'
       - 'plugins/signoz/plugin.json'
       - 'plugins/signoz/mcp.json'
       - 'plugins/signoz/skills/**'
       - 'gemini-extension.json'
       - '.devin-plugin/plugin.json'
       - 'LICENSE'
+      - 'scripts/check_client_mcp_configs.py'
       - 'scripts/check_plugin_versions.py'
       - 'scripts/package_agent_plugin.py'
       - '.github/workflows/publish-agent-plugin.yml'
@@ -41,6 +44,9 @@ jobs:
 
       - name: Check plugin version parity
         run: python3 scripts/check_plugin_versions.py check plugins/signoz
+
+      - name: Check client MCP config isolation
+        run: python3 scripts/check_client_mcp_configs.py plugins/signoz
 
       - name: Build clean portable package
         run: python3 scripts/package_agent_plugin.py "$RUNNER_TEMP/signoz"

@@ -28,7 +28,7 @@ mapping used by this procedure.
 
 Read [references/client-configs.md](references/client-configs.md) for a portable
 Agent Plugins v1 install, when the user names a client other than the bundled
-Claude Code, Codex, or Cursor plugin path, when a native client config already
+Claude Code or Cursor plugin path, when a native client config already
 exists, or when self-hosted stdio/local-binary setup is requested.
 
 ## Configuration procedure
@@ -47,14 +47,15 @@ Classify the install from the format the active client loaded, not from other
 files that happen to coexist in the plugin root. An Agent Plugins v1 install
 uses the portable `mcp.json` when its root `plugin.json` declares the canonical
 Agent Plugins schema, even if the same root contains registration files for
-Claude Code, Codex, Cursor, or Grok Build. Use a client-specific registration
+Claude Code, Cursor, or Grok Build. Use a client-specific registration
 file only when that client loaded the corresponding compatibility package.
 
-- Portable Agent Plugins v1 install, including a VS Code installation whose
-  root manifest declares the Agent Plugins schema: use the standard `mcp.json`
-  in the installed plugin root.
-- Claude Code, Codex, or Cursor compatibility-package install: use the bundled
-  client-specific registration files.
+- Portable Agent Plugins v1 install, including a VS Code or Codex installation
+  whose root manifest declares the Agent Plugins schema: use the standard
+  `mcp.json` in the installed plugin root.
+- Claude Code compatibility-package install: use the persisted plugin option
+  referenced by its bundled registration file. Cursor compatibility-package
+  install: use its bundled registration file.
 - Grok Build: use the Grok Build CLI recipe in `client-configs.md`. It ships a
   bundled registration file, but its endpoint is configured through
   `[mcp_servers.signoz]`, not by editing that file.
@@ -77,21 +78,22 @@ Silently determine the SigNoz MCP server state using the reference flow,
 Probe with `signoz_list_services(timeRange: "1h", limit: 1)`. Do not use docs
 tools (`signoz_search_docs` or `signoz_fetch_doc`) for this check.
 
-- For a portable Agent Plugins v1 install, including one active in VS Code, or
-  a Claude Code, Codex, or Cursor bundled plugin install, the reference flow's
-  registration-file fallback applies.
+- For Codex, check the effective `signoz` entry with `codex mcp get signoz` or
+  `codex mcp list` before consulting the plugin-root `mcp.json`; a native entry
+  of the same name has higher precedence and may intentionally be the active
+  fallback. For other Agent Plugins v1 clients, and for bundled Claude Code or
+  Cursor installs, use the reference flow's client-specific fallback.
 - For Grok Build, read `[mcp_servers.signoz]` from Grok's config scopes (or run
   `grok mcp list`) instead. Its bundled `.signoz_grok_mcp.json` ships a working
   default and is overridden by config, so it never reports the live state.
 - For every other client, including native VS Code setup and Devin CLI, do not
   read or search for the plugin-root `mcp.json`, `.signoz_claude_mcp.json`,
-  `.mcp.json`, or
-  `.signoz_cursor_mcp.json`. Those are bundled files for a different plugin
+  or `.signoz_cursor_mcp.json`. Those are bundled files for a different plugin
   distribution and are irrelevant here even if a file-search tool happens to
-  find them (for example when this skill is linked from a local checkout of
-  the `agent-skills` source repo itself). This does not exclude native files
-  such as `.vscode/mcp.json` or `.cursor/mcp.json`; check the identified
-  client's own native config location per `client-configs.md`.
+  find them (for example when this skill is linked from a local checkout of the
+  `agent-skills` source repo itself). This does not exclude native files such as
+  `.vscode/mcp.json` or `.cursor/mcp.json`; check the identified client's own
+  native config location per `client-configs.md`.
 
 State outcomes:
 
@@ -138,9 +140,8 @@ cannot complete interactive OAuth, use the header-based fallback in
 
 ### Step 4: Apply the endpoint
 
-For a portable Agent Plugins v1 install or bundled Claude Code, Codex, and
-Cursor plugin installs, edit the registration files using the reference editing
-rules:
+For an Agent Plugins v1 install, including Codex, or a bundled Claude Code or
+Cursor plugin install, apply the endpoint using the reference editing rules:
 
 1. For Agent Plugins v1, apply the portable endpoint eligibility rules in
    `mcp-settings.md` and the canonical file shape in `client-configs.md`. When
@@ -155,30 +156,54 @@ rules:
    workspace or user MCP config and preserve every unrelated server and setting.
    Never infer that an existing native entry is accidental solely because both
    registrations exist.
-2. In `.signoz_claude_mcp.json` for Claude Code, replace only the `url` value
-   with the resolved MCP endpoint. Preserve the existing server key and `type`:
-   this file ships the server key `mcp`, and renaming it changes the tool
-   namespace (`plugin:signoz:mcp`) and forces re-authentication.
-3. In `.mcp.json` for Codex, replace only the `url` value with the resolved MCP
-   endpoint, preserving the existing `signoz` server key.
+2. For Claude Code, leave `.signoz_claude_mcp.json` unchanged. Get the exact
+   enabled plugin ID from `claude plugin list --json`, then update only
+   `pluginConfigs[<plugin-id>].options.SIGNOZ_MCP_URL` in
+   `~/.claude/settings.json`, preserving unrelated settings. Claude ignores
+   project and local `pluginConfigs`. If managed settings or `--settings`
+   supplies the option, report that higher-precedence source instead of
+   claiming the user setting changed. **Customize** updates the same user
+   option.
+3. For Codex, update the Agent Plugins v1 `mcp.json`, preserving its `signoz`
+   key and `type`. If a native `signoz` entry already exists, update it too
+   because it takes precedence. For a non-portable endpoint, leave `mcp.json`
+   unchanged and use the native entry instead. Verify with
+   `codex mcp get signoz` or `codex mcp list`.
 4. In `.signoz_cursor_mcp.json` for Cursor, replace only the `url` value with the
    resolved MCP endpoint, preserving the existing `signoz` server key.
 5. Preserve unrelated MCP servers and settings.
 
-Claude Code target shape (keep the `mcp` server key and `type`):
+Claude Code user-settings fragment (use the exact installed plugin ID and
+preserve the rest of `~/.claude/settings.json`):
 
 ```json
 {
+  "pluginConfigs": {
+    "signoz@<marketplace>": {
+      "options": {
+        "SIGNOZ_MCP_URL": "https://mcp.us.signoz.cloud/mcp"
+      }
+    }
+  }
+}
+```
+
+Agent Plugins v1 target shape, including Codex (keep `$schema`, the `signoz`
+server key, and `type`):
+
+```json
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
   "mcpServers": {
-    "mcp": {
-      "type": "http",
+    "signoz": {
+      "type": "streamable-http",
       "url": "https://mcp.us.signoz.cloud/mcp"
     }
   }
 }
 ```
 
-Codex and Cursor target shape (keep the `signoz` server key):
+Cursor target shape (keep the `signoz` server key):
 
 ```json
 {
@@ -190,13 +215,14 @@ Codex and Cursor target shape (keep the `signoz` server key):
 }
 ```
 
-If either bundled file still uses any `SIGNOZ_MCP_URL` wrapper from an older
-version, replace it with the concrete resolved URL.
+If an active non-Claude registration file still uses any `SIGNOZ_MCP_URL`
+wrapper from an older version, replace it with the concrete resolved URL.
 
-Portable and client-specific registration files live inside the installed
-plugin. Plugin updates can reset them to the placeholder; if that happens,
-rerun this setup skill. For a more durable native-client setup, use the relevant
-recipe in `client-configs.md`.
+Portable and Cursor registration files live inside the installed plugin.
+Plugin updates can reset them to the placeholder; if that happens, rerun this
+setup skill. Claude Code's persisted plugin option survives plugin updates. For
+a more durable native-client setup, use the relevant recipe in
+`client-configs.md`.
 
 For Codex, if the user says the endpoint reset again, keeps resetting, or asks
 for a durable/persistent setup, also create or update the native Codex MCP
@@ -271,8 +297,9 @@ client-specific authentication step:
   self-hosted HTTP endpoint (no OAuth unless the server runs with
   `OAUTH_ENABLED=true`), skip the login step and just verify with `/mcp` that the
   already-authenticated `signoz` server is connected.
-- **Claude Code**: restart Claude Code if the server does not appear, then run
-  `/mcp`, select `signoz`, and complete authentication.
+- **Claude Code**: run `/reload-plugins` so Claude re-substitutes the persisted
+  option, then run `/mcp`, select the `signoz` plugin's `mcp` server
+  (`plugin:signoz:mcp`), and complete authentication.
 - **Claude Desktop**: for SigNoz Cloud or publicly reachable self-hosted HTTP,
   reconnect the custom connector and complete authentication when prompted.
   Private-network or localhost endpoints need local stdio because remote
