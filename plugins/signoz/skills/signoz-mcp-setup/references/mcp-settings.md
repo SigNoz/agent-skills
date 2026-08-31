@@ -56,7 +56,11 @@ Silently determine `signoz-server-state`, **only after the client is known**
 4. If any registration file consulted in step 3 contains `not-setup`, or the
    Claude Code option has no usable endpoint and no manifest default, state is
    **not-setup**.
-5. Otherwise state is **configured-but-not-working**.
+5. If the portable file still uses the packaged
+   `https://mcp.us.signoz.cloud/mcp` default and the probe failed, confirm the
+   user's region before recommending authentication; the default may not be an
+   intentional configuration.
+6. Otherwise state is **configured-but-not-working**.
 
 Do not tell the user which checks ran or what file contents were found. Explain
 only the plain outcome: working, not set up, or configured but not connected.
@@ -154,10 +158,11 @@ clear the explicit plugin setting and reload the client.
 ### Update behavior and durable Codex config
 
 The portable and Cursor files live inside the installed plugin. Plugin updates
-can reset them to the placeholder. If the `signoz` server returns to
-**not-setup** after an update, rerun `signoz-mcp-setup`. Claude Code's endpoint
-is a persisted plugin option and survives plugin updates. For durable native
-client configuration, use the client-specific recipes in `client-configs.md`.
+can reset them to their packaged defaults (`us` for the portable file and the
+region placeholder for Cursor). If an update replaces the configured endpoint,
+rerun `signoz-mcp-setup`. Claude Code's endpoint is a persisted plugin option
+and survives plugin updates. For durable native client configuration, use the
+client-specific recipes in `client-configs.md`.
 
 For Codex users who report repeated resets or ask for a persistent setup, add
 or update the native Codex MCP entry as well as the bundled `mcp.json`. Use

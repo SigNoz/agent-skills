@@ -219,10 +219,10 @@ If an active non-Claude registration file still uses any `SIGNOZ_MCP_URL`
 wrapper from an older version, replace it with the concrete resolved URL.
 
 Portable and Cursor registration files live inside the installed plugin.
-Plugin updates can reset them to the placeholder; if that happens, rerun this
-setup skill. Claude Code's persisted plugin option survives plugin updates. For
-a more durable native-client setup, use the relevant recipe in
-`client-configs.md`.
+Plugin updates can reset them to their packaged defaults (`us` for the portable
+file and the region placeholder for Cursor); if that happens, rerun this setup
+skill. Claude Code's persisted plugin option survives plugin updates. For a more
+durable native-client setup, use the relevant recipe in `client-configs.md`.
 
 For Codex, if the user says the endpoint reset again, keeps resetting, or asks
 for a durable/persistent setup, also create or update the native Codex MCP

@@ -28,7 +28,7 @@ CLIENT_MCP_CONTRACTS = (
         {
             "signoz": {
                 "type": "streamable-http",
-                "url": "https://not-setup/mcp",
+                "url": "https://mcp.us.signoz.cloud/mcp",
             }
         },
     ),
