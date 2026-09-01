@@ -122,7 +122,7 @@ instead of hitting collisions mid-build:
 - **Is there a notification channel to reuse?** (Carried into Phase 5.)
 
 Paginate every inventory list until a match is found or all pages are
-exhausted. When a view's `sourcePage` is unknown, search traces, logs, metrics,
+exhausted. When a view's `source` is unknown, search traces, logs, metrics,
 and meter separately.
 
 Learn just enough to decide extend-vs-create per artifact; leave the
