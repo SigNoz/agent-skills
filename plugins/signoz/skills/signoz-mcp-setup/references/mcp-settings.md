@@ -34,10 +34,8 @@ Silently determine `signoz-server-state`, **only after the client is known**
      loaded by the active client as portable, read the standard `mcp.json` in
      the installed plugin root. Ignore neighboring compatibility files; their
      presence does not change the active package format.
-   - **Claude Code bundled plugin install**: read the exact enabled plugin ID's
-     option from `~/.claude/settings.json`; managed settings and `--settings`
-     override it. Ignore project/local `pluginConfigs`. If absent, use the
-     manifest default; `.signoz_claude_mcp.json` is only the template.
+   - **Claude Code bundled plugin install**: read the active plugin root's
+     `.signoz_claude_mcp.json` path supplied by `SKILL.md` Step 4.
    - **Cursor bundled plugin install**: read the client-specific plugin
      registration file below.
    - **Grok Build**: read `[mcp_servers.signoz]` from `./.grok/config.toml`,
@@ -53,13 +51,13 @@ Silently determine `signoz-server-state`, **only after the client is known**
      because that's where the *source* repo keeps them, not because they
      configure the current client. Check that client's own native config
      location from `client-configs.md` instead.
-4. If any registration file consulted in step 3 contains `not-setup`, or the
-   Claude Code option has no usable endpoint and no manifest default, state is
-   **not-setup**.
-5. If the portable file still uses the packaged
+4. If any registration file consulted in step 3 contains `not-setup` or has no
+   usable endpoint, state is **not-setup**.
+5. If the portable or Claude file still uses the packaged
    `https://mcp.us.signoz.cloud/mcp` default and the probe failed, confirm the
-   user's region before recommending authentication; the default may not be an
-   intentional configuration.
+   user's region before recommending authentication; state is
+   **configured-but-not-working**, and the default may not be an intentional
+   configuration.
 6. Otherwise state is **configured-but-not-working**.
 
 Do not tell the user which checks ran or what file contents were found. Explain
@@ -74,8 +72,7 @@ or edit them for any other client, even if a file search finds them:
 
 - plugin-root `mcp.json` for Agent Plugins v1, including Codex (not native
   `.vscode/mcp.json` or `.cursor/mcp.json` files)
-- `.signoz_claude_mcp.json` for Claude Code, as a read-only
-  `${user_config.SIGNOZ_MCP_URL}` substitution template
+- `.signoz_claude_mcp.json` for Claude Code, with a literal HTTPS URL
 - `.signoz_cursor_mcp.json` for Cursor
 
 The plugin also ships `.signoz_grok_mcp.json` for Grok Build, but Grok is **not**
@@ -94,11 +91,10 @@ client.
 Update the active configuration **for the identified client only**. Use the
 canonical portable shape and transport restrictions in `client-configs.md` for
 the Agent Plugins v1 file. For Cursor, replace only the `url` value and preserve
-the `signoz` key. For Claude Code, update only the persisted plugin option in
-`~/.claude/settings.json`, subject to higher-precedence managed or `--settings`
-values, and leave `.signoz_claude_mcp.json` unchanged: its `mcp` key determines
-the `plugin:signoz:mcp` tool namespace. Do not create duplicate MCP server
-entries or rename an existing server.
+the `signoz` key. For Claude Code, replace only `mcpServers.mcp.url` in
+the active plugin root's `.signoz_claude_mcp.json` path supplied by `SKILL.md`
+Step 4; its `mcp` key determines the `plugin:signoz:mcp` tool namespace. Do not
+create duplicate MCP server entries or rename an existing server.
 
 ## Editing Rules
 
@@ -109,6 +105,7 @@ Use the client-specific shape for the registration file you are editing.
 The URL should use a concrete endpoint in these active registration files:
 
 - plugin-root `mcp.json` for Agent Plugins v1, including Codex
+- `.signoz_claude_mcp.json` for Claude Code
 - `.signoz_cursor_mcp.json` for Cursor
 
 ```json
@@ -118,20 +115,9 @@ The URL should use a concrete endpoint in these active registration files:
 Replace the entire `url` value with the resolved MCP endpoint. For the portable
 file, follow `client-configs.md`; it is the canonical source for its complete
 shape and HTTPS restriction. Do not keep `${SIGNOZ_MCP_URL:-...}` in the active
-files above; Codex treats it as a literal URL, and Cursor documents
-interpolation syntax that does not include shell-style defaults.
-
-For Claude Code, do not replace the placeholder in
-`.signoz_claude_mcp.json`. Identify the exact enabled plugin ID, then write the
-concrete endpoint to
-`pluginConfigs[<plugin-id>].options.SIGNOZ_MCP_URL` in
-`~/.claude/settings.json`, preserving unrelated settings and options. Do this
-regardless of the plugin's installation scope; project and local
-`pluginConfigs` entries are ignored. If managed settings or a `--settings`
-source supplies the option, report that higher-precedence source rather than
-claiming a user edit took effect. Otherwise **Customize** updates the same user
-setting. Run `/reload-plugins` after the option changes so the MCP template is
-substituted again.
+files above. Codex and Claude.ai/Desktop treat unresolved placeholders as
+literal URLs, and Cursor documents interpolation syntax that does not include
+shell-style defaults. Run `/reload-plugins` after changing the Claude Code file.
 
 Grok Build is the one exception, which is why its registration is a separate
 file: Grok expands `${VAR}` and `${VAR:-default}` in MCP `url`, `command`,
@@ -139,9 +125,8 @@ file: Grok expands `${VAR}` and `${VAR:-default}` in MCP `url`, `command`,
 deliberately keeps `${SIGNOZ_MCP_URL:-https://mcp.us.signoz.cloud/mcp}`. Leave
 it intact and configure Grok through `[mcp_servers.signoz]`.
 
-If an active non-Claude registration file contains any legacy
-`SIGNOZ_MCP_URL` wrapper, replace the full value with the concrete resolved
-URL.
+If an active registration file other than Grok's contains any legacy
+`SIGNOZ_MCP_URL` wrapper, replace the full value with the concrete resolved URL.
 
 Examples:
 
@@ -150,19 +135,13 @@ https://mcp.eu.signoz.cloud/mcp
 http://localhost:8000/mcp
 ```
 
-If the user's client has an explicit plugin setting or environment override for
-the endpoint, that value can override this default. If this setup skill updates
-the default but the client still connects to the old endpoint, tell the user to
-clear the explicit plugin setting and reload the client.
-
 ### Update behavior and durable Codex config
 
-The portable and Cursor files live inside the installed plugin. Plugin updates
-can reset them to their packaged defaults (`us` for the portable file and the
-region placeholder for Cursor). If an update replaces the configured endpoint,
-rerun `signoz-mcp-setup`. Claude Code's endpoint is a persisted plugin option
-and survives plugin updates. For durable native client configuration, use the
-client-specific recipes in `client-configs.md`.
+The portable, Claude Code, and Cursor files live inside the installed plugin.
+Plugin updates can reset them to their packaged defaults (`us` for the portable
+and Claude files, and the region placeholder for Cursor). If an update replaces
+the configured endpoint, rerun `signoz-mcp-setup`. For durable native client
+configuration, use the client-specific recipes in `client-configs.md`.
 
 For Codex users who report repeated resets or ask for a persistent setup, add
 or update the native Codex MCP entry as well as the bundled `mcp.json`. Use

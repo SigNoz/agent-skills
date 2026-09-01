@@ -53,17 +53,19 @@ file only when that client loaded the corresponding compatibility package.
 - Portable Agent Plugins v1 install, including a VS Code or Codex installation
   whose root manifest declares the Agent Plugins schema: use the standard
   `mcp.json` in the installed plugin root.
-- Claude Code compatibility-package install: use the persisted plugin option
-  referenced by its bundled registration file. Cursor compatibility-package
-  install: use its bundled registration file.
+- Claude Code compatibility-package install: use its installed bundled
+  registration file. Cursor compatibility-package install: use its bundled
+  registration file.
 - Grok Build: use the Grok Build CLI recipe in `client-configs.md`. It ships a
   bundled registration file, but its endpoint is configured through
   `[mcp_servers.signoz]`, not by editing that file.
 - VS Code / GitHub Copilot native MCP setup: use the native recipe only when no
   Agent Plugins v1 install is active, the user explicitly requests native
   config, or the endpoint is not eligible for portable `mcp.json`.
-- Claude Desktop, Gemini CLI, Devin CLI, Windsurf, Zed, Antigravity CLI, or
-  OpenCode: use the matching native client recipe in `client-configs.md`.
+- Claude.ai or Claude Desktop hosted partner plugin: use the hosted connector
+  recipe in `client-configs.md`. For Claude Desktop local stdio, Gemini CLI,
+  Devin CLI, Windsurf, Zed, Antigravity CLI, or OpenCode, use the matching
+  native client recipe there.
 - Unknown or unsupported client: use the generic HTTP MCP recipe and point the
   user to the SigNoz MCP Server docs for their client's exact config surface.
 
@@ -156,14 +158,10 @@ Cursor plugin install, apply the endpoint using the reference editing rules:
    workspace or user MCP config and preserve every unrelated server and setting.
    Never infer that an existing native entry is accidental solely because both
    registrations exist.
-2. For Claude Code, leave `.signoz_claude_mcp.json` unchanged. Get the exact
-   enabled plugin ID from `claude plugin list --json`, then update only
-   `pluginConfigs[<plugin-id>].options.SIGNOZ_MCP_URL` in
-   `~/.claude/settings.json`, preserving unrelated settings. Claude ignores
-   project and local `pluginConfigs`. If managed settings or `--settings`
-   supplies the option, report that higher-precedence source instead of
-   claiming the user setting changed. **Customize** updates the same user
-   option.
+2. For Claude Code, replace only `mcpServers.mcp.url` in
+   `${CLAUDE_PLUGIN_ROOT}/.signoz_claude_mcp.json` with the resolved endpoint.
+   Preserve the `mcp` server key, `type: "http"`, and every unrelated file.
+   This installed path is versioned and will reset on a plugin update.
 3. For Codex, update the Agent Plugins v1 `mcp.json`, preserving its `signoz`
    key and `type`. If a native `signoz` entry already exists, update it too
    because it takes precedence. For a non-portable endpoint, leave `mcp.json`
@@ -173,16 +171,14 @@ Cursor plugin install, apply the endpoint using the reference editing rules:
    resolved MCP endpoint, preserving the existing `signoz` server key.
 5. Preserve unrelated MCP servers and settings.
 
-Claude Code user-settings fragment (use the exact installed plugin ID and
-preserve the rest of `~/.claude/settings.json`):
+Claude Code target shape (keep the `mcp` server key and `type`):
 
 ```json
 {
-  "pluginConfigs": {
-    "signoz@<marketplace>": {
-      "options": {
-        "SIGNOZ_MCP_URL": "https://mcp.us.signoz.cloud/mcp"
-      }
+  "mcpServers": {
+    "mcp": {
+      "type": "http",
+      "url": "https://mcp.us.signoz.cloud/mcp"
     }
   }
 }
@@ -215,14 +211,15 @@ Cursor target shape (keep the `signoz` server key):
 }
 ```
 
-If an active non-Claude registration file still uses any `SIGNOZ_MCP_URL`
-wrapper from an older version, replace it with the concrete resolved URL.
+If an active registration file other than Grok's still uses any
+`SIGNOZ_MCP_URL` wrapper from an older version, replace it with the concrete
+resolved URL.
 
-Portable and Cursor registration files live inside the installed plugin.
-Plugin updates can reset them to their packaged defaults (`us` for the portable
-file and the region placeholder for Cursor); if that happens, rerun this setup
-skill. Claude Code's persisted plugin option survives plugin updates. For a more
-durable native-client setup, use the relevant recipe in `client-configs.md`.
+Portable, Claude Code, and Cursor registration files live inside the installed
+plugin. Plugin updates can reset them to their packaged defaults (`us` for the
+portable and Claude files, and the region placeholder for Cursor); if that
+happens, rerun this setup skill. For a more durable native-client setup, use the
+relevant recipe in `client-configs.md`.
 
 For Codex, if the user says the endpoint reset again, keeps resetting, or asks
 for a durable/persistent setup, also create or update the native Codex MCP
@@ -297,15 +294,17 @@ client-specific authentication step:
   self-hosted HTTP endpoint (no OAuth unless the server runs with
   `OAUTH_ENABLED=true`), skip the login step and just verify with `/mcp` that the
   already-authenticated `signoz` server is connected.
-- **Claude Code**: run `/reload-plugins` so Claude re-substitutes the persisted
-  option, then run `/mcp`, select the `signoz` plugin's `mcp` server
+- **Claude Code**: run `/reload-plugins` so Claude reloads the edited
+  registration, then run `/mcp`, select the `signoz` plugin's `mcp` server
   (`plugin:signoz:mcp`), and complete authentication.
 - **Claude Desktop**: for SigNoz Cloud or publicly reachable self-hosted HTTP,
-  reconnect the custom connector and complete authentication when prompted.
-  Private-network or localhost endpoints need local stdio because remote
-  connectors originate from Anthropic's cloud. Restart Claude Desktop after a
-  local stdio change so it reloads `claude_desktop_config.json`; that file is
-  only for command-based registration, not a hosted URL.
+  add the connector with the resolved URL if it is **Not added**. If it was
+  already added, remove and re-add it with the resolved URL; do not keep a
+  second connector. Then complete authentication. Private-network or localhost
+  endpoints need local stdio because remote connectors originate from
+  Anthropic's cloud. Restart Claude Desktop after a local stdio change so it
+  reloads `claude_desktop_config.json`; that file is only for command-based
+  registration, not a hosted URL.
 - **Grok Build**: run `/mcps` (or press Ctrl+L and open the MCP Servers tab),
   press `r` to reload after the config change, then select `signoz` and press
   `i` to complete the OAuth flow in the browser. Self-hosted endpoints need no

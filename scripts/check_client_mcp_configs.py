@@ -17,7 +17,7 @@ CLIENT_MCP_CONTRACTS = (
         {
             "mcp": {
                 "type": "http",
-                "url": "${user_config.SIGNOZ_MCP_URL}",
+                "url": "https://mcp.us.signoz.cloud/mcp",
             }
         },
     ),
@@ -83,6 +83,16 @@ def check_client_mcp_configs(plugin_dir: Path) -> None:
             raise ValueError(
                 f"{client_name} manifest {manifest} declares mcpServers="
                 f"{declared_target!r}, expected {expected_declaration!r}"
+            )
+        claude_user_config = manifest_data.get("userConfig")
+        if (
+            client_name == "Claude Code"
+            and isinstance(claude_user_config, dict)
+            and "SIGNOZ_MCP_URL" in claude_user_config
+        ):
+            raise ValueError(
+                "Claude Code manifest must not declare the unused "
+                f"SIGNOZ_MCP_URL userConfig option: {manifest}"
             )
 
         resolved_target = (plugin_dir / expected_target).resolve()

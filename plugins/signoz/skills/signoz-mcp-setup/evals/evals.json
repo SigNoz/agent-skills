@@ -3,21 +3,21 @@
   "evals": [
     {
       "id": 0,
-      "eval_name": "claude-desktop-hosted-custom-connector",
-      "prompt": "Configure Claude Desktop to use the hosted SigNoz Cloud MCP endpoint https://mcp.eu.signoz.cloud/mcp. Show me exactly where you would put it.",
-      "expected_output": "Agent routes the remote endpoint through Claude Desktop Settings > Connectors > Add custom connector and does not write a remote URL entry to claude_desktop_config.json. It explains that the desktop JSON file is reserved for local stdio command registrations, then gives the connector authentication/reconnect step.",
+      "eval_name": "claude-desktop-partner-plugin-connector",
+      "prompt": "I installed SigNoz from Anthropic & Partners in Claude Desktop. Its mcp connector says Not added. Configure it for the eu region, and tell me what to do if it was already connected.",
+      "expected_output": "Agent opens the installed SigNoz plugin's mcp connector, replaces its URL with https://mcp.eu.signoz.cloud/mcp before adding it, and completes OAuth. If it was already added, the agent removes it and re-adds the plugin connector with the new URL. It does not keep a simultaneous second connector or put a remote URL in claude_desktop_config.json.",
       "assertions": [
         {
-          "text": "Agent configures the hosted URL through Claude Desktop Custom Connectors",
-          "description": "Claude Desktop remote MCP uses the connector UI"
+          "text": "For a Not added connector, Agent opens the installed SigNoz plugin's mcp connector and sets https://mcp.eu.signoz.cloud/mcp before adding it",
+          "description": "The partner plugin connector is configured before its first connection"
         },
         {
-          "text": "Agent does not put a remote url entry in claude_desktop_config.json",
-          "description": "The desktop JSON file does not register hosted remote MCP endpoints"
+          "text": "For an already-added connector, Agent removes it and re-adds the plugin connector with the new URL without keeping a simultaneous second connector",
+          "description": "Claude connector changes use the documented remove-and-re-add flow"
         },
         {
-          "text": "Agent states that claude_desktop_config.json is only used here for a local stdio command with command, args, and env",
-          "description": "The remote and local configuration contracts must remain distinct"
+          "text": "Agent does not put a remote url entry in claude_desktop_config.json and completes OAuth",
+          "description": "Hosted connector configuration stays out of the local stdio file"
         }
       ],
       "files": []
@@ -156,27 +156,23 @@
       "id": 7,
       "eval_name": "compatibility-package-wins-over-portable-files",
       "prompt": "I installed the SigNoz marketplace plugin in Claude Code. Its plugin root contains mcp.json as well as .signoz_claude_mcp.json. Configure it for the eu region.",
-      "expected_output": "Agent uses the explicit Claude Code marketplace installation to identify the Claude Code compatibility package, despite the colocated portable mcp.json. It identifies the exact enabled SigNoz plugin ID, updates only pluginConfigs[<plugin-id>].options.SIGNOZ_MCP_URL in ~/.claude/settings.json to https://mcp.eu.signoz.cloud/mcp regardless of installation scope, and preserves unrelated settings. It does not write project or local pluginConfigs. It leaves both .signoz_claude_mcp.json and the portable mcp.json unchanged, runs or requests /reload-plugins, then tells the user to select the signoz plugin's mcp server for authentication. If a managed or --settings source controls the option, it reports that higher-precedence source instead of claiming the user setting won.",
+      "expected_output": "Agent uses the explicit Claude Code marketplace installation to identify the Claude Code compatibility package, despite the colocated portable mcp.json. It updates only mcpServers.mcp.url in the active plugin root's .signoz_claude_mcp.json to https://mcp.eu.signoz.cloud/mcp, preserving the mcp server key and type=http. It leaves the portable mcp.json unchanged, warns that a plugin update can restore the packaged us endpoint and the setup skill should be rerun, runs or requests /reload-plugins, verifies the effective URL, then tells the user to select the signoz plugin's mcp server for authentication.",
       "assertions": [
         {
           "text": "Agent treats the install as the Claude Code compatibility package rather than a portable package",
           "description": "The explicit Claude Code marketplace installation identifies the active package format"
         },
         {
-          "text": "Agent identifies the exact enabled SigNoz plugin ID and updates only pluginConfigs[<plugin-id>].options.SIGNOZ_MCP_URL in ~/.claude/settings.json regardless of installation scope while preserving unrelated settings; it does not write project or local pluginConfigs",
-          "description": "The endpoint is written to Claude Code's persisted userConfig option"
+          "text": "Agent updates only mcpServers.mcp.url in the active plugin root's .signoz_claude_mcp.json to https://mcp.eu.signoz.cloud/mcp",
+          "description": "The endpoint is written to the active Claude Code plugin registration"
         },
         {
-          "text": "Agent leaves .signoz_claude_mcp.json and plugin-root mcp.json unchanged",
-          "description": "The cached substitution template and inactive portable registration are not mutated"
+          "text": "Agent preserves the mcp server key and type http and leaves plugin-root mcp.json unchanged",
+          "description": "The active Claude registration retains its identity while the inactive portable registration is not mutated"
         },
         {
-          "text": "Agent reloads plugins and tells the user to authenticate the signoz plugin's mcp server, not a server named signoz",
-          "description": "Claude re-substitutes the persisted option and authentication targets the retained connector"
-        },
-        {
-          "text": "If managed settings or a --settings source controls the option, Agent reports the higher-precedence source instead of claiming the user setting took effect",
-          "description": "Claude's pluginConfig precedence is respected"
+          "text": "Agent warns that a plugin update can restore the packaged us endpoint, tells the user to rerun setup if that happens, reloads plugins, verifies the effective URL, and authenticates the signoz plugin's mcp server",
+          "description": "The finish step covers update reset, reload, and authentication behavior"
         }
       ],
       "files": []
