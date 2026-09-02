@@ -8,14 +8,5 @@
   "homepage": "https://signoz.io/privacy/",
   "repository": "https://github.com/SigNoz/agent-skills",
   "license": "MIT",
-  "mcpServers": "./.signoz_claude_mcp.json",
-  "userConfig": {
-    "SIGNOZ_MCP_URL": {
-      "type": "string",
-      "title": "SigNoz MCP endpoint",
-      "description": "SigNoz Cloud: keep the default and edit the region segment to match yours — https://mcp.<region>.signoz.cloud/mcp (regions: us, us2, eu, eu2, in, in2; find yours under Settings -> Ingestion, or see https://signoz.io/docs/ingestion/signoz-cloud/keys/). After install, run /mcp, select signoz, and complete the Cloud OAuth login. Self-hosted SigNoz: enter your own HTTP /mcp URL, for example http://localhost:8000/mcp.",
-      "default": "https://mcp.us.signoz.cloud/mcp",
-      "required": true
-    }
-  }
+  "mcpServers": "./.signoz_claude_mcp.json"
 }
