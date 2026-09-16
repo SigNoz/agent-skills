@@ -5,11 +5,12 @@
       "id": 0,
       "eval_name": "mcp-path-narrow-language",
       "prompt": "How do I configure the OTLP exporter for a Python application sending traces to SigNoz Cloud?",
-      "expected_output": "Agent calls signoz_search_docs with the user's natural-language query and section_slug='apm-distributed-tracing' (or similar). Trusts BM25 ranking — does not invent its own keyword scoring. Picks the Python-specific instrumentation guide from top results, calls signoz_fetch_doc on the canonical URL, and answers with the OTLP endpoint, headers (signoz-ingestion-key), protocol, and a Python code snippet. Cites the canonical https://signoz.io/docs/... URL. Does not fetch unrelated language guides.",
+      "expected_output": "Agent calls signoz_search_docs with 2 to 6 keywords taken from the question, for example 'Python OTLP exporter traces', and section_slug='apm-distributed-tracing' (or similar). It does not pass the whole sentence and keeps product names (Python, OTLP) as written. Picks the Python-specific instrumentation guide from top results, calls signoz_fetch_doc on the canonical URL, and answers with the OTLP endpoint, headers (signoz-ingestion-key), protocol, and a Python code snippet. Cites the canonical https://signoz.io/docs/... URL. Does not fetch unrelated language guides.",
       "files": [],
       "assertions": [
         {"id": "uses_mcp_search", "text": "Agent calls signoz_search_docs (MCP tool) rather than only HTTP fetching."},
-        {"id": "narrows_section", "text": "Agent passes a section_slug for tracing/APM (e.g. apm-distributed-tracing) to narrow the BM25 search."},
+        {"id": "keyword_search_text", "text": "searchText is 2 to 6 keywords that keep 'Python' and 'OTLP' as written, not the full question sentence."},
+        {"id": "narrows_section", "text": "Agent passes a section_slug for tracing/APM (e.g. apm-distributed-tracing) to narrow the search."},
         {"id": "fetches_python_page", "text": "Agent fetches a Python-specific instrumentation guide via signoz_fetch_doc, not a generic overview."},
         {"id": "cites_canonical_url", "text": "Answer cites at least one canonical https://signoz.io/docs/... URL."},
         {"id": "answer_includes_key_setup", "text": "Answer includes OTLP endpoint, signoz-ingestion-key header, and a Python code snippet or env var setup."},
@@ -35,10 +36,11 @@
       "id": 2,
       "eval_name": "multi-page-alerts-config-and-troubleshoot",
       "prompt": "How do I configure alert rules in SigNoz, and how do I troubleshoot when they fire unexpectedly?",
-      "expected_output": "Agent recognizes the task spans two needs: alert setup AND troubleshooting. Calls signoz_search_docs with section_slug='alerts' and fetches TWO pages — one on alert configuration, one on alert troubleshooting/debugging. Synthesizes both into a single answer: setup steps first, then debugging guidance. Cites both canonical URLs. Does not pad with loosely-related pages just because they share keywords.",
+      "expected_output": "Agent recognizes the task spans two needs: alert setup AND troubleshooting. Calls signoz_search_docs once per intent with keyword searchText (for example 'alert rules configure' and 'alerts troubleshooting'), each with section_slug='alerts', and fetches TWO pages: one on alert configuration, one on alert troubleshooting/debugging. Synthesizes both into a single answer: setup steps first, then debugging guidance. Cites both canonical URLs. Does not pad with loosely-related pages just because they share keywords.",
       "files": [],
       "assertions": [
-        {"id": "fetches_multiple_pages", "text": "Agent fetches at least 2 distinct docs pages — one on alert configuration, one on troubleshooting."},
+        {"id": "fetches_multiple_pages", "text": "Agent fetches at least 2 distinct docs pages: one on alert configuration, one on troubleshooting."},
+        {"id": "splits_intents", "text": "Agent makes separate signoz_search_docs calls for the configuration intent and the troubleshooting intent, each with a short keyword searchText, rather than one call with the whole question."},
         {"id": "uses_alerts_section_slug", "text": "Agent passes section_slug='alerts' to signoz_search_docs."},
         {"id": "synthesizes_both_topics", "text": "Answer covers BOTH alert configuration AND troubleshooting unexpected fires."},
         {"id": "cites_both_urls", "text": "Answer cites at least 2 canonical https://signoz.io/docs/... URLs."},
@@ -64,11 +66,12 @@
       "id": 4,
       "eval_name": "no-heuristic-topic-dashboards",
       "prompt": "How do I create a dashboard panel that shows p99 latency for my metrics?",
-      "expected_output": "Agent recognizes there is no heuristic row for dashboards. Goes directly to signoz_search_docs with the user's query and section_slug='dashboards'. Does NOT invent a heuristic claim or pretend to follow one. Picks the dashboard panel / metrics query guide from top BM25 results, fetches it, and answers with the panel-builder steps. Cites canonical URL.",
+      "expected_output": "Agent recognizes there is no heuristic row for dashboards. Goes directly to signoz_search_docs with 2 to 6 keywords (for example 'dashboard panel p99 latency') and section_slug='dashboards'. Does NOT invent a heuristic claim or pretend to follow one. Picks the dashboard panel / metrics query guide from top results, fetches it, and answers with the panel-builder steps. Cites canonical URL.",
       "files": [],
       "assertions": [
         {"id": "no_false_heuristic", "text": "Agent does NOT claim to follow a heuristic for dashboards (none exists)."},
         {"id": "uses_mcp_search", "text": "Agent calls signoz_search_docs (MCP tool) directly."},
+        {"id": "keyword_search_text", "text": "searchText is 2 to 6 keywords such as 'dashboard panel p99 latency', not the full question sentence."},
         {"id": "uses_dashboards_section", "text": "Agent passes section_slug='dashboards' to narrow the search."},
         {"id": "fetches_dashboard_guide", "text": "Agent fetches a dashboard panel / metrics-query guide page."},
         {"id": "answer_explains_panel_steps", "text": "Answer explains concrete dashboard panel construction steps (panel type, query, p99 aggregation, group/legend)."},
@@ -79,7 +82,7 @@
       "id": 5,
       "eval_name": "query-builder-howto",
       "prompt": "How do I use the SigNoz query builder to compute p95 latency grouped by service.name?",
-      "expected_output": "Agent calls signoz_search_docs with section_slug='querying' (no heuristic exists for querying — agent must not invent one). Picks the query builder docs page from BM25 results and fetches it. Answers with the concrete UI steps: choose traces signal, select duration metric, set aggregation to p95, set group-by to service.name. Grounds the answer in fetched docs content. Cites the canonical URL. Does NOT delegate to signoz-generating-queries — this is a docs lookup ('how do I use the query builder'), not query generation.",
+      "expected_output": "Agent calls signoz_search_docs with keyword searchText (for example 'query builder p95 group by') and section_slug='querying' (no heuristic exists for querying; agent must not invent one). Picks the query builder docs page from the results and fetches it. Answers with the concrete UI steps: choose traces signal, select duration metric, set aggregation to p95, set group-by to service.name. Grounds the answer in fetched docs content. Cites the canonical URL. Does NOT delegate to signoz-generating-queries; this is a docs lookup ('how do I use the query builder'), not query generation.",
       "files": [],
       "assertions": [
         {"id": "no_false_heuristic", "text": "Agent does NOT claim to follow a heuristic for querying (none exists)."},
@@ -117,6 +120,20 @@
         {"id": "refetches_same_url", "text": "Agent calls signoz_fetch_doc again with the same canonical URL and the returned relevant heading."},
         {"id": "grounds_answer_in_narrow_fetch", "text": "Agent grounds the API-key answer in the narrowed fetched content and cites the canonical URL."},
         {"id": "discloses_if_still_incomplete", "text": "If the narrowed response is still truncated before the needed material, Agent discloses incomplete coverage and does not infer that missing content or a setting does not exist."}
+      ]
+    },
+    {
+      "id": 8,
+      "eval_name": "retries-off-topic-top-result",
+      "prompt": "How do I mute alerts during a planned maintenance window in SigNoz? The first signoz_search_docs call you make returns a top result about alert notification channels that does not cover maintenance windows.",
+      "expected_output": "Agent judges the first top result off-topic for the question, does not fetch or answer from it, and calls signoz_search_docs once more with fewer or different keywords (for example 'planned maintenance alerts' or 'alert silence maintenance'). It fetches the planned maintenance page from the retried results, answers from that content, and cites the canonical URL. It does not keep retrying beyond one or two attempts and does not fall back to a guessed /docs/... URL.",
+      "files": [],
+      "assertions": [
+        {"id": "does_not_answer_from_off_topic", "text": "Agent does not fetch or answer from the off-topic notification-channel result."},
+        {"id": "retries_with_different_terms", "text": "Agent calls signoz_search_docs a second time with a searchText that is shorter or uses different keywords than the first call."},
+        {"id": "bounded_retries", "text": "Agent makes at most two retries before answering or disclosing that the docs do not cover the question."},
+        {"id": "fetches_search_result_url", "text": "Agent calls signoz_fetch_doc only with a URL returned by signoz_search_docs."},
+        {"id": "cites_canonical_url", "text": "Answer cites the canonical https://signoz.io/docs/... URL of the maintenance-window page."}
       ]
     }
   ]
