@@ -126,12 +126,12 @@
       "id": 8,
       "eval_name": "retries-off-topic-top-result",
       "prompt": "How do I mute alerts during a planned maintenance window in SigNoz? The first signoz_search_docs call you make returns a top result about alert notification channels that does not cover maintenance windows.",
-      "expected_output": "Agent judges the first top result off-topic for the question, does not fetch or answer from it, and calls signoz_search_docs once more with fewer or different keywords (for example 'planned maintenance alerts' or 'alert silence maintenance'). It fetches the planned maintenance page from the retried results, answers from that content, and cites the canonical URL. It does not keep retrying beyond one or two attempts and does not fall back to a guessed /docs/... URL.",
+      "expected_output": "Agent judges the first top result off-topic for the question, does not fetch or answer from it, and calls signoz_search_docs once more with fewer or different keywords (for example 'planned maintenance alerts' or 'alert silence maintenance'). It fetches the planned maintenance page from the retried results, answers from that content, and cites the canonical URL. It does not search a third time and does not fall back to a guessed /docs/... URL.",
       "files": [],
       "assertions": [
         {"id": "does_not_answer_from_off_topic", "text": "Agent does not fetch or answer from the off-topic notification-channel result."},
         {"id": "retries_with_different_terms", "text": "Agent calls signoz_search_docs a second time with a searchText that is shorter or uses different keywords than the first call."},
-        {"id": "bounded_retries", "text": "Agent makes at most two retries before answering or disclosing that the docs do not cover the question."},
+        {"id": "bounded_retries", "text": "Agent retries at most once (two signoz_search_docs calls in total) before answering or disclosing that the docs do not cover the question."},
         {"id": "fetches_search_result_url", "text": "Agent calls signoz_fetch_doc only with a URL returned by signoz_search_docs."},
         {"id": "cites_canonical_url", "text": "Answer cites the canonical https://signoz.io/docs/... URL of the maintenance-window page."}
       ]
