@@ -20,10 +20,10 @@ Prefer the SigNoz MCP server tools when available; fall back to direct HTTP fetc
 
 ### Preferred: MCP tools
 
-- `signoz_search_docs`: BM25 search over the indexed docs corpus. Pass the user's natural-language query as `searchText`. Narrow with `section_slug` when the question maps cleanly to a single docs section (the tool's own schema lists valid slugs; defer to it rather than memorizing). Trust the ranking; the index handles relevance.
+- `signoz_search_docs`: keyword search over the indexed docs corpus, ranked by how many of the query terms a page matches. Pass 2 to 6 keywords for one topic as `searchText`, for example `Kubernetes pod logs`; keep product and technology names as the user wrote them and drop filler such as "how do I" or "please". Whole user sentences rank worse than their keywords. Split a question with two intents into two calls. Narrow with `section_slug` when the question maps cleanly to a single docs section (the tool's own schema lists example slugs; an unknown slug returns zero results, so reuse a `section_slug` from an earlier result rather than guessing). If the top result is off-topic, retry once with fewer or different terms before answering.
 - `signoz_fetch_doc`: markdown for one indexed page. Pass the canonical URL or `/docs/...` path; optionally narrow to a section with `heading`. Inspect `truncation_reason` and `available_headings` in every response rather than assuming the returned `content` is complete.
 
-Never call `signoz_search_docs` with empty `searchText`; always pass the user's phrase.
+Never call `signoz_search_docs` with empty `searchText`; always pass keywords taken from the user's question.
 Never call `signoz_fetch_doc` without a URL; neither tool guesses missing input.
 `signoz://...` URIs are MCP resources: read them through the MCP resource API,
 never `signoz_fetch_doc`, which accepts only `https://signoz.io/docs/...` URLs
@@ -55,7 +55,7 @@ Accept: text/markdown
 1. **Identify the domain** from the user's question: instrumentation, OpenTelemetry setup, querying, dashboards, alerts, troubleshooting, deployment, or API docs.
 2. **Check the heuristics table below**. If a heuristic matches, read it before answering: heuristics encode product decisions (which path/method fits the user's environment), useful in both paths.
 3. **Search and fetch**: pick the path based on tool availability:
-   - **With MCP tools**: call `signoz_search_docs` with the user's query; pass `section_slug` if the domain maps cleanly to one. Read the top 1-3 results and call `signoz_fetch_doc` on the chosen URL (use `heading` to narrow if the page is large and the question is sub-section-specific).
+   - **With MCP tools**: call `signoz_search_docs` with 2 to 6 keywords from the user's question; pass `section_slug` if the domain maps cleanly to one. Read the top 1-3 results and call `signoz_fetch_doc` on the chosen URL (use `heading` to narrow if the page is large and the question is sub-section-specific). If the top result is off-topic, retry once with fewer or different terms.
    - **Without MCP tools**: grep `sitemap.md` for candidate pages, rank the best 2-5 by how directly they answer the task, and `GET` only URLs discovered in the sitemap with `Accept: text/markdown`. Heuristic coverage is sparse; for topics without a heuristic row, skim the sitemap by section path and prefer setup/troubleshooting/API-reference pages over overviews.
    - Fetch **one page** for narrow questions; fetch **multiple pages** when the task spans setup + troubleshooting, or method-selection + language guide. Keep the set small.
 4. **Handle truncated fetches before answering.** When `signoz_fetch_doc` returns `truncation_reason: "size"`, treat `content` as an incomplete prefix. Select the most relevant entry from `available_headings` and refetch the same search-result URL with that `heading`. If no heading covers the question, or the narrowed response is still truncated before the needed material, disclose that the fetched documentation is incomplete and do not infer that omitted content or a setting does not exist.
