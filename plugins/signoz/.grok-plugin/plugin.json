@@ -1,9 +1,10 @@
 {
   "name": "signoz",
-  "version": "2026.9.200",
+  "version": "2026.09.02",
   "description": "Official SigNoz plugin for MCP setup, docs, queries, dashboards, and alerts",
   "author": {
-    "name": "SigNoz"
+    "name": "SigNoz",
+    "url": "https://signoz.io"
   },
   "homepage": "https://signoz.io",
   "repository": "https://github.com/SigNoz/agent-skills",
@@ -16,5 +17,8 @@
     "clickhouse",
     "tracing",
     "logging"
-  ]
+  ],
+  "mcpServers": "./.signoz_grok_mcp.json",
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.json"
 }

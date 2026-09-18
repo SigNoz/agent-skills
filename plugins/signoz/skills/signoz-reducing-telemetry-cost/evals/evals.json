@@ -10,6 +10,7 @@
         "Agent starts with signoz_execute_builder_query Cost Meter queries before signal-specific analysis",
         "Agent discovers Cost Meter groupBy keys with signoz_get_field_keys signal=metrics source=meter",
         "Every raw builder groupBy entry in the actual signoz_execute_builder_query payload losslessly copies name, fieldDataType, fieldContext, and signal from the selected signoz_get_field_keys result",
+        "Every Cost Meter builder_query has limit=100 plus Query Builder v5 order by __result desc and no dashboard orderBy",
         "Agent analyzes metrics, logs, and traces because every signal has Cost Meter data",
         "Agent orders the investigation by current weighted cost: metrics, then logs, then traces",
         "Agent returns one consolidated prioritized action list without repeating the per-signal playbooks"
@@ -40,6 +41,7 @@
         "Agent calls signoz_list_metrics with source=meter and uses the returned metric names and units rather than assuming a fixed meter list",
         "Agent calls signoz_execute_builder_query with an outer query object containing Unix-millisecond start and end, requestType=time_series, formatOptions, and variables",
         "Agent uses source=meter, the discovered metricName and temporality, stepInterval=3600, and timeAggregation=sum for Cost Meter totals",
+        "Every Cost Meter builder_query has limit=100 plus Query Builder v5 order by __result desc and no dashboard orderBy",
         "Agent does not use signoz_query_metrics for Cost Meter totals",
         "Agent excludes datapoints marked partial=true and sums the remaining complete hourly buckets",
         "Agent converts log and span bytes to GB with the decimal 1e9 divisor",

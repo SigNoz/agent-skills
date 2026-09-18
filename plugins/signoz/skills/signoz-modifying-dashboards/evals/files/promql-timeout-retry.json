@@ -1,13 +1,12 @@
 {
   "mode": "offline_mcp_fixture",
-  "instructions": "Use the ordered reads and stubbed dry-runs to produce an offline simulated tool trace. Do not query a live tenant or call signoz_update_dashboard.",
+  "instructions": "Use the ordered reads and stubbed dry-runs to produce an offline simulated tool trace. Do not query a live tenant or call a dashboard write tool.",
   "responses": [
     {
       "tool": "signoz_list_dashboards",
       "request": {"limit": 50, "offset": 0},
       "response": {
-        "data": [{"uuid": "88888888-8888-4888-8888-888888888888", "name": "Prometheus Overview"}],
-        "pagination": {"total": 1, "offset": 0, "limit": 50, "hasMore": false, "nextOffset": -1}
+        "data": {"dashboards": [{"id": "88888888-8888-4888-8888-888888888888", "name": "prometheus-overview-0f3a", "spec": {"display": {"name": "Prometheus Overview"}}}], "total": 1}
       }
     },
     {
@@ -16,30 +15,28 @@
       "response": {
         "status": "success",
         "data": {
-          "uuid": "88888888-8888-4888-8888-888888888888",
-          "title": "Prometheus Overview",
-          "description": "Prometheus scrape health",
-          "tags": ["prometheus"],
-          "variables": {},
-          "widgets": [
-            {
-              "id": "99999999-9999-4999-8999-999999999999",
-              "panelTypes": "graph",
-              "title": "Scrape Rate",
-              "query": {
-                "queryType": "promql",
-                "promql": [
-                  {"name": "A", "query": "sum(rate(prometheus_tsdb_head_samples_appended_total[5m]))", "disabled": false, "legend": "Samples"}
-                ]
-              },
-              "selectedLogFields": [],
-              "selectedTracesFields": [],
-              "thresholds": [],
-              "contextLinks": {"linksData": []}
-            }
-          ],
-          "layout": [{"i": "99999999-9999-4999-8999-999999999999", "x": 0, "y": 0, "w": 12, "h": 6}],
-          "panelMap": {}
+          "id": "88888888-8888-4888-8888-888888888888",
+          "name": "prometheus-overview-0f3a",
+          "tags": [{"key": "source", "value": "prometheus"}],
+          "spec": {
+            "display": {"name": "Prometheus Overview", "description": "Prometheus scrape health"},
+            "variables": [],
+            "panels": {
+              "scrape-rate": {
+                "kind": "Panel",
+                "spec": {
+                  "display": {"name": "Scrape Rate"},
+                  "plugin": {"kind": "signoz/TimeSeriesPanel", "spec": {}},
+                  "queries": [
+                    {"kind": "time_series", "spec": {"name": "A", "plugin": {"kind": "signoz/PromQLQuery", "spec": {"name": "A", "query": "sum(rate(prometheus_tsdb_head_samples_appended_total[5m]))", "disabled": false, "legend": "Samples"}}}}
+                  ]
+                }
+              }
+            },
+            "layouts": [
+              {"kind": "Grid", "spec": {"display": {"title": "Scrape health"}, "items": [{"x": 0, "y": 0, "width": 12, "height": 6, "content": {"$ref": "#/spec/panels/scrape-rate"}}]}}
+            ]
+          }
         }
       }
     }

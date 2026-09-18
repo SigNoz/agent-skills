@@ -1,14 +1,14 @@
 ---
 name: signoz-creating-dashboards
 description: >
-  Create a new SigNoz dashboard from a natural-language intent — import a
+  Create a new SigNoz dashboard from a natural-language intent: import a
   curated template (PostgreSQL, Redis, JVM, k8s, hostmetrics, APM, LLM,
   etc.) when one fits, or build a custom dashboard from scratch with
   metric / trace / log panels. Make sure to use this skill whenever the
   user says "create a dashboard for…", "set up monitoring for…",
   "build me a dashboard…", "I need observability for…", "import a
   dashboard template", or asks to track / visualize a service, database,
-  cluster, or AI/LLM platform — even if they don't explicitly say
+  cluster, or AI/LLM platform, even if they don't explicitly say
   "dashboard". Also use it when someone wants to "monitor", "watch", or
   "see metrics for" a technology and the natural answer is a dashboard.
 argument-hint: <natural-language dashboard intent>
@@ -35,8 +35,10 @@ resolve.
 
 ### 1. Check for an existing dashboard
 
-Call `signoz_list_dashboards`, following pagination until `total` is covered
-before concluding that no match exists. The v2 list excludes system dashboards.
+Call `signoz_list_dashboards` with a distinctive `filter` when available and
+`limit=50`, following `offset` pagination until `total` is covered before
+concluding that no match exists. A later-page error blocks the write. The v2
+list excludes system dashboards.
 It may contain user and integration dashboards; only `source=user` dashboards
 are mutable. Compare names, descriptions, and tags by real domain relevance.
 
@@ -62,6 +64,10 @@ If all representative signals are absent, explain that the imported dashboard
 will show no data and ask whether to continue. If some are absent, identify
 them and let the user decide. Import with the catalog `path`; do not fetch or
 recreate template JSON yourself.
+
+If import fails, surface the error and offer either a custom build from the same
+validated signals or a stop. Do not retry silently or create a fabricated
+replacement payload without telling the user the import failed.
 
 ### 3. Discover data for a custom dashboard
 
@@ -151,6 +157,15 @@ Skip queryless text panels. For each query panel, validate the complete active
 query, including formulas and trace operators. Do not claim a stripped query
 validated unsupported fields. If the executor cannot represent an authored
 semantic, surface the validation gap before saving.
+
+Every builder query and formula uses a positive `limit` and non-empty Query
+Builder v5 `order`. Raw lists and trace requests default to 100 ordered by
+timestamp descending; raw logs add `id` descending for stable ties. Aggregate
+queries use 100 ordered by their primary aggregation, formula outputs use 100
+ordered by `__result`, and every base query referenced by a formula uses 10000
+because its limit applies before formula evaluation. This field is `order`, not
+dashboard `orderBy`. Narrow filters or grouping if 10000 can truncate inputs.
+Keep these bounded specs unchanged in the dry-run and saved Perses query.
 
 ### 8. Preview, create, and verify
 

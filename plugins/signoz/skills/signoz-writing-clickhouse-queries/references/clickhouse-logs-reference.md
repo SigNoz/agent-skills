@@ -9,7 +9,7 @@
   - Use Indexed (Selected) Columns Over Map Access
   - Use GLOBAL IN for Resource Fingerprint Subquery
   - Complete GROUP BY Projections
-  - Body Text Search — Engaging Skip Indexes (predicate engagement,
+  - Body Text Search: Engaging Skip Indexes (predicate engagement,
     anti-patterns, OR-of-LIKE, hyphens/punctuation, EXPLAIN, type traps)
 - Attribute Access Syntax (resource attributes, span/log attributes,
   existence checks, timestamp conversion)
@@ -95,8 +95,8 @@ WHERE timestamp >= $start_timestamp_nano AND timestamp <= $end_timestamp_nano
   AND ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp
 ```
 
-- `$start_timestamp_nano` / `$end_timestamp_nano` — nanosecond precision, filters the `timestamp` column.
-- `$start_timestamp` / `$end_timestamp` — seconds precision, filters the `ts_bucket_start` column.
+- `$start_timestamp_nano` / `$end_timestamp_nano`: nanosecond precision, filters the `timestamp` column.
+- `$start_timestamp` / `$end_timestamp`: seconds precision, filters the `ts_bucket_start` column.
 - The `- 1800` is required because `ts_bucket_start` is rounded down to 30-minute intervals.
 
 ### 3. Use Indexed (Selected) Columns Over Map Access
@@ -111,7 +111,7 @@ When an attribute has been promoted to a selected (indexed) field, a dedicated m
 
 **Naming convention**: prefix with `attribute_<dataType>_`, replace `.` with `$$` for dotted attribute names.
 
-An `_exists` variant is also created: `attribute_string_method_exists Bool` — use this to check existence of an indexed attribute.
+An `_exists` variant is also created: `attribute_string_method_exists Bool`: use this to check existence of an indexed attribute.
 
 ### 4. Use GLOBAL IN for Resource Fingerprint Subquery
 
@@ -132,7 +132,7 @@ dataset is demonstrably small and bounded.
 Every non-aggregated `SELECT` expression must appear in `GROUP BY`, including
 computed expressions: `SELECT JSONExtractString(body, 'kind') AS kind, count() ... GROUP BY kind`.
 
-### 6. Body Text Search — Engaging Skip Indexes
+### 6. Body Text Search: Engaging Skip Indexes
 
 The `body` column has two skip indexes, **both on `lower(body)`**:
 
@@ -141,7 +141,7 @@ INDEX body_index_v2_token  lower(body) TYPE tokenbf_v1(10000, 2, 0)   GRANULARIT
 INDEX body_index_v2_ngram  lower(body) TYPE ngrambf_v1(4, 15000, 3, 0) GRANULARITY 1
 ```
 
-ClickHouse compares predicate ASTs to the index expression **literally**. A predicate must reference `lower(body)` to engage either index — `hasToken(body, …)` and `body LIKE '%x%'` prune nothing.
+ClickHouse compares predicate ASTs to the index expression **literally**. A predicate must reference `lower(body)` to engage either index; `hasToken(body, …)` and `body LIKE '%x%'` prune nothing.
 
 #### Predicate engagement
 
@@ -150,10 +150,10 @@ ClickHouse compares predicate ASTs to the index expression **literally**. A pred
 | `hasToken(lower(body), 'tok')` | yes | no | Whole-token check; best for distinctive single words. |
 | `lower(body) = 'literal'` | yes | yes | Exact equality. |
 | `lower(body) LIKE '%substr%'` | no | yes | Substring must be ≥ 4 chars (ngrambf `N=4`). |
-| `lower(body) LIKE '%a%b%'` | no | yes | n-grams of each substring ANDed — more selective. |
+| `lower(body) LIKE '%a%b%'` | no | yes | n-grams of each substring ANDed, more selective. |
 | `lower(body) ILIKE '%x%'` | no | sometimes | Prefer the explicit `lower(body) LIKE '%x%'` form. |
 | `position(body, 'x') > 0` | no | no | Always rewrite to `lower(body) LIKE`. |
-| `positionCaseInsensitive(body, 'X') > 0` | no | no | Biggest trap — engages neither even with `lower(body)` index. |
+| `positionCaseInsensitive(body, 'X') > 0` | no | no | Biggest trap: engages neither even with `lower(body)` index. |
 | `match(lower(body), 'regex')` | no | partial | Only literal substrings inside the regex are usable. |
 
 #### Anti-patterns to rewrite
@@ -167,7 +167,7 @@ ClickHouse compares predicate ASTs to the index expression **literally**. A pred
 
 Lowercase the literal (the index value is lowercase). Escape `%` and `_` in the literal; pass other characters (hyphens, dots, parens, colons) through as-is.
 
-#### OR-of-LIKE — add a common AND-prefix
+#### OR-of-LIKE: add a common AND-prefix
 
 OR'd `LIKE` patterns weaken ngrambf to nearly nothing: any branch matching keeps the granule. Find a token or substring shared by **all** branches and AND it before the OR block:
 
@@ -185,13 +185,13 @@ WHERE hasToken(lower(body), 'failed')               -- tokenbf engages
      OR lower(body) LIKE '%failed to send baz%' )
 ```
 
-Pick the AND-prefix in this order: (1) most distinctive single token via `hasToken`, (2) two ANDed `hasToken` calls, (3) distinctive shared substring via `LIKE`. Avoid common words like `the`, `user`, `error` — high false-positive rate on the bloom filter.
+Pick the AND-prefix in this order: (1) most distinctive single token via `hasToken`, (2) two ANDed `hasToken` calls, (3) distinctive shared substring via `LIKE`. Avoid common words like `the`, `user`, `error`: high false-positive rate on the bloom filter.
 
 #### Hyphens and punctuation split tokens
 
 `tokenbf` only stores `[A-Za-z0-9_]+` runs. Anything else (hyphens, dots, slashes, quotes, parens, colons) is a token boundary. So:
 
-- `hasToken(lower(body), 'settlement-requested')` matches **nothing** — there is no such token.
+- `hasToken(lower(body), 'settlement-requested')` matches **nothing**: there is no such token.
 - Use `hasToken(lower(body), 'settlement') AND hasToken(lower(body), 'requested')`, or
 - Use `lower(body) LIKE '%settlement-requested%'` (ngrambf handles punctuation).
 
@@ -202,18 +202,18 @@ EXPLAIN indexes=1
 <your query>;
 ```
 
-Each `Skip` block under `ReadFromMergeTree` shows `Granules: kept/total`. For both `body_index_v2_token` and `body_index_v2_ngram`, kept should be `<` total. The `Combined` block is what feeds the actual scan — that's the number to drive down.
+Each `Skip` block under `ReadFromMergeTree` shows `Granules: kept/total`. For both `body_index_v2_token` and `body_index_v2_ngram`, kept should be `<` total. The `Combined` block is what feeds the actual scan; that's the number to drive down.
 
 Failure modes:
-- `Granules: 195/195` — predicate doesn't match the index expression, or the chosen token is too common.
-- `Skip` block missing — predicate engages no skip index at all.
+- `Granules: 195/195` means the predicate doesn't match the index expression, or the chosen token is too common.
+- `Skip` block missing: predicate engages no skip index at all.
 
 `tokenbf_v1(10000, …)` is small and saturates at high cardinality; `ngrambf_v1(4, 15000, …)` is the workhorse. If tokenbf looks idle even with a correct `hasToken(lower(body), …)`, lean on `lower(body) LIKE` rather than chasing tokenbf pruning the filter size won't deliver.
 
 #### Type traps in body-search queries
 
 - `toUnixTimestamp64Nano(now())` → `Code: 43, ILLEGAL_TYPE_OF_ARGUMENT`. Use `now64()` (or `toDateTime64(now(), 9)`). SigNoz dashboard macros like `$start_timestamp_nano` resolve to literal integers and sidestep this.
-- `max(fromUnixTimestamp64Nano(timestamp))` converts every row before aggregating. Use `fromUnixTimestamp64Nano(max(timestamp))` — `max` once on cheap UInt64, convert once at the end.
+- `max(fromUnixTimestamp64Nano(timestamp))` converts every row before aggregating. Use `fromUnixTimestamp64Nano(max(timestamp))`: `max` once on cheap UInt64, convert once at the end.
 
 ---
 
@@ -306,7 +306,7 @@ ORDER BY value DESC;
 
 ## Query Examples
 
-### Timeseries — Count per minute grouped by container name
+### Timeseries: Count per minute grouped by container name
 
 Shows `mapContains` for attribute existence check and attribute in GROUP BY.
 
@@ -324,7 +324,7 @@ GROUP BY container_name, ts
 ORDER BY ts ASC;
 ```
 
-### Timeseries — Filtered by service, severity, and attribute
+### Timeseries: Filtered by service, severity, and attribute
 
 Shows combining resource CTE with `severity_text` and attribute map access.
 
@@ -349,7 +349,7 @@ GROUP BY ts
 ORDER BY ts ASC;
 ```
 
-### Advanced — Top 10 largest logs for payload auditing
+### Advanced: Top 10 largest logs for payload auditing
 
 Calculates per-log byte size from body + all attributes. Keep queries to ≤6 hour windows for this pattern.
 

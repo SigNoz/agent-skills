@@ -2,35 +2,45 @@
   "mode": "offline_conversation_fixture",
   "instructions": "Treat the eval prompt as the user's reply to the prior applicability question.",
   "dashboard": {
-    "uuid": "55555555-5555-4555-8555-555555555555",
-    "title": "Kafka",
-    "variables": {},
-    "widgets": [
-      {
-        "id": "consumer-lag",
-        "panelTypes": "graph",
-        "title": "Consumer Lag",
-        "query": {"queryType": "builder", "builder": {"queryData": [{"queryName": "A", "dataSource": "metrics", "expression": "A", "aggregations": [{"metricName": "kafka.consumer_group.lag", "timeAggregation": "latest", "spaceAggregation": "max"}], "filter": {"expression": ""}, "groupBy": []}], "queryFormulas": []}}
+    "id": "55555555-5555-4555-8555-555555555555",
+    "name": "kafka-5f21",
+    "spec": {
+      "display": {"name": "Kafka"},
+      "variables": [],
+      "panels": {
+        "consumer-lag": {
+          "kind": "Panel",
+          "spec": {
+            "display": {"name": "Consumer Lag"},
+            "plugin": {"kind": "signoz/TimeSeriesPanel", "spec": {}},
+            "queries": [{"kind": "time_series", "spec": {"name": "A", "plugin": {"kind": "signoz/BuilderQuery", "spec": {"name": "A", "signal": "metrics", "aggregations": [{"metricName": "kafka.consumer_group.lag", "timeAggregation": "latest", "spaceAggregation": "max"}], "filter": {"expression": ""}, "order": [{"key": {"name": "max(latest(kafka.consumer_group.lag))"}, "direction": "desc"}], "limit": 100}}}}]
+          }
+        },
+        "throughput": {
+          "kind": "Panel",
+          "spec": {
+            "display": {"name": "Throughput"},
+            "plugin": {"kind": "signoz/TimeSeriesPanel", "spec": {}},
+            "queries": [{"kind": "time_series", "spec": {"name": "A", "plugin": {"kind": "signoz/BuilderQuery", "spec": {"name": "A", "signal": "metrics", "aggregations": [{"metricName": "kafka.consumer_group.messages", "timeAggregation": "rate", "spaceAggregation": "sum"}], "filter": {"expression": ""}, "order": [{"key": {"name": "sum(rate(kafka.consumer_group.messages))"}, "direction": "desc"}], "limit": 100}}}}]
+          }
+        },
+        "broker-health": {
+          "kind": "Panel",
+          "spec": {
+            "display": {"name": "Broker Health"},
+            "plugin": {"kind": "signoz/TimeSeriesPanel", "spec": {}},
+            "queries": [{"kind": "time_series", "spec": {"name": "A", "plugin": {"kind": "signoz/BuilderQuery", "spec": {"name": "A", "signal": "metrics", "aggregations": [{"metricName": "kafka.broker.active", "timeAggregation": "latest", "spaceAggregation": "sum"}], "filter": {"expression": ""}, "order": [{"key": {"name": "sum(latest(kafka.broker.active))"}, "direction": "desc"}], "limit": 100}}}}]
+          }
+        }
       },
-      {
-        "id": "throughput",
-        "panelTypes": "graph",
-        "title": "Throughput",
-        "query": {"queryType": "builder", "builder": {"queryData": [{"queryName": "A", "dataSource": "metrics", "expression": "A", "aggregations": [{"metricName": "kafka.consumer_group.messages", "timeAggregation": "rate", "spaceAggregation": "sum"}], "filter": {"expression": ""}, "groupBy": []}], "queryFormulas": []}}
-      },
-      {
-        "id": "broker-health",
-        "panelTypes": "graph",
-        "title": "Broker Health",
-        "query": {"queryType": "builder", "builder": {"queryData": [{"queryName": "A", "dataSource": "metrics", "expression": "A", "aggregations": [{"metricName": "kafka.broker.active", "timeAggregation": "latest", "spaceAggregation": "sum"}], "filter": {"expression": ""}, "groupBy": []}], "queryFormulas": []}}
-      }
-    ],
-    "layout": [
-      {"i": "consumer-lag", "x": 0, "y": 0, "w": 6, "h": 6},
-      {"i": "throughput", "x": 6, "y": 0, "w": 6, "h": 6},
-      {"i": "broker-health", "x": 0, "y": 6, "w": 12, "h": 3}
-    ],
-    "panelMap": {}
+      "layouts": [
+        {"kind": "Grid", "spec": {"display": {"title": "Overview"}, "items": [
+          {"x": 0, "y": 0, "width": 6, "height": 6, "content": {"$ref": "#/spec/panels/consumer-lag"}},
+          {"x": 6, "y": 0, "width": 6, "height": 6, "content": {"$ref": "#/spec/panels/throughput"}},
+          {"x": 0, "y": 6, "width": 12, "height": 3, "content": {"$ref": "#/spec/panels/broker-health"}}
+        ]}}
+      ]
+    }
   },
   "discovery": {
     "signal": "metrics",

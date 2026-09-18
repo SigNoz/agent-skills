@@ -1,10 +1,11 @@
 {
   "name": "signoz",
-  "version": "2026.07.16",
+  "version": "2026.09.02",
   "description": "Official SigNoz plugin for MCP setup, docs, queries, dashboards, and alerts",
   "author": {
     "name": "SigNoz"
   },
+  "homepage": "https://signoz.io/privacy/",
   "repository": "https://github.com/SigNoz/agent-skills",
   "license": "MIT",
   "mcpServers": "./.signoz_claude_mcp.json",

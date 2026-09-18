@@ -1,19 +1,17 @@
 {
   "mode": "offline_mcp_fixture",
-  "instructions": "Use these ordered responses to produce an offline simulated tool trace; do not query a live tenant.",
+  "instructions": "Use these ordered responses to produce an offline simulated tool trace; do not query a live tenant. The list response carries a top-level total and no pagination block.",
   "responses": [
     {
       "request": {"limit": 50, "offset": 0},
       "response": {
-        "data": [{"uuid": "33333333-3333-4333-8333-333333333333", "name": "Platform API"}],
-        "pagination": {"total": 51, "offset": 0, "limit": 50, "hasMore": true, "nextOffset": 50}
+        "data": {"dashboards": [{"id": "33333333-3333-4333-8333-333333333333", "name": "platform-api-7b12", "spec": {"display": {"name": "Platform API"}}}], "total": 51}
       }
     },
     {
       "request": {"limit": 50, "offset": 50},
       "response": {
-        "data": [{"uuid": "44444444-4444-4444-8444-444444444444", "name": "Payments API"}],
-        "pagination": {"total": 51, "offset": 50, "limit": 50, "hasMore": false, "nextOffset": -1}
+        "data": {"dashboards": [{"id": "44444444-4444-4444-8444-444444444444", "name": "payments-api-3e57", "spec": {"display": {"name": "Payments API"}}}], "total": 51}
       }
     },
     {
@@ -21,34 +19,27 @@
       "response": {
         "status": "success",
         "data": {
-          "uuid": "44444444-4444-4444-8444-444444444444",
-          "title": "Payments API",
-          "variables": {},
-          "widgets": [
-            {
-              "id": "55555555-5555-4555-8555-555555555555",
-              "panelTypes": "graph",
-              "title": "Request Rate",
-              "query": {
-                "queryType": "builder",
-                "builder": {
-                  "queryData": [
-                    {
-                      "queryName": "A",
-                      "dataSource": "traces",
-                      "expression": "A",
-                      "aggregations": [{"expression": "rate()"}],
-                      "filter": {"expression": "service.name = 'payments'"},
-                      "groupBy": []
-                    }
-                  ],
-                  "queryFormulas": []
+          "id": "44444444-4444-4444-8444-444444444444",
+          "name": "payments-api-3e57",
+          "spec": {
+            "display": {"name": "Payments API"},
+            "variables": [],
+            "panels": {
+              "request-rate": {
+                "kind": "Panel",
+                "spec": {
+                  "display": {"name": "Request Rate"},
+                  "plugin": {"kind": "signoz/TimeSeriesPanel", "spec": {}},
+                  "queries": [
+                    {"kind": "time_series", "spec": {"name": "A", "plugin": {"kind": "signoz/BuilderQuery", "spec": {"name": "A", "signal": "traces", "aggregations": [{"expression": "rate()"}], "filter": {"expression": "service.name = 'payments'"}, "order": [{"key": {"name": "rate()"}, "direction": "desc"}], "limit": 100}}}}
+                  ]
                 }
               }
-            }
-          ],
-          "layout": [{"i": "55555555-5555-4555-8555-555555555555", "x": 0, "y": 0, "w": 12, "h": 6}],
-          "panelMap": {}
+            },
+            "layouts": [
+              {"kind": "Grid", "spec": {"display": {"title": "Traffic"}, "items": [{"x": 0, "y": 0, "width": 12, "height": 6, "content": {"$ref": "#/spec/panels/request-rate"}}]}}
+            ]
+          }
         }
       }
     }

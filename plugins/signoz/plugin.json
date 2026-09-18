@@ -1,9 +1,11 @@
 {
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "signoz",
   "version": "2026.9.200",
   "description": "Official SigNoz plugin for MCP setup, docs, queries, dashboards, and alerts",
   "author": {
-    "name": "SigNoz"
+    "name": "SigNoz",
+    "url": "https://signoz.io"
   },
   "homepage": "https://signoz.io",
   "repository": "https://github.com/SigNoz/agent-skills",

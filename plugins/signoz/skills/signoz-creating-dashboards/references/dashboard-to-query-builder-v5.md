@@ -10,6 +10,7 @@
 - [Translate query plugins](#translate-query-plugins)
 - [Builder query mapping](#builder-query-mapping)
 - [Formula mapping](#formula-mapping)
+- [Bounds and ordering](#bounds-and-ordering)
 - [Trace operator mapping](#trace-operator-mapping)
 - [PromQL and ClickHouse mapping](#promql-and-clickhouse-mapping)
 - [Variables](#variables)
@@ -142,6 +143,21 @@ Keep the authored topology.
 Do not put comparisons into a numeric formula. Do not silently remove formula
 fields merely to make validation pass.
 
+## Bounds and ordering
+
+Bounds and ordering are part of the persisted spec; execute what the panel
+stores. Every builder query and formula needs a positive `limit` and non-empty
+`order`. Raw/list and trace requests default to 100; raw traces order by
+timestamp descending and raw logs add `id` descending. Aggregate logs/traces
+order by their primary aggregation. Metrics use the composed aggregation name
+or `__result`; formulas use `__result`.
+
+Formula inputs use 10000 because SigNoz limits each component before formula
+evaluation. Follow every formula reference, including disabled formulas, to
+all base builder-query leaves. Preserve an intentional smaller pre-formula top
+N. Narrow filters or grouping if cardinality may exceed 10000. Keep disabled
+inputs and dry-run the complete composite.
+
 ## Trace operator mapping
 
 Map each trace relationship plugin to a `builder_trace_operator` envelope in
@@ -191,9 +207,13 @@ Raw heatmaps use `requestType: "heatmap"` with
 `signoz_execute_builder_query`. They do not use the convenience
 `signoz_query_metrics` contract.
 
-`bucketOptions` may be present on the effective enabled metric query or
-formula as described by `signoz://metrics-aggregation-guide`. Preserve bucket
-boundaries, counts, and overflow metadata in the result.
+Heatmaps require exactly one enabled metric query, formula, PromQL query, or
+ClickHouse query; logs/traces builder signals are invalid. Disabled formula
+inputs are allowed. `bucketOptions` may be present only on the effective
+enabled metric query or formula as described by
+`signoz://metrics-aggregation-guide`. `fillGaps: false` or omission is valid;
+`fillGaps: true`, functions, and non-empty HAVING are rejected. Preserve bucket
+boundaries, counts, overflow metadata, and the raw upstream result.
 
 There is no advertised dashboard HeatmapPanel plugin. Do not translate a raw
 heatmap execution into a saved heatmap panel.

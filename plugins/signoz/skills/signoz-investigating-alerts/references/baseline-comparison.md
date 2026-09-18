@@ -32,7 +32,7 @@ relative description ("24h before fire").
 
 ## Builder query template (`signoz_execute_builder_query`)
 
-For each neighbor signal, run the same builder query twice — once per
+For each neighbor signal, run the same builder query twice, once per
 window. The only thing that changes is `start` / `end`.
 
 This is a complete tool-argument example for trace p99 latency. Replace the
@@ -57,6 +57,10 @@ guide for the chosen signal. Keep the outer `query`, `formatOptions`, and
             "signal": "traces",
             "disabled": false,
             "stepInterval": 60,
+            "limit": 100,
+            "order": [
+              {"key": {"name": "p99(duration_nano)"}, "direction": "desc"}
+            ],
             "having": { "expression": "" },
             "filter": { "expression": "service.name = 'checkout'" },
             "aggregations": [
@@ -76,6 +80,19 @@ guide for the chosen signal. Keep the outer `query`, `formatOptions`, and
 }
 ```
 
+Keep the same positive limit and Query Builder v5 `order` in the fire and
+baseline requests. For time series, the limit ranks groups over the whole
+window, so a short-lived local spike can be outside the top N. Dashboard
+`orderBy` is not valid in this execution payload. For a formula alert, first
+replay the stored component limits exactly. If any formula input is below
+10000, run a second fire/baseline comparison with that input raised to 10000;
+base limits are applied before formula evaluation, so independent top-N inputs
+can hide the group that should have fired. Find inputs by inspecting every
+formula expression, including formulas with `disabled: true`, and following
+formula references to all `builder_query` leaves. This dependency walk changes
+only the comparison bounds; it does not prove deterministic formula-to-formula
+evaluation order.
+
 ## Computing the delta
 
 For each signal, after running both windows:
@@ -90,7 +107,7 @@ delta_pct = (fire_value - baseline_value) / max(baseline_value, epsilon) * 100
   a stable reference.
 - Use `epsilon = max(baseline_value * 0.01, signal-specific floor)` to
   avoid divide-by-zero on metrics that idle at 0 (e.g., error rate).
-- Clamp `delta_pct` for display at ±10000% — beyond that the absolute
+- Clamp `delta_pct` for display at ±10000%; beyond that the absolute
   values matter more than the ratio.
 
 ## Surfacing the comparison
@@ -99,12 +116,12 @@ In the Tier 2 output for each signal, present:
 
 ```
 - p99 latency: 4.1s vs 320ms baseline (+1180%)
-  query: signoz_execute_builder_query — p99(duration_nano) on
+  query: signoz_execute_builder_query, p99(duration_nano) on
          service.name = checkout, fire window 14:32-14:40 UTC vs
          baseline 14:32-14:40 UTC (24h prior)
 ```
 
-The agent should embed these in the "Likely causes — Evidence"
+The agent should embed these in the "Likely causes - Evidence"
 sections of the final structured output. The query line lets the user
 re-run the comparison without rebuilding the parameters.
 
@@ -116,7 +133,7 @@ Skip baseline comparison and call out the limitation if:
   (`signoz_get_alert_history` shows a fire in the baseline window).
   In that case use a 7-day median or the user's confirmed
   known-healthy window.
-- The service was deployed within 24h before the baseline window —
+- The service was deployed within 24h before the baseline window;
   the baseline reflects pre-deploy behavior. Note this and either
   use a median or explicitly state "no good baseline available".
 - The alert is `anomaly_rule` (Z-score). The rule already encodes a
@@ -126,7 +143,7 @@ Skip baseline comparison and call out the limitation if:
 
 ## Logs / traces drill-down (Tier 3)
 
-Tier 3 does not require a baseline — the question is "what happened",
+Tier 3 does not require a baseline: the question is "what happened",
 not "what changed". Run a single fire-window query for each:
 
 - `signoz_search_traces` with the resource filter + `has_error = true`.

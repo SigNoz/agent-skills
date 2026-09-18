@@ -1,7 +1,7 @@
 ---
 name: signoz-writing-clickhouse-queries
 description: >-
-  Write raw ClickHouse SQL for a SigNoz dashboard panel — timeseries, value,
+  Write raw ClickHouse SQL for a SigNoz dashboard panel: timeseries, value,
   or table widgets that the builder UI cannot express (custom joins, window
   functions, regex extraction over log bodies, aggregations beyond builder
   syntax). Trigger when the user explicitly asks for a "ClickHouse query",

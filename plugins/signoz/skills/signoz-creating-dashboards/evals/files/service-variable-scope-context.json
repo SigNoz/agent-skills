@@ -3,53 +3,52 @@
   "instructions": "Treat the eval prompt as the user's reply to the prior applicability question.",
   "representativeVariables": {"service_name": "checkoutservice"},
   "draft": {
-    "variables": {
-      "service_name": {
-        "id": "44444444-4444-4444-8444-444444444444",
-        "name": "service_name",
-        "type": "DYNAMIC",
-        "dynamicVariablesAttribute": "service.name",
-        "dynamicVariablesSource": "Traces"
-      }
-    },
-    "widgets": [
-      {
-        "id": "request-rate",
-        "panelTypes": "graph",
-        "title": "Request Rate by Service",
-        "query": {
-          "queryType": "builder",
-          "builder": {
-            "queryData": [{"queryName": "A", "dataSource": "traces", "expression": "A", "aggregations": [{"expression": "count()"}], "filter": {"expression": ""}, "groupBy": [{"key": "service.name", "type": "resource", "dataType": "string"}], "legend": "{{service.name}}"}],
-            "queryFormulas": []
+    "schemaVersion": "v6",
+    "spec": {
+      "display": {"name": "Backend Services"},
+      "variables": [
+        {"kind": "ListVariable", "spec": {"name": "service_name", "display": {"name": "Service"}, "allowMultiple": true, "allowAllValue": true, "plugin": {"kind": "signoz/DynamicVariable", "spec": {"name": "service.name", "signal": "traces"}}}}
+      ],
+      "panels": {
+        "request-rate": {
+          "kind": "Panel",
+          "spec": {
+            "display": {"name": "Request Rate by Service"},
+            "plugin": {"kind": "signoz/TimeSeriesPanel", "spec": {}},
+            "queries": [
+              {"kind": "time_series", "spec": {"name": "A", "plugin": {"kind": "signoz/BuilderQuery", "spec": {"name": "A", "signal": "traces", "aggregations": [{"expression": "count()"}], "filter": {"expression": ""}, "groupBy": [{"name": "service.name", "fieldContext": "resource", "fieldDataType": "string", "signal": "traces"}], "legend": "{{service.name}}", "order": [{"key": {"name": "count()"}, "direction": "desc"}], "limit": 100}}}}
+            ]
+          }
+        },
+        "p99-latency": {
+          "kind": "Panel",
+          "spec": {
+            "display": {"name": "P99 Latency by Service"},
+            "plugin": {"kind": "signoz/TimeSeriesPanel", "spec": {}},
+            "queries": [
+              {"kind": "time_series", "spec": {"name": "A", "plugin": {"kind": "signoz/BuilderQuery", "spec": {"name": "A", "signal": "traces", "aggregations": [{"expression": "p99(duration_nano)"}], "filter": {"expression": ""}, "groupBy": [{"name": "service.name", "fieldContext": "resource", "fieldDataType": "string", "signal": "traces"}], "legend": "{{service.name}}", "order": [{"key": {"name": "p99(duration_nano)"}, "direction": "desc"}], "limit": 100}}}}
+            ]
+          }
+        },
+        "global-health": {
+          "kind": "Panel",
+          "spec": {
+            "display": {"name": "Global System Health"},
+            "plugin": {"kind": "signoz/TimeSeriesPanel", "spec": {}},
+            "queries": [
+              {"kind": "time_series", "spec": {"name": "A", "plugin": {"kind": "signoz/BuilderQuery", "spec": {"name": "A", "signal": "traces", "aggregations": [{"expression": "count()"}], "filter": {"expression": "has_error = true"}, "order": [{"key": {"name": "count()"}, "direction": "desc"}], "limit": 100}}}}
+            ]
           }
         }
       },
-      {
-        "id": "p99-latency",
-        "panelTypes": "graph",
-        "title": "P99 Latency by Service",
-        "query": {
-          "queryType": "builder",
-          "builder": {
-            "queryData": [{"queryName": "A", "dataSource": "traces", "expression": "A", "aggregations": [{"expression": "p99(duration_nano)"}], "filter": {"expression": ""}, "groupBy": [{"key": "service.name", "type": "resource", "dataType": "string"}], "legend": "{{service.name}}"}],
-            "queryFormulas": []
-          }
-        }
-      },
-      {
-        "id": "global-health",
-        "panelTypes": "graph",
-        "title": "Global System Health",
-        "query": {
-          "queryType": "builder",
-          "builder": {
-            "queryData": [{"queryName": "A", "dataSource": "traces", "expression": "A", "aggregations": [{"expression": "count()"}], "filter": {"expression": "has_error = true"}, "groupBy": []}],
-            "queryFormulas": []
-          }
-        }
-      }
-    ]
+      "layouts": [
+        {"kind": "Grid", "spec": {"display": {"title": "Overview"}, "items": [
+          {"x": 0, "y": 0, "width": 6, "height": 7, "content": {"$ref": "#/spec/panels/request-rate"}},
+          {"x": 6, "y": 0, "width": 6, "height": 7, "content": {"$ref": "#/spec/panels/p99-latency"}},
+          {"x": 0, "y": 7, "width": 12, "height": 7, "content": {"$ref": "#/spec/panels/global-health"}}
+        ]}}
+      ]
+    }
   },
   "dryRunResponses": [
     {"panelId": "request-rate", "response": {"isError": false, "rows": 2}},

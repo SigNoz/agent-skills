@@ -1,0 +1,121 @@
+name: Validate Agent Plugin
+
+on:
+  pull_request:
+    paths:
+      - 'plugins/signoz/.claude-plugin/plugin.json'
+      - 'plugins/signoz/.codex-plugin/plugin.json'
+      - 'plugins/signoz/.cursor-plugin/plugin.json'
+      - 'plugins/signoz/.grok-plugin/plugin.json'
+      - 'plugins/signoz/.signoz_claude_mcp.json'
+      - 'plugins/signoz/.mcp.json'
+      - 'plugins/signoz/plugin.json'
+      - 'plugins/signoz/mcp.json'
+      - 'plugins/signoz/skills/**'
+      - 'gemini-extension.json'
+      - '.devin-plugin/plugin.json'
+      - 'LICENSE'
+      - 'scripts/check_client_mcp_configs.py'
+      - 'scripts/check_plugin_versions.py'
+      - 'scripts/package_agent_plugin.py'
+      - '.github/workflows/publish-agent-plugin.yml'
+      - '.github/workflows/validate-agent-plugin.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: validate-agent-plugin-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Check plugin version parity
+        run: python3 scripts/check_plugin_versions.py check plugins/signoz
+
+      - name: Check client MCP config isolation
+        run: python3 scripts/check_client_mcp_configs.py plugins/signoz
+
+      - name: Build clean portable package
+        run: python3 scripts/package_agent_plugin.py "$RUNNER_TEMP/signoz"
+
+      - name: Install validators
+        run: |
+          python3 -m pip install \
+            'check-jsonschema==0.37.4' \
+            'git+https://github.com/agentskills/agentskills.git@217be548739f21d6008915c29aefe320ea1a90af#subdirectory=skills-ref'
+
+      - name: Validate Agent Plugins schemas
+        run: |
+          check-jsonschema \
+            --schemafile https://agent-plugins.org/schemas/1.0.0/plugin.schema.json \
+            "$RUNNER_TEMP/signoz/plugin.json"
+          check-jsonschema \
+            --schemafile https://agent-plugins.org/schemas/1.0.0/mcp.schema.json \
+            "$RUNNER_TEMP/signoz/mcp.json"
+
+      - name: Validate portable Agent Skills
+        run: |
+          for SKILL_MD in "$RUNNER_TEMP"/signoz/skills/*/SKILL.md; do
+            skills-ref validate "${SKILL_MD%/SKILL.md}"
+          done
+
+          frontmatter_hint() {
+            local FILE="$1"
+            local INDENT="$2"
+            awk -v prefix="${INDENT}argument-hint:" '
+              NR == 1 { next }
+              $0 == "---" { exit }
+              index($0, prefix) == 1 {
+                value = substr($0, length(prefix) + 1)
+                sub(/^[[:space:]]*/, "", value)
+                print value
+                exit
+              }
+            ' "$FILE"
+          }
+
+          for SOURCE_SKILL_MD in plugins/signoz/skills/*/SKILL.md; do
+            HINT=$(frontmatter_hint "$SOURCE_SKILL_MD" "")
+            if [[ -z "$HINT" ]]; then
+              continue
+            fi
+            SKILL_NAME=$(basename "$(dirname "$SOURCE_SKILL_MD")")
+            PACKAGED_SKILL_MD="$RUNNER_TEMP/signoz/skills/$SKILL_NAME/SKILL.md"
+            PACKAGED_HINT=$(frontmatter_hint "$PACKAGED_SKILL_MD" "  ")
+            if [[ "$PACKAGED_HINT" != "$HINT" ]]; then
+              echo "Portable argument-hint mismatch: $SKILL_NAME"
+              exit 1
+            fi
+          done
+
+      - name: Check portable package boundary
+        run: |
+          EXPECTED=$'LICENSE\nmcp.json\nplugin.json\nskills'
+          ACTUAL=$(find "$RUNNER_TEMP/signoz" -mindepth 1 -maxdepth 1 -printf '%f\n' | sort)
+          if [[ "$ACTUAL" != "$EXPECTED" ]]; then
+            echo "Unexpected portable package entries:"
+            echo "$ACTUAL"
+            exit 1
+          fi
+
+          INTERNAL_DIRS=$(find "$RUNNER_TEMP/signoz/skills" \
+            -mindepth 2 -maxdepth 2 -type d \
+            \( -name evals -o -name tests \) -print)
+          if [[ -n "$INTERNAL_DIRS" ]]; then
+            echo "Internal test directories leaked into the portable package:"
+            echo "$INTERNAL_DIRS"
+            exit 1
+          fi

@@ -5,8 +5,7 @@
     {
       "request": {"limit": 50, "offset": 0},
       "response": {
-        "data": [{"uuid": "88888888-8888-4888-8888-888888888888", "name": "Trace Operations"}],
-        "pagination": {"total": 1, "offset": 0, "limit": 50, "hasMore": false, "nextOffset": -1}
+        "data": {"dashboards": [{"id": "88888888-8888-4888-8888-888888888888", "name": "trace-operations-b70e", "spec": {"display": {"name": "Trace Operations"}}}], "total": 1}
       }
     },
     {
@@ -14,47 +13,30 @@
       "response": {
         "status": "success",
         "data": {
-          "uuid": "88888888-8888-4888-8888-888888888888",
-          "title": "Trace Operations",
-          "description": "Recent traces by configured region",
-          "tags": ["traces"],
-          "variables": {
-            "region": {
-              "id": "99999999-9999-4999-8999-999999999999",
-              "name": "region",
-              "key": "region",
-              "type": "CUSTOM",
-              "customValue": "us-east-1,eu-west-1",
-              "multiSelect": true,
-              "showALLOption": true
-            }
-          },
-          "widgets": [
-            {
-              "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-              "panelTypes": "trace",
-              "title": "Recent Checkout Traces",
-              "query": {
-                "queryType": "builder",
-                "builder": {
-                  "queryData": [
-                    {
-                      "queryName": "A",
-                      "dataSource": "traces",
-                      "filter": {"expression": "service.name = 'checkout' AND region = $region"},
-                      "groupBy": [],
-                      "orderBy": [{"columnName": "timestamp", "order": "desc"}],
-                      "pageSize": 20,
-                      "aggregations": []
-                    }
-                  ],
-                  "queryFormulas": []
+          "id": "88888888-8888-4888-8888-888888888888",
+          "name": "trace-operations-b70e",
+          "tags": [{"key": "signal", "value": "traces"}],
+          "spec": {
+            "display": {"name": "Trace Operations", "description": "Recent traces by configured region"},
+            "variables": [
+              {"kind": "ListVariable", "spec": {"name": "region", "display": {"name": "Region"}, "allowMultiple": true, "allowAllValue": true, "plugin": {"kind": "signoz/CustomVariable", "spec": {"customValue": "us-east-1,eu-west-1"}}}}
+            ],
+            "panels": {
+              "recent-checkout-traces": {
+                "kind": "Panel",
+                "spec": {
+                  "display": {"name": "Recent Checkout Traces"},
+                  "plugin": {"kind": "signoz/ListPanel", "spec": {"selectFields": [{"name": "timestamp", "fieldContext": "span", "signal": "traces"}, {"name": "name", "fieldDataType": "string", "fieldContext": "span", "signal": "traces"}]}},
+                  "queries": [
+                    {"kind": "raw", "spec": {"name": "A", "plugin": {"kind": "signoz/BuilderQuery", "spec": {"name": "A", "signal": "traces", "filter": {"expression": "service.name = 'checkout' AND region IN $region"}, "selectFields": [{"name": "timestamp", "fieldContext": "span", "signal": "traces"}, {"name": "name", "fieldDataType": "string", "fieldContext": "span", "signal": "traces"}], "order": [{"key": {"name": "timestamp"}, "direction": "desc"}], "limit": 20}}}}
+                  ]
                 }
               }
-            }
-          ],
-          "layout": [{"i": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "x": 0, "y": 0, "w": 12, "h": 6}],
-          "panelMap": {}
+            },
+            "layouts": [
+              {"kind": "Grid", "spec": {"display": {"title": "Traces"}, "items": [{"x": 0, "y": 0, "width": 12, "height": 6, "content": {"$ref": "#/spec/panels/recent-checkout-traces"}}]}}
+            ]
+          }
         }
       }
     }

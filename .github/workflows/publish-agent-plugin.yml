@@ -1,0 +1,94 @@
+name: Publish Agent Plugin
+
+on:
+  push:
+    branches:
+      - main
+    # Package changes publish only after the auto-bump PR updates this manifest's version.
+    paths:
+      - 'plugins/signoz/plugin.json'
+
+concurrency:
+  group: publish-agent-plugin
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build clean portable package
+        run: python3 scripts/package_agent_plugin.py "$RUNNER_TEMP/signoz"
+
+      - name: Check portable package boundary
+        run: |
+          EXPECTED=$'LICENSE\nmcp.json\nplugin.json\nskills'
+          ACTUAL=$(find "$RUNNER_TEMP/signoz" -mindepth 1 -maxdepth 1 -printf '%f\n' | sort)
+          if [[ "$ACTUAL" != "$EXPECTED" ]]; then
+            echo "Unexpected portable package entries:"
+            echo "$ACTUAL"
+            exit 1
+          fi
+
+      - name: Publish agent-plugin branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLISH_BRANCH: agent-plugin
+        run: |
+          gh auth setup-git
+
+          PUBLISH_DIR="$RUNNER_TEMP/published-agent-plugin"
+          REPOSITORY_URL="https://github.com/${GITHUB_REPOSITORY}.git"
+          PUBLISHED_VERSION=""
+
+          if git ls-remote --exit-code --heads "$REPOSITORY_URL" "$PUBLISH_BRANCH" >/dev/null 2>&1; then
+            git clone --branch "$PUBLISH_BRANCH" --single-branch "$REPOSITORY_URL" "$PUBLISH_DIR"
+            if [[ -f "$PUBLISH_DIR/plugin.json" ]]; then
+              PUBLISHED_VERSION=$(jq -r '.version // empty' "$PUBLISH_DIR/plugin.json")
+            fi
+          else
+            mkdir -p "$PUBLISH_DIR"
+            git -C "$PUBLISH_DIR" init
+            git -C "$PUBLISH_DIR" switch -c "$PUBLISH_BRANCH"
+            git -C "$PUBLISH_DIR" remote add origin "$REPOSITORY_URL"
+          fi
+
+          rsync -a --delete --exclude='.git/' "$RUNNER_TEMP/signoz/" "$PUBLISH_DIR/"
+
+          git -C "$PUBLISH_DIR" config user.name "github-actions[bot]"
+          git -C "$PUBLISH_DIR" config user.email "github-actions[bot]@users.noreply.github.com"
+          git -C "$PUBLISH_DIR" add --all
+
+          if git -C "$PUBLISH_DIR" diff --cached --quiet; then
+            echo "Published package is already current"
+            exit 0
+          fi
+
+          SOURCE_VERSION=$(jq -er '.version | select(type == "string" and length > 0)' "$RUNNER_TEMP/signoz/plugin.json")
+          if [[ -n "$PUBLISHED_VERSION" ]]; then
+            if [[ "$SOURCE_VERSION" == "$PUBLISHED_VERSION" ]]; then
+              echo "::error::Refusing to publish changed package without a version bump ($SOURCE_VERSION)"
+              exit 1
+            fi
+
+            OLDEST_VERSION=$(printf '%s\n%s\n' "$SOURCE_VERSION" "$PUBLISHED_VERSION" | sort -V | head -1)
+            if [[ "$OLDEST_VERSION" == "$SOURCE_VERSION" ]]; then
+              echo "::error::Refusing to replace $PUBLISHED_VERSION with older version $SOURCE_VERSION"
+              exit 1
+            fi
+          fi
+
+          SOURCE_SHA="${GITHUB_SHA:0:12}"
+          git -C "$PUBLISH_DIR" commit -m "chore: publish agent plugin from $SOURCE_SHA"
+          git -C "$PUBLISH_DIR" push origin "$PUBLISH_BRANCH"
