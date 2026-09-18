@@ -5,7 +5,7 @@
       "id": 0,
       "eval_name": "template-with-data-jvm",
       "prompt": "Create a JVM dashboard so I can monitor my Java service.",
-      "expected_output": "Agent paginates signoz_list_dashboards and finds existing JVM dashboards (e.g. 'JVM Performance Metrics', 'JVM Metrics Dashboard'). Surfaces these duplicates with name and UUID and presents the three options: '(a) modify an existing one, (b) create a new one anyway, (c) stop'. When the user picks (b) create new, agent then calls signoz_list_dashboard_templates and picks the JVM catalog entry. Runs the Step 3b-i.1 no-data probe via signoz_list_metrics with searchText='jvm'; finds JVM metrics flowing, proceeds silently to signoz_import_dashboard with the chosen template path. On success, reports the created dashboard's title, panel count, sections, and variables, and offers a customization or alerting follow-up.",
+      "expected_output": "Agent paginates signoz_list_dashboards and surfaces existing JVM dashboards with canonical id and source. After the user chooses create-new, it selects the JVM template, probes JVM metrics, imports the catalog path, and reports the returned dashboard id and summary.",
       "expectations": [
         "Agent calls signoz_list_dashboards before any write operation and surfaces the existing JVM dashboards as duplicates",
         "Agent presents modify / create new / stop options to the user before proceeding",
@@ -75,12 +75,12 @@
       "id": 7,
       "eval_name": "template-kafka-consumer-pressure",
       "prompt": "Quick — just build me a Kafka consumer-health dashboard with fetch rate and commit latency, grouped by client. Don't ask a bunch of questions, I'm in the middle of an incident.",
-      "expected_output": "Agent still paginates signoz_list_dashboards under incident pressure, then calls signoz_list_dashboard_templates and finds the Kafka Server Monitoring template at kafka/kafka-dashboard.json. It probes kafka metric ingestion, previews the template, and imports it with signoz_import_dashboard rather than custom-building a parallel dashboard. Because the user requested specific consumer panels/grouping, it reports the imported dashboard UUID and hands those customizations to signoz-modifying-dashboards; it does not update inline from the creation skill.",
+      "expected_output": "Agent still paginates signoz_list_dashboards under incident pressure, then calls signoz_list_dashboard_templates and finds the Kafka Server Monitoring template at kafka/kafka-dashboard.json. It probes kafka metric ingestion, previews the template, and imports it with signoz_import_dashboard rather than custom-building a parallel dashboard. Because the user requested specific consumer panels/grouping, it reports the imported dashboard id and hands those customizations to signoz-modifying-dashboards; it does not update inline from the creation skill.",
       "expectations": [
         "Agent finds the Kafka Server Monitoring catalog entry with path kafka/kafka-dashboard.json",
         "Agent probes ingestion with signoz_list_metrics using a kafka-related searchText before import",
         "Agent calls signoz_import_dashboard with kafka/kafka-dashboard.json and does not call signoz_create_dashboard",
-        "Agent hands the requested fetch-rate, commit-latency, and client-grouping changes to signoz-modifying-dashboards using the imported dashboard UUID",
+        "Agent hands the requested fetch-rate, commit-latency, and client-grouping changes to signoz-modifying-dashboards using the imported dashboard id",
         "Agent does not call signoz_update_dashboard inline from the creation skill",
         "Agent does NOT bypass the duplicate check or skip signoz_list_dashboards under the incident-pressure framing"
       ],
@@ -118,7 +118,7 @@
         "The actual signoz_execute_builder_query call contains builder_query envelopes named A and B plus a sibling builder_formula envelope named F1 with its expression; no execution spec contains dashboard-only queryName or dataSource",
         "Each dry-run base query carries the service restriction under filter.expression and does not send the dashboard filters alias",
         "Agent runs signoz_execute_builder_query as a per-panel dry-run for every authored panel before signoz_create_dashboard",
-        "The actual signoz_create_dashboard call keeps queryName/dataSource in queryData, queryName in queryFormulas, and the service filter in dashboard/editor form"
+        "The signoz_create_dashboard payload is v6 Perses with spec.panels and Grid layouts; formulas remain inside one panel query and no legacy queryData/queryFormulas fields are persisted"
       ],
       "files": []
     },
@@ -126,7 +126,7 @@
       "id": 11,
       "eval_name": "duplicate-modify-hands-off",
       "prompt": "I want to add a slow-query panel to my existing PostgreSQL dashboard.",
-      "expected_output": "Agent calls signoz_list_dashboards, finds the existing PostgreSQL dashboard, and presents the modify/create/stop options. When the user picks (a) modify, agent must hand off to signoz-modifying-dashboards with the dashboard's UUID and the user's intent — must NOT call signoz_get_dashboard or signoz_update_dashboard from this skill. The skill's scope-boundary guardrail forbids inline modification.",
+      "expected_output": "Agent calls signoz_list_dashboards, finds the existing PostgreSQL dashboard, and presents the modify/create/stop options. When the user picks (a) modify, agent must hand off to signoz-modifying-dashboards with the dashboard's canonical id and the user's intent; it does not call signoz_get_dashboard or signoz_update_dashboard from this skill.",
       "expectations": [
         "Agent calls signoz_list_dashboards and surfaces the existing PostgreSQL dashboard",
         "Agent presents modify / create new / stop options to the user",
@@ -138,13 +138,14 @@
       "id": 12,
       "eval_name": "shape-check-no-stringify",
       "prompt": "Create a dashboard with one timeseries panel showing service request rate for the checkout service. Walk me through the create call.",
-      "expected_output": "Agent walks the standard custom-build path: list_dashboards, list_dashboard_templates (no exact 'request rate one panel' template), discovery via list_metrics + get_field_keys, reads dashboard MCP resources. Builds the JSON, dry-runs the panel via signoz_execute_builder_query, then emits a plain-language summary and calls signoz_create_dashboard. CRITICAL: the payload sent to signoz_create_dashboard must have layout, widgets, and variables as native JSON arrays/objects — NOT as JSON.stringify'd strings. Required top-level fields are title, layout (array of {x,y,w,h,i}), widgets (array). Each widget must include id, panelTypes, title, query with queryType and its active payload, selectedLogFields, selectedTracesFields, thresholds, and contextLinks. Agent must NOT wrap any of these in a JSON string.",
+      "expected_output": "Agent follows the custom-build flow, reads the dashboard resources, creates a v6 Perses payload with spec.display, spec.panels map, spec.layouts Grid items, and spec.variables, dry-runs the one query panel, previews, and calls signoz_create_dashboard. Native objects and arrays are sent without stringification.",
       "expectations": [
-        "Payload sent to signoz_create_dashboard has layout as an array of objects (not a stringified JSON string)",
-        "Payload sent to signoz_create_dashboard has widgets as an array of objects (not a stringified JSON string)",
-        "Each widget in the payload includes id, panelTypes, title, query, selectedLogFields, selectedTracesFields, thresholds, and contextLinks",
-        "Each widget contextLinks is an object with a linksData array, never a bare array",
-        "The widget's query object includes queryType and the complete active Builder payload; inactive PromQL and ClickHouse payloads need not be authored",
+        "Payload sent to signoz_create_dashboard has top-level schemaVersion='v6', generateName=true, tags, and spec as native JSON",
+        "Payload sent to signoz_create_dashboard has spec.panels as a native object map and spec.layouts as native arrays, not stringified JSON",
+        "The panel is a Perses Panel with exactly one spec.queries entry and its Grid item points to #/spec/panels/<panel-id>",
+        "The payload contains none of widgets, panelTypes, panelMap, queryData, selectedLogFields, or selectedTracesFields",
+        "The Perses panel uses a current panel plugin shape from signoz://dashboard/widgets-examples; no widget contextLinks field is required",
+        "The panel's sole query is a current direct query plugin or signoz/CompositeQuery, with no legacy queryType/queryData wrapper",
         "Agent runs signoz_execute_builder_query as a dry-run for the panel before signoz_create_dashboard"
       ],
       "files": []
@@ -166,17 +167,17 @@
       "id": 10,
       "eval_name": "custom-build-multi-service-user-journey",
       "prompt": "Create a user-journey dashboard for our OpenTelemetry demo checkout flow — I want per-hop latency and error rate across frontend, cartservice, checkoutservice, paymentservice, and shippingservice, so I can see where transactions slow down or fail. Discover the exact service names from the instance rather than hard-coding them.",
-      "expected_output": "Multi-service journey dashboard, no catalog template (apm covers single-service). Agent calls signoz_list_dashboards (none). signoz_list_dashboard_templates returns the catalog; agent reads it in-context and finds no user-journey match. Falls through to custom build. Calls signoz_get_field_keys with signal=traces fieldContext=resource to confirm service.name; signoz_get_field_values for service.name (or signoz_list_services) to verify the named services exist on the instance — the actual names are 'frontend', 'cartservice', 'checkoutservice', 'paymentservice', 'shippingservice' (plus others). Reads signoz://traces/query-builder-guide and signoz://dashboard/* resources. Builds JSON with: filter service.name IN (the discovered service names); per-service latency panels (p50/p95/p99) with groupBy=service.name (resource attr); per-service error-rate panels using A*100/B formula (errors / total); a request-rate panel grouped by service.name. Variables include service.name (multi-select pre-populated) and deployment.environment.name. The signoz_create_dashboard payload keeps the dashboard/editor groupBy shape with key='service.name', dataType='string', type='resource'. For every signoz_execute_builder_query dry-run, the agent performs the Query Builder v5 translation: queryName to name, dataSource='traces' to signal='traces', and groupBy to name='service.name', fieldDataType='string', fieldContext='resource', signal='traces'. Dry-run groupBy entries contain none of key/dataType/type. Emits plain-language summary (no JSON dump) before signoz_create_dashboard. Performs shape check.",
+      "expected_output": "Agent finds no exact template, discovers the actual service.name values, reads the traces and dashboard resources, and builds a v6 Perses dashboard with latency, error-rate, and request-rate panels. Grouping uses canonical name/fieldDataType/fieldContext/signal fields. Error rate uses one CompositeQuery with disabled inputs and an enabled formula. Every query panel is dry-run before create.",
       "expectations": [
         "Agent calls signoz_list_dashboard_templates and finds no matching user-journey template before custom build",
         "Agent calls signoz_list_services or signoz_get_field_values for service.name (signal=traces) to verify which services actually exist on the instance before authoring",
         "Agent uses an IN-list filter on service.name with the actual discovered service names (e.g. 'cartservice', 'checkoutservice', 'paymentservice', 'shippingservice') — not invented short names like 'cart' or 'payment'",
-        "The signoz_create_dashboard call keeps each per-hop groupBy in dashboard form with key='service.name', dataType='string', and type='resource' (not the execution-only name/fieldDataType/fieldContext aliases)",
+        "The signoz_create_dashboard call keeps each per-hop groupBy in canonical form with name='service.name', fieldDataType='string', fieldContext='resource', and signal='traces'",
         "Agent includes a formula combining error count and total count (A*100/B or equivalent) for per-service error rate, not a single rate aggregation",
         "Agent reads at least one signoz://dashboard/ or signoz://traces/ MCP resource before authoring JSON",
         "Agent emits a plain-language summary (no JSON dump) before calling signoz_create_dashboard",
-        "For every authored grouped panel, the actual signoz_execute_builder_query call maps queryName to name and dataSource='traces' to signal='traces', and maps groupBy to name='service.name', fieldDataType='string', fieldContext='resource', signal='traces'",
-        "No groupBy entry passed to signoz_execute_builder_query contains the dashboard-only key, dataType, or type fields",
+        "For every authored grouped panel, the signoz_execute_builder_query call preserves canonical name, signal, and groupBy fields",
+        "No saved or execution groupBy entry contains legacy key, dataType, or type aliases",
         "Agent calls signoz_create_dashboard only after every query-bearing panel has an actual signoz_execute_builder_query dry-run"
       ],
       "files": []
@@ -185,20 +186,20 @@
       "id": 14,
       "eval_name": "custom-build-logs-signal-volume-and-errors",
       "prompt": "Create a dashboard for our application log analytics — I want a timeseries of log volume per service, a value panel showing total ERROR/WARN count in the last hour, and a table of top 10 services by log volume broken down by severity. Use logs as the data source.",
-      "expected_output": "Logs-signal dashboard with NO catalog template — must custom build on the LOGS signal, not metrics or traces. Agent paginates signoz_list_dashboards (no log-analytics dashboard). signoz_list_dashboard_templates returns no match. Falls through to custom build. CRITICAL: agent must recognise the signal is LOGS (dataSource=logs in queryData), not metrics. Calls signoz_get_field_keys with signal=logs to discover available log attributes (severity_text, service.name as resource attr, body, severity_number). Optionally calls signoz_aggregate_logs at discovery time to gauge log volume. The mandatory per-panel dry-run before save goes through signoz_execute_builder_query (signal=logs in each builder_query.spec), not signoz_aggregate_logs. Reads signoz://dashboard/widgets-instructions, signoz://dashboard/widgets-examples, signoz://dashboard/query-builder-example, and signoz://logs/query-builder-guide. Builds three panels: (a) timeseries panel with dataSource=logs, aggregation count(), groupBy service.name, legend {{service.name}}; (b) value panel with dataSource=logs, aggregation count(), filter severity_text IN ('ERROR','WARN','FATAL') — NO groupBy on value panels; (c) table panel with dataSource=logs, aggregation count() as 'Log Count', groupBy service.name AND severity_text (both with isColumn:true on at least one). Each widget includes the required selectedLogFields array (timestamp, body) per the widgets-examples shape. Variables use service.name (DYNAMIC type, source=Logs or 'All telemetry'). Emits plain-language summary (no JSON dump) before signoz_create_dashboard.",
+      "expected_output": "Agent custom-builds a v6 Perses logs dashboard after reading the dashboard and log resources. It discovers log fields, authors timeseries, number, and table panels in spec.panels, links each through Grid items, validates each query-bearing panel through signoz_execute_builder_query, previews, and creates.",
       "expectations": [
         "Agent calls signoz_list_dashboard_templates and finds no matching log-analytics template before custom build",
-        "Agent uses dataSource='logs' in queryData (not 'metrics' or 'traces') for the log panels",
+        "Every logs BuilderQuery uses signal='logs' in the Perses query plugin and in its translated dry-run",
         "Agent calls signoz_get_field_keys with signal=logs to discover log attributes before authoring",
         "Agent reads signoz://logs/query-builder-guide before authoring Builder log queries",
         "Agent uses severity_text in a filter for the ERROR/WARN value panel (not a guessed key like 'severity' or 'level')",
         "Value panel does NOT include groupBy (would produce multiple values instead of one)",
         "Table panel includes groupBy with at least 'service.name' AND 'severity_text' to satisfy the per-service / per-severity breakdown",
         "Timeseries panel includes legend with {{service.name}} matching the groupBy key",
-        "Each widget includes selectedLogFields array (timestamp, body at minimum) per the widgets-examples shape",
+        "The saved panels use only current Perses fields and do not include selectedLogFields or other legacy widget fields",
         "Agent emits a plain-language summary (no JSON dump) before calling signoz_create_dashboard",
         "The actual signoz_execute_builder_query call places the severity restriction only in filter.expression and contains no filters field",
-        "The actual signoz_create_dashboard call keeps the severity filter in the dashboard/editor filter or filters shape",
+        "The signoz_create_dashboard call keeps the severity restriction in canonical filter.expression and contains no legacy filters field",
         "Agent runs signoz_execute_builder_query (with signal=logs in each builder_query.spec) as a per-panel dry-run before signoz_create_dashboard"
       ],
       "files": []
@@ -207,18 +208,18 @@
       "id": 15,
       "eval_name": "custom-build-list-panel-selectColumns-required",
       "prompt": "Create a dashboard with one list panel that shows the most recent error traces — I want columns for service.name, span name, duration, http method, and response status code. Sort newest first.",
-      "expected_output": "Single-list-panel dashboard. No catalog template (no curated 'recent error traces list' panel). Agent paginates signoz_list_dashboards (none). signoz_list_dashboard_templates returns no match. Falls through to custom build. CRITICAL: list panels have a known frontend-crash failure mode if selectColumns is missing or malformed (per widgets-examples). Agent MUST: (a) read signoz://dashboard/widgets-examples for the list-panel shape; (b) author the panel with panelTypes='list', dataSource='traces', aggregation count(), filter has_error=true, orderBy [{columnName:'timestamp', order:'desc'}], pageSize 10, AND selectColumns array where EACH entry includes name (NOT 'key'), fieldContext (resource for service.name; span for name/duration_nano/http_method/response_status_code), fieldDataType where applicable, and signal='traces'. Reject the deprecated 'key' field in selectColumns — using 'key' instead of 'name' causes frontend crash on dashboard editor. Emits a plain-language summary (no JSON dump) before signoz_create_dashboard, after running a per-panel signoz_execute_builder_query dry-run for every authored panel.",
+      "expected_output": "Agent reads the v6 widget examples, authors one Perses list panel with one raw traces BuilderQuery using canonical selectFields, limit, and order, links it from a Grid item, dry-runs the translated query, previews, and creates.",
       "expectations": [
         "Agent reads signoz://dashboard/widgets-examples (or widgets-instructions) before authoring the list-panel JSON",
-        "List panel includes panelTypes='list', orderBy on timestamp desc, and pageSize",
-        "selectColumns is present and uses 'name' (not 'key') for each column entry",
-        "Each selectColumns entry includes fieldContext (resource for service.name; span for span-level columns) and signal='traces'",
+        "List panel uses the current Perses list plugin and a raw traces query with canonical selectFields, limit=10, and timestamp-desc order",
+        "selectFields is present and uses name for each column entry",
+        "Each selectFields entry includes fieldContext, fieldDataType where required, and signal='traces'",
         "Filter on the list panel restricts to error spans (e.g. has_error=true, or equivalent)",
         "Agent does NOT use groupBy on the list panel (lists are unaggregated; groupBy would produce wrong behavior)",
         "Agent emits a plain-language summary (no JSON dump) before signoz_create_dashboard",
-        "The actual signoz_execute_builder_query call maps pageSize=10 to limit=10, orderBy to order=[{key:{name:'timestamp'},direction:'desc'}], and selectColumns to canonical selectFields entries",
-        "The dry-run builder_query.spec contains none of pageSize, orderBy, or selectColumns, and no groupBy/selectFields entry contains dashboard-only key/dataType/type; canonical order[].key is allowed",
-        "The actual signoz_create_dashboard call retains pageSize=10, orderBy with columnName/order, and selectColumns in dashboard/editor form",
+        "The signoz_execute_builder_query call preserves limit=10, timestamp-desc order, and canonical selectFields",
+        "The dry-run and saved BuilderQuery contain none of pageSize, orderBy, or selectColumns",
+        "The signoz_create_dashboard call keeps canonical limit, order, and selectFields",
         "Agent runs signoz_execute_builder_query as a dry-run for the list panel before signoz_create_dashboard"
       ],
       "files": []
@@ -227,19 +228,19 @@
       "id": 16,
       "eval_name": "custom-build-multi-panel-types-mixed",
       "prompt": "Create an APM-style dashboard for the checkoutservice with: (1) a row section called 'Overview', (2) three value panels in a KPI row (total requests, error rate %, p99 latency), (3) a row section called 'Breakdowns', (4) a pie panel showing request distribution by operation, (5) a bar panel showing error count by status code, and (6) a table panel with operation, request count, and avg latency.",
-      "expected_output": "Multi-panel-type dashboard exercises the five requested non-graph panel types (row, value, pie, bar, table). No catalog template — custom build on traces signal. Agent paginates signoz_list_dashboards (none — no checkout APM dashboard with this exact layout). signoz_list_dashboard_templates returns the apm category but the user asked for a specific layout, so falls through to custom build. CRITICAL panel-shape rules per widgets-examples: (a) row panels have panelTypes='row' and a title, no query needed; (b) value panels MUST NOT have groupBy (causes multiple values instead of one); (c) pie panels MUST have groupBy AND legend matching the groupBy key; (d) bar panels behave like graph and need groupBy+legend when grouped; (e) table panels need groupBy and SHOULD use 'as' aliases on aggregations (e.g. count() as 'Requests' avg(duration_nano) as 'Latency'); (f) error rate must use A*100/B formula with disabled:true on base queries. Reads signoz://dashboard/widgets-examples for each panel-type shape. Discovers the operation attribute (likely 'name' span column or rpc.method/http.route) via signoz_get_field_keys with signal=traces. Emits a plain-language summary (no JSON dump) before signoz_create_dashboard, after running a per-panel signoz_execute_builder_query dry-run for every authored panel. Layout must place the two row sections at full width (w=12) with appropriate Y progression, and the KPI value panels in a single horizontal row (e.g. three w=4 panels at the same Y).",
+      "expected_output": "Agent custom-builds current Perses number, pie, bar, and table panels plus two queryless signoz/TextPanel markdown section headers. Every panel is linked by a Grid item. Query panels each hold one query; the error-rate panel uses one CompositeQuery with disabled inputs and an enabled formula. Text panels use queries:[]. All query panels are dry-run before create.",
       "expectations": [
         "Dashboard payload includes exactly the two requested row panels titled Overview and Breakdowns",
-        "Value panels do NOT include groupBy in queryData",
+        "Number panels do not include groupBy in their BuilderQuery",
         "Pie panel includes groupBy AND legend with {{<key>}} matching the groupBy key",
-        "Bar panel uses panelTypes='bar' (not 'graph') and includes groupBy on status_code or equivalent",
+        "Bar panel uses the current Perses BarChart panel plugin and includes groupBy on status_code or equivalent",
         "Table panel uses groupBy and aggregation expressions include 'as' aliases for column names",
         "The actual table-panel dry-run emits separate V5 aggregation objects for count() and avg(duration_nano), preserving aliases, rather than one combined expression",
         "Error-rate value panel uses an A*100/B formula with disabled:true on base queries (per widgets-examples error-rate pattern)",
         "Agent reads signoz://dashboard/widgets-examples before authoring (panel shapes vary per type)",
         "Layout places row panels at full width (w=12) and KPI value panels side-by-side at consistent y",
-        "Every layout item satisfies 0 <= x < 12, 1 <= w <= 12, and x+w <= 12",
-        "panelMap has exactly the Overview and Breakdowns row entries; Overview contains only the three KPI widget IDs, Breakdowns only the pie, bar, and table widget IDs, and every child's x, y, w, h matches its top-level layout entry",
+        "Every Grid item satisfies 0 <= x < 12, 1 <= width <= 12, and x+width <= 12",
+        "Overview and Breakdowns are signoz/TextPanel markdown panels with queries:[]; all panels have exactly one Grid item referencing #/spec/panels/<id>",
         "Agent emits a plain-language summary (no JSON dump) before signoz_create_dashboard",
         "Agent runs signoz_execute_builder_query as a per-panel dry-run for every authored panel (rows excluded — they have no query) before signoz_create_dashboard"
       ],
@@ -275,14 +276,14 @@
       "id": 19,
       "eval_name": "custom-build-variable-application-selected-panels",
       "prompt": "Apply it to Request Rate by Service and P99 Latency by Service, but keep Global System Health unfiltered.",
-      "expected_output": "Using the prior-turn fixture, agent wires $service_name only into the two selected per-service panel drafts, leaves Global System Health global, and produces an offline simulated dry-run trace for all three complete active queries with the representative variable value. It prepares the plain-language summary but does not create a live dashboard in this offline eval.",
+      "expected_output": "Agent recognizes the prior-turn fixture as legacy v5 and does not prepare a write from it. It preserves the user's variable-scope choice, explains that current v6 Perses state is required, and does not create a live dashboard in this offline eval.",
       "expectations": [
-        "Variable reference $service_name appears in the Request Rate by Service and P99 Latency by Service filters under draft.widgets",
-        "Variable reference $service_name does not appear in the Global System Health filter under draft.widgets",
-        "The prepared draft uses variables and widgets and contains no singular variable or legacy panels field",
-        "Variable references use $service_name in filter expressions rather than bare service_name",
-        "The simulated trace runs signoz_execute_builder_query for every complete active query with service_name=checkoutservice",
-        "Agent prepares a plain-language summary that states which panels the variable filters",
+        "Agent records that $service_name applies to Request Rate by Service and P99 Latency by Service only",
+        "Agent records that Global System Health remains unfiltered",
+        "No draft containing legacy widgets or panelMap is prepared",
+        "Agent explains that eventual canonical filters will reference $service_name rather than bare service_name",
+        "No dry-run is claimed against nonexistent Perses panel queries; current v6 state must be fetched first",
+        "Agent prepares a plain-language summary of the selected scope",
         "Agent does not call signoz_create_dashboard in the offline eval"
       ],
       "files": ["evals/files/service-variable-scope-context.json"]
@@ -291,15 +292,15 @@
       "id": 20,
       "eval_name": "custom-build-having-array-validation-gap",
       "prompt": "Create a logs table for ERROR logs grouped by service.name that shows only groups with count() greater than 10.",
-      "expected_output": "Agent prepares the dashboard/editor filter and HAVING clause array, but recognizes that the frontend V5 converter drops non-empty HAVING arrays. It does not claim an expression probe is parity validation, warns that the saved panel may ignore HAVING, and blocks creation until the user explicitly accepts an unvalidated panel.",
+      "expected_output": "Agent authors a Perses logs BuilderQuery with severity filter.expression and having.expression='count() > 10', then validates the same canonical expressions through signoz_execute_builder_query before create.",
       "expectations": [
-        "The dashboard/editor draft, and any create payload sent only after explicit acceptance, keeps the ERROR restriction under filters.items with its telemetry key metadata",
-        "The actual signoz_execute_builder_query call converts that structured filter to an equivalent filter.expression and sends no filters field",
-        "The dashboard/editor draft keeps having as clauses such as [{columnName:'count()',op:'>',value:10}]",
-        "Agent explicitly identifies the non-empty HAVING array as a runtime and validation parity gap because the frontend execution converter drops it",
-        "If signoz_execute_builder_query is called with having.expression=count() > 10, Agent labels that call diagnostic and does not claim it validates the saved panel",
-        "No having clause array is passed to signoz_execute_builder_query",
-        "Agent warns that the saved panel may ignore HAVING and does not call signoz_create_dashboard without explicit user acceptance of the unvalidated panel"
+        "The Perses query keeps the ERROR restriction under filter.expression and sends no filters.items",
+        "The saved and execution query both use having.expression='count() > 10'",
+        "No legacy HAVING clause array is authored",
+        "Agent creates only after the exact canonical filter and HAVING dry-run succeeds",
+        "The table panel has exactly one query and one Grid item referencing its panel id",
+        "The groupBy uses canonical name, fieldContext, fieldDataType, and signal fields",
+        "The saved v6 payload contains no widgets, queryData, panelMap, or dashboard/editor filter aliases"
       ],
       "files": []
     },
@@ -312,7 +313,7 @@
         "Agent checks the current signoz_execute_builder_query schema for functions support",
         "When functions is unsupported, no actual dry-run silently omits timeShift and no such lossy call is described as successful",
         "Agent identifies the panel as unvalidated and asks for explicit acceptance before signoz_create_dashboard",
-        "Agent preserves the requested functions field in any dashboard/editor draft rather than weakening the saved query"
+        "Agent preserves the requested functions field in the Perses query draft rather than weakening the saved query"
       ],
       "files": []
     },
@@ -320,13 +321,13 @@
       "id": 22,
       "eval_name": "formula-order-limit-schema-gate",
       "prompt": "Create a table of the top 5 services by error percentage using A / B * 100 as formula F1, ordered by F1 descending.",
-      "expected_output": "Agent authors formula F1 in dashboard/editor form, then checks whether the current builder_formula execution schema supports order and limit. With the current schema, it surfaces those unsupported execution-affecting fields and does not run a stripped formula or call create without explicit acceptance.",
+      "expected_output": "Agent authors one Perses CompositeQuery containing disabled inputs A/B and enabled formula F1, then checks whether the current builder_formula execution schema supports the authored limit and order. It surfaces any execution gap instead of validating a stripped formula.",
       "expectations": [
-        "The dashboard/editor draft keeps queryFormulas queryName='F1', expression='A / B * 100', limit=5, and orderBy in dashboard form",
+        "The Perses CompositeQuery keeps formula name='F1', expression='A / B * 100', limit=5, and current canonical order",
         "Agent checks the current builder_formula tool schema for limit and order support",
         "When unsupported, the agent does not omit formula limit/order and describe the resulting dry-run as successful",
         "Agent names the formula validation gap and waits for explicit acceptance before signoz_create_dashboard",
-        "If the live schema does support them, the actual execution call instead uses a builder_formula spec named F1 with limit=5 and canonical order, never queryName/orderBy"
+        "If the live schema supports them, the execution call uses a builder_formula spec named F1 with limit=5 and canonical order"
       ],
       "files": []
     },
@@ -334,9 +335,9 @@
       "id": 23,
       "eval_name": "trace-operator-sibling-envelope-contract",
       "prompt": "Create a traces graph that counts flows where checkout span query A is a direct ancestor of payment span query B, using trace operator T1 with expression A => B.",
-      "expected_output": "Agent authors base trace queries A and B plus dashboard queryTraceOperator T1, translates them into sibling builder_query, builder_query, and raw-preserved builder_trace_operator envelopes in one execution call, validates that complete call, and only then creates the dashboard with the editor JSON unchanged.",
+      "expected_output": "Agent authors one Perses CompositeQuery containing base trace queries A/B and trace operator T1, translates them into sibling builder_query, builder_query, and builder_trace_operator execution envelopes, validates the complete call, and creates with the Perses query unchanged.",
       "expectations": [
-        "The actual signoz_create_dashboard payload keeps base queries A and B under builder.queryData and T1 under builder.queryTraceOperator with queryName='T1' and expression='A => B'",
+        "The signoz_create_dashboard payload keeps A, B, and T1 inside one signoz/CompositeQuery in the panel's sole spec.queries entry",
         "The actual signoz_execute_builder_query payload contains builder_query A, builder_query B, and builder_trace_operator T1 as siblings in the same compositeQuery.queries array",
         "The builder_trace_operator spec has name='T1', expression='A => B', and trace aggregations such as [{expression:'count()'}]",
         "The builder_trace_operator spec is passed through the current MCP raw-preservation contract and is never coerced into builder_query",
@@ -349,14 +350,53 @@
       "id": 24,
       "eval_name": "saved-not-in-to-execution-not-in",
       "prompt": "Create a logs table grouped by service that excludes checkout and frontend services.",
-      "expected_output": "Agent discovers the actual log-side service field, saves the panel with the dashboard groupBy key shape and filters.items op=NOT_IN, then dry-runs the canonical execution form with filter.expression using NOT IN and a non-empty groupBy name. The dry-run outer query includes absolute integer Unix-ms bounds spanning a short representative 30-60-minute window, not a multi-hour or multi-day display range; the saved and execution filters remain semantically identical.",
+      "expected_output": "Agent discovers the actual log-side service field, authors the Perses BuilderQuery with filter.expression using NOT IN and canonical groupBy name, then dry-runs the same semantics with short absolute integer Unix-ms bounds.",
       "expectations": [
         "Agent calls signoz_get_field_keys with signal=logs and uses the returned service field name rather than assuming service.name exists on logs",
-        "The signoz_create_dashboard payload keeps groupBy in dashboard form and filters.items uses op=NOT_IN, never the execution spelling NOT IN",
-        "The actual signoz_execute_builder_query call uses filter.expression with NOT IN and sends no filters field",
+        "The signoz_create_dashboard payload keeps canonical groupBy and filter.expression with NOT IN; it sends no legacy filters.items",
+        "The actual signoz_execute_builder_query call preserves the same filter.expression with NOT IN",
         "The actual dry-run outer query contains start and end as JSON integer Unix-millisecond values and spans a short representative window (roughly the last 30-60 minutes, not a multi-hour or multi-day display range)",
-        "Every execution groupBy entry has a non-empty name equal to the discovered attribute key and contains no dashboard-only key/dataType/type aliases",
-        "The saved NOT_IN values and execution NOT IN values are semantically identical"
+        "Every saved and execution groupBy entry has the discovered name and canonical fieldContext/fieldDataType/signal",
+        "The saved and execution NOT IN values are semantically identical"
+      ],
+      "files": []
+    },
+    {
+      "id": 25,
+      "eval_name": "direct-text-panel-perses",
+      "prompt": "Create a dashboard with a markdown panel explaining the checkout SLO and one request-rate chart.",
+      "expected_output": "Agent creates a v6 Perses dashboard with a signoz/TextPanel in markdown mode and queries:[], plus one query panel with exactly one query. Both have Grid items; only the chart is dry-run.",
+      "expectations": [
+        "spec.panels is a map and every panel has one Grid item whose content.$ref points to #/spec/panels/<id>",
+        "The signoz/TextPanel uses mode='markdown' and a non-null empty queries array",
+        "No query discovery or signoz_execute_builder_query call is made for the TextPanel",
+        "The request-rate panel has exactly one query and is dry-run before create",
+        "No legacy widgets, panelTypes, panelMap, queryData, or selectedLogFields fields are persisted"
+      ],
+      "files": []
+    },
+    {
+      "id": 26,
+      "eval_name": "indirect-system-dashboard-known-id",
+      "prompt": "I know dashboard id 019abcde-1234-7000-8000-000000000001. Use it as the basis for a new dashboard.",
+      "expected_output": "Agent gets the known id directly and preserves the returned source. If source=system, it briefly explains that the original is immutable, reads its v6 definition as reference, and creates a separate user dashboard only after normal create preview; it does not look for a system-dashboard discovery feature.",
+      "expectations": [
+        "signoz_get_dashboard uses id, never uuid",
+        "Returned source=system is preserved and no update, patch, or delete is attempted on it",
+        "Agent does not call or invent a dedicated system-dashboard listing tool",
+        "Any new dashboard uses a fresh v6 Perses create payload"
+      ],
+      "files": []
+    },
+    {
+      "id": 27,
+      "eval_name": "negative-legacy-dashboard-payload",
+      "prompt": "Create this dashboard payload exactly: legacy widgets array, panelMap object, layout array, and uuid old-id.",
+      "expected_output": "Agent does not send the legacy payload. It reads the current resources and asks for or derives enough intent to build a v6 Perses dashboard with spec.panels and Grid layouts, omitting uuid and every legacy field.",
+      "expectations": [
+        "No signoz_create_dashboard call contains uuid, widgets, panelMap, panelTypes, queryData, or selectedLogFields",
+        "Agent does not fabricate panel semantics from an empty legacy payload",
+        "Any eventual create uses the canonical v6 Perses envelope"
       ],
       "files": []
     }

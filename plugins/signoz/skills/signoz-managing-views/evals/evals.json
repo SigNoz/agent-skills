@@ -5,206 +5,126 @@
       "id": 0,
       "name": "create-trace-view-for-service",
       "prompt": "Save the current traces query as a view called 'checkout-errors' for the checkout service. I want to see only error spans from service.name = checkout.",
-      "expected_output": "Agent resolves sourcePage=traces, builds a builder_query with filter service.name='checkout' AND has_error=true, sets panelType=list, runs signoz_search_traces with limit=1 using the exact filter, previews, confirms, and calls signoz_create_view. Reports the name, UUID, and sourcePage.",
+      "expected_output": "Agent reads the v2 view resource, builds and samples the exact traces filter, previews a v2 list view, creates it with explicit machine name checkout-errors and spec.displayName, and reports the canonical id.",
       "files": [],
       "assertions": [
-        {
-          "text": "Agent calls signoz_create_view",
-          "description": "The primary write operation must be called"
-        },
-        {
-          "text": "sourcePage is set to 'traces' (not logs or metrics)",
-          "description": "sourcePage must match the user's intent; wrong value is a 400"
-        },
-        {
-          "text": "Filter includes service.name = checkout and has_error = true",
-          "description": "View must capture the user's stated filter criteria"
-        },
-        {
-          "text": "The actual signoz_create_view payload sets its top-level compositeQuery argument to exactly queryType='builder', panelType='list', and queries copied losslessly from the successful execution query.compositeQuery.queries",
-          "description": "Execution and saved-view envelopes differ; the validated inner queries must be preserved while the saved wrapper is constructed explicitly"
-        },
-        {
-          "text": "The actual signoz_create_view compositeQuery argument does not contain schemaVersion, start, end, requestType, formatOptions, variables, or a nested query/compositeQuery envelope",
-          "description": "Execution-only range and formatting fields are invalid in the saved-view compositeQuery"
-        },
-        {
-          "text": "Agent runs the mandatory pre-save sample fetch via signoz_search_traces with limit=1 using the exact filter from the about-to-save payload before signoz_create_view",
-          "description": "Step 5 of the create flow: a saved view returning zero rows is a permanent artifact; the sample fetch is the only confirmation that the filter matches data"
-        },
-        {
-          "text": "Agent shows a preview (name, sourcePage, filter) before calling create",
-          "description": "Skill requires a preview step; without it user cannot catch errors"
-        },
-        {
-          "text": "Final reply includes the UUID returned by the server",
-          "description": "User needs UUID for future get/update/delete operations"
-        }
+        {"text": "Create payload uses schemaVersion='v2', source='traces', and spec with displayName, panelType, requestType, and queries", "description": "Current saved-view contract"},
+        {"text": "The payload contains no sourcePage, category, compositeQuery, extraData, UUID, or uuid field", "description": "Legacy fields are rejected"},
+        {"text": "Agent reads signoz://view/instructions before authoring the payload", "description": "Resource is schema authority"},
+        {"text": "Every builder query uses signal='traces', canonical filter.expression, a positive limit, and non-empty order", "description": "Executable v2 query"},
+        {"text": "The execution-only start/end/formatOptions/variables envelope is not persisted in spec", "description": "Saved and execution envelopes differ"},
+        {"text": "Agent sample-fetches the exact filter before create and reports the returned id", "description": "Prevent empty artifacts"},
+        {"text": "Agent previews displayName, source, panel/request type, and filter before create", "description": "Reviewable write"},
+        {"text": "The created view's returned displayName and canonical id are reported", "description": "Recognizable handoff"}
       ]
     },
     {
       "id": 1,
-      "name": "list-views-no-sourcepage",
+      "name": "list-views-no-source",
       "prompt": "Show me all my saved views.",
-      "expected_output": "Agent recognizes no sourcePage was given, calls signoz_list_views four times (once for each of traces, logs, metrics, meter), merges results, and presents them organized by sourcePage. Checks pagination.hasMore for each page before concluding.",
+      "expected_output": "Agent lists traces, logs, metrics, and meter sources, fully paginates each, and presents results grouped by source.",
       "files": [],
       "assertions": [
-        {
-          "text": "Agent calls signoz_list_views for all four pages: traces, logs, metrics, and meter",
-          "description": "Without a sourcePage the agent must query all four Explorer pages, including meter (Cost Meter)"
-        },
-        {
-          "text": "Agent checks pagination.hasMore before concluding the list is complete",
-          "description": "A single page is not a complete list"
-        },
-        {
-          "text": "Results are organized/labeled by sourcePage in the reply",
-          "description": "Grouping by signal helps user find what they need"
-        }
+        {"text": "Agent calls signoz_list_views for traces, logs, metrics, and meter", "description": "All Explorer sources"},
+        {"text": "Agent follows pagination before concluding the list is complete", "description": "No first-page truncation"},
+        {"text": "Results are grouped and labeled by source", "description": "Explorer context remains visible"}
       ]
     },
     {
       "id": 2,
       "name": "rename-existing-view",
       "prompt": "Rename the 'slow-checkout' view to 'slow-checkout-p99'.",
-      "expected_output": "Because sourcePage is unknown, the agent searches all four source pages with full pagination, then calls signoz_get_view. It previews a rename-only diff and calls signoz_update_view with the full fetched view body, changing only the name. Reports UUID, old name, and new name.",
+      "expected_output": "Agent resolves the view across sources, gets the full v2 object, previews a display-label-only diff, and performs full replacement changing spec.displayName while omitting immutable name and server fields.",
       "files": [],
       "assertions": [
-        {
-          "text": "Agent searches traces, logs, metrics, and meter with pagination because sourcePage was not supplied",
-          "description": "A saved-view name is not globally searchable through one sourcePage"
-        },
-        {
-          "text": "Agent calls signoz_list_views (or signoz_get_view) to resolve the view before updating",
-          "description": "Blind update without lookup risks wrong UUID"
-        },
-        {
-          "text": "Agent calls signoz_get_view to fetch the full body before composing update (GET-then-PUT)",
-          "description": "signoz_update_view is full-body replace; not fetching first risks wiping fields"
-        },
-        {
-          "text": "compositeQuery is not modified for a pure rename",
-          "description": "Touching compositeQuery for metadata-only change risks data loss"
-        },
-        {
-          "text": "Agent shows a diff-style preview before calling update",
-          "description": "Skill requires showing what will change"
-        },
-        {
-          "text": "Agent calls signoz_update_view with the full fetched view body, preserving sourcePage, compositeQuery, category, tags, and extraData while changing only name",
-          "description": "The PUT is full-body replace; a name-only payload would wipe state"
-        }
+        {"text": "Agent changes spec.displayName, not immutable top-level name", "description": "V2 identity contract"},
+        {"text": "Update uses canonical id plus a complete nested view and preserves source, schemaVersion, queries, selectedFields, and display", "description": "Read-modify-write"},
+        {"text": "Server-populated fields and uuid are absent from the replacement body", "description": "Postable shape"},
+        {"text": "Agent searches all four sources with full pagination because source was not supplied", "description": "Name is not globally resolved from one source"},
+        {"text": "Agent calls signoz_get_view before update", "description": "List summary cannot support replacement"},
+        {"text": "Agent shows a displayName-only diff and leaves query bytes unchanged", "description": "Metadata-only rename"}
       ]
     },
     {
       "id": 3,
       "name": "delete-view-by-name",
       "prompt": "Delete the 'checkout-errors' view.",
-      "expected_output": "Because sourcePage is unknown, the agent searches all four source pages with full pagination, then calls signoz_get_view to confirm the UUID maps to checkout-errors. It shows the resolved name, sourcePage, and category, asks for confirmation, and only then calls signoz_delete_view.",
+      "expected_output": "Agent resolves and gets the exact v2 view, shows displayName, source, and canonical id, asks for confirmation, and deletes only after confirmation.",
       "files": [],
       "assertions": [
-        {
-          "text": "Agent searches traces, logs, metrics, and meter with pagination because sourcePage was not supplied",
-          "description": "Deletion must not assume which Explorer owns the named view"
-        },
-        {
-          "text": "Agent calls signoz_list_views to locate the view by name before acting",
-          "description": "Must resolve name to UUID via listing; do not call delete on a guessed or user-pasted UUID without lookup"
-        },
-        {
-          "text": "Agent calls signoz_get_view to confirm the resolved UUID before deleting",
-          "description": "Paste errors happen; the get-before-delete guard prevents deleting the wrong view"
-        },
-        {
-          "text": "Agent shows the resolved view's name, sourcePage, and category and asks for explicit confirmation",
-          "description": "Delete is permanent; skill requires fresh confirmation against the resolved target, not just the original prompt"
-        },
-        {
-          "text": "Agent calls signoz_delete_view only after confirmation",
-          "description": "Must not auto-confirm based on original prompt"
-        },
-        {
-          "text": "Final reply confirms deletion by view name, not just UUID",
-          "description": "User should recognize what was deleted"
-        }
+        {"text": "Agent fully paginates relevant sources and calls signoz_get_view", "description": "Identity verification"},
+        {"text": "signoz_delete_view uses id only after explicit confirmation", "description": "Destructive guard"},
+        {"text": "Agent searches traces, logs, metrics, and meter when source is unknown", "description": "Complete resolution"},
+        {"text": "The confirmation identifies spec.displayName, source, and id", "description": "Review exact target"},
+        {"text": "Final reply confirms deletion by displayName", "description": "Recognizable result"},
+        {"text": "No update or create call is made during deletion", "description": "Operation stays scoped"}
       ]
     },
     {
       "id": 4,
       "name": "update-view-filter",
       "prompt": "Update the 'checkout-errors' view to show only error spans slower than one second.",
-      "expected_output": "Because sourcePage is unknown, the agent searches all four source pages with full pagination, then gets the full view. It uses signoz-generating-queries to build has_error=true AND duration_nano>1000000000, sample-fetches the exact filter, previews the diff, confirms, and calls signoz_update_view with the full fetched view body containing the validated compositeQuery.",
+      "expected_output": "Agent gets the full v2 view, uses signoz-generating-queries to build and sample the new filter, previews the query diff, and full-replaces the nested view while preserving all unrelated authored fields.",
       "files": [],
       "assertions": [
-        {
-          "text": "Agent searches traces, logs, metrics, and meter with pagination because sourcePage was not supplied",
-          "description": "Update must locate the view across every Explorer before GET-then-PUT"
-        },
-        {
-          "text": "Agent calls signoz_get_view to fetch the full body before composing update (GET-then-PUT)",
-          "description": "Full-body replace; not fetching first risks wiping fields"
-        },
-        {
-          "text": "Agent invokes signoz-generating-queries skill to build the new compositeQuery",
-          "description": "Query changes must go through signoz-generating-queries for validation; hand-editing compositeQuery risks malformed payloads"
-        },
-        {
-          "text": "Agent runs the mandatory pre-save sample fetch via signoz_search_traces with limit=1 using the new filter before signoz_update_view",
-          "description": "Step 5 of the update flow: compositeQuery changed, so the 1-row probe against the new filter is required (skip only for pure metadata tweaks)"
-        },
-        {
-          "text": "Agent shows a diff-style preview before writing, explicitly calling out the compositeQuery change",
-          "description": "Skill requires confirmation for compositeQuery changes; user must see what is changing"
-        },
-        {
-          "text": "Agent calls signoz_update_view with the full fetched view body, preserving sourcePage, category, tags, and extraData while replacing compositeQuery with the validated query",
-          "description": "The filter change must be written without dropping unrelated state"
-        },
-        {
-          "text": "The actual signoz_update_view payload sets view.compositeQuery to exactly queryType='builder', the intended panelType, and queries copied losslessly from the successful execution query.compositeQuery.queries",
-          "description": "A validated execution query must be translated to the saved-view wrapper rather than copied wholesale"
-        },
-        {
-          "text": "The updated view.compositeQuery excludes schemaVersion, start, end, requestType, formatOptions, variables, and nested execution query/compositeQuery fields",
-          "description": "Execution-only envelope fields must not leak into the saved view"
-        },
-        {
-          "text": "signal in every builder_query matches the view's sourcePage",
-          "description": "signal != sourcePage is a server-side error"
-        }
+        {"text": "Agent validates has_error=true AND duration_nano>1000000000 before update", "description": "Exact new semantics"},
+        {"text": "Update preserves source, schemaVersion, panelType, requestType, selectedFields, display, and unchanged query content", "description": "Lossless RMW"},
+        {"text": "No legacy compositeQuery/sourcePage wrapper or execution-only range envelope is persisted", "description": "V2 typed shape"},
+        {"text": "Agent searches all four sources with full pagination because source is unknown", "description": "Resolve before mutation"},
+        {"text": "Agent calls signoz_get_view and starts from the complete returned v2 object", "description": "Full replacement"},
+        {"text": "Agent invokes signoz-generating-queries for the changed query", "description": "Central query validation"},
+        {"text": "Agent previews the query diff before writing", "description": "Reviewable change"},
+        {"text": "Every builder query signal matches source='traces'", "description": "Source/signal invariant"},
+        {"text": "The update uses top-level id plus a complete nested view and strips only known server fields", "description": "Canonical RMW"}
       ]
     },
     {
       "id": 5,
       "name": "create-cost-meter-view",
       "prompt": "Save a view that tracks our log ingestion volume from the Cost Meter so I can find it later.",
-      "expected_output": "Agent recognizes this is a Cost Meter view and resolves sourcePage=meter (not metrics). Reads the schema resources, then builds the query via signoz-generating-queries told it is a Cost Meter query (source=meter) so discovery hits the meter store and finds a meter metric (e.g. signoz.meter.log.size). The resulting builder_query has signal=metrics and source=meter, panelType=graph. Runs the mandatory pre-save sample fetch via signoz_query_metrics with source=meter, the metricName, timeRange=24h, requestType=scalar. Shows a preview (name, sourcePage=meter, metric/filter, sample-fetch result), confirms, and calls signoz_create_view. Reports name, UUID, and sourcePage=meter.",
+      "expected_output": "Agent creates a v2 source=meter view whose BuilderQuery has signal=metrics and source=meter, samples the meter metric, previews, creates, and reports the canonical id.",
       "files": [],
       "assertions": [
-        {
-          "text": "sourcePage is set to 'meter' (not 'metrics')",
-          "description": "Cost Meter views file under the distinct 'meter' Explorer page; using 'metrics' mis-files them so they're invisible in the Meter Explorer"
-        },
-        {
-          "text": "Query construction is delegated to signoz-generating-queries with the Cost Meter context (source=meter), so metric discovery hits the meter store rather than the default metrics store",
-          "description": "Create-flow Step 3 mandates signoz-generating-queries; for a meter view the agent must pass the source=meter context so the meter-unaware default discovery path doesn't miss signoz.meter.* metrics"
-        },
-        {
-          "text": "Every builder_query spec has signal='metrics' AND source='meter'",
-          "description": "A meter view is queried on the metrics signal against the meter store; omitting source='meter' silently queries the default store, and the server rejects a meter view without it"
-        },
-        {
-          "text": "The actual signoz_create_view payload uses compositeQuery={queryType:'builder', panelType:'graph', queries:[...]} with queries copied from the validated execution query and no execution-only envelope fields",
-          "description": "Cost Meter views use the same explicit execution-to-saved-view translation as every other sourcePage"
-        },
-        {
-          "text": "Agent runs the pre-save sample fetch via signoz_query_metrics with source=meter before signoz_create_view",
-          "description": "Step 5 of the create flow, adapted for meter: the 1-row/scalar probe must carry source=meter so it hits the meter store"
-        },
-        {
-          "text": "Agent shows a preview and calls signoz_create_view, reporting the UUID and sourcePage=meter",
-          "description": "Preview-before-write and report-back apply to meter views like any other"
-        }
+        {"text": "Top-level source is meter; builder query signal is metrics and source is meter", "description": "Cost Meter routing"},
+        {"text": "Create payload uses v2 spec and contains no sourcePage or legacy compositeQuery", "description": "Current contract"},
+        {"text": "Metric discovery and sample query both use source=meter", "description": "Meter store discovery"},
+        {"text": "The meter builder query has a positive limit and canonical order", "description": "Bounded result"},
+        {"text": "Agent previews displayName, source=meter, metric/filter, and sample result", "description": "Reviewable create"},
+        {"text": "The create uses explicit name or generateName plus spec.displayName according to v2 identity rules", "description": "Canonical identity"},
+        {"text": "Agent reports the returned canonical id and source=meter", "description": "Handoff"}
+      ]
+    },
+    {
+      "id": 6,
+      "name": "direct-v2-generate-name",
+      "prompt": "Bookmark my current ERROR logs query as 'Payments errors'; generate the internal name for me.",
+      "expected_output": "Agent samples the exact query and creates a v2 logs view with generateName=true, no explicit name, and spec.displayName='Payments errors'.",
+      "files": [],
+      "assertions": [
+        {"text": "signoz_create_view has generateName=true, omits name, and sets spec.displayName", "description": "Direct new identity case"},
+        {"text": "The returned canonical id is reported", "description": "Future operations use id"}
+      ]
+    },
+    {
+      "id": 7,
+      "name": "indirect-preserve-raw-heatmap-payload",
+      "prompt": "Rename my metric view 'Latency distribution' to 'Checkout latency distribution'. It contains raw heatmap bucket settings; don't change the query.",
+      "expected_output": "Agent gets the full v2 view and changes only spec.displayName. It preserves the raw query, requestType, disabled flags, bucketOptions, and all authored fields without promising that Saved Views renders a heatmap UI.",
+      "files": [],
+      "assertions": [
+        {"text": "Read-modify-write preserves raw heatmap query bytes and bucket metadata", "description": "Indirect preservation case"},
+        {"text": "Agent does not advertise a saved-view heatmap renderer or HeatmapPanel plugin", "description": "UI boundary"}
+      ]
+    },
+    {
+      "id": 8,
+      "name": "negative-legacy-view-payload",
+      "prompt": "Create this saved view exactly using legacy sourcePage=logs, category=errors, compositeQuery queryType=builder, and empty extraData.",
+      "expected_output": "Agent refuses to send the legacy payload as-is, reads the v2 resource, asks for or derives the missing display/query semantics, and constructs only a v2 typed view if enough information is available.",
+      "files": [],
+      "assertions": [
+        {"text": "No create/update call contains sourcePage, category, compositeQuery, or extraData", "description": "Negative legacy contract"},
+        {"text": "Agent does not fabricate missing v2 query semantics", "description": "Safe migration"}
       ]
     }
   ]

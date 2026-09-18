@@ -116,6 +116,44 @@
         "The actual query does not use timeAggregation=latest, rate, or increase"
       ],
       "files": []
+    },
+    {
+      "id": 10,
+      "eval_name": "direct-explicit-log-search-scopes",
+      "prompt": "Search logs from the last hour for timeout across body, attributes, and resources, but keep service.name='payments'.",
+      "expected_output": "Agent reads the log guide and calls signoz_search_logs with canonical filter using search('timeout', body, attribute, resource), plus either an inline service.name='payments' predicate or service='payments', which the server composes into the same ANDed predicate. It does not use searchText for restricted cross-field search and does not send the rejected query alias.",
+      "expectations": [
+        "signoz_search_logs uses filter, not query",
+        "The filter contains search('timeout', body, attribute, resource) without the log scope, and service.name='payments' is supplied either inline in filter or through service='payments'",
+        "searchText is omitted because it is body-only and cannot express the requested cross-scope search"
+      ],
+      "files": []
+    },
+    {
+      "id": 11,
+      "eval_name": "indirect-raw-formula-heatmap",
+      "prompt": "Run a heatmap of checkout latency ratio F1=A/B with 80 linear buckets up to 5 seconds. A and B are metrics queries.",
+      "expected_output": "Agent uses raw signoz_execute_builder_query with requestType=heatmap, disabled metric inputs A and B, one enabled formula F1 carrying linear bucketOptions maxValue=5 and numBuckets=80, does not enable fillGaps, and includes no functions or having. fillGaps may be absent or false. It preserves returned buckets, counts, and overflow metadata.",
+      "expectations": [
+        "The request is sent to signoz_execute_builder_query, not signoz_query_metrics",
+        "A and B are disabled and F1 is the sole enabled output",
+        "F1 bucketOptions is kind=linear with maxValue=5 and numBuckets=80",
+        "fillGaps is absent or false, and no heatmap query includes functions or having",
+        "The result preserves bucket boundaries, counts, and overflow"
+      ],
+      "files": []
+    },
+    {
+      "id": 12,
+      "eval_name": "negative-log-query-alias-and-literal-escaping",
+      "prompt": "Use the log query alias to find the literal C:\\logs\\it's broken across all log fields.",
+      "expected_output": "Agent refuses the removed query alias, uses canonical filter with explicit search(), and escapes the generated literal by doubling backslashes before escaping the apostrophe. It does not alter a caller-authored raw filter because none was supplied.",
+      "expectations": [
+        "No signoz_search_logs call contains query",
+        "The generated search literal escapes backslashes first and then the apostrophe exactly once",
+        "Agent does not fall back to searchText because the request says all log fields"
+      ],
+      "files": []
     }
   ]
 }

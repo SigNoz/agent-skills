@@ -5,18 +5,18 @@
       "id": 0,
       "eval_name": "add-panel-to-existing-dashboard",
       "prompt": "Add a traces panel showing p99 latency by service to my 'API Monitoring' dashboard. Group by service.name.",
-      "expected_output": "Agent resolves 'API Monitoring' to a UUID by paginating dashboard results, fetches it, reads the required dashboard and traces query resources, builds a complete graph widget with a UUID, appends it within the 12-column layout, preserves supported non-target state, and dry-runs the exact query before preparing the full update. The prepared dashboard update keeps the dashboard/editor groupBy shape, while the actual dry-run translates it to the Query Builder v5 execution shape.",
+      "expected_output": "Agent resolves API Monitoring to a canonical id by paginating dashboard results, fetches it, verifies source=user, reads the dashboard and traces resources, and prepares one patch that adds a Perses timeseries panel plus its Grid item. It dry-runs the translated query before patching.",
       "files": [],
       "expectations": [
-        "Updated dashboard has exactly one more widget than original",
-        "Agent reads the three required dashboard resources plus signoz://dashboard/query-builder-example and signoz://traces/query-builder-guide before authoring the widget",
-        "New widget includes id, panelTypes, title, query, selectedLogFields, selectedTracesFields, thresholds, and contextLinks",
-        "New widget query includes queryType and the complete active Builder payload required by the MCP resources; inactive query payloads need not be authored",
-        "New widget's id is a valid UUID",
-        "New widget's query prepared for signoz_update_dashboard keeps groupBy in dashboard form with key='service.name', dataType='string', and type='resource' (not the execution-only aliases)",
-        "Layout has one new entry whose 'i' matches the new widget's id",
-        "When rows exist, the new widget appears exactly once in the intended panelMap row and its x, y, w, h match the top-level layout entry",
-        "All supported non-target widget and variable semantics remain present",
+        "Updated dashboard has exactly one more entry in spec.panels",
+        "Agent reads the required dashboard resources plus signoz://dashboard/query-builder-example and signoz://traces/query-builder-guide before authoring the panel",
+        "New panel is added at /spec/panels/<id> and its Grid item at /spec/layouts/<n>/spec/items/- references #/spec/panels/<id>",
+        "New panel has exactly one spec.queries entry containing the complete active BuilderQuery or CompositeQuery required by the MCP resources",
+        "New panel has a stable map key and every reference uses that same panel id",
+        "The saved Perses BuilderQuery keeps groupBy name='service.name', fieldDataType='string', fieldContext='resource', and signal='traces'",
+        "One new Grid item has content.$ref equal to #/spec/panels/<new-panel-id>",
+        "The new panel has exactly one Grid item and no panelMap or legacy layout entry is authored",
+        "All supported non-target panel, layout, variable, display, and tag semantics remain present",
         "The actual signoz_execute_builder_query call maps queryName='A' to name='A' and dataSource='traces' to signal='traces', and maps groupBy to name='service.name', fieldDataType='string', fieldContext='resource', signal='traces'",
         "The actual dry-run outer query contains start and end as JSON integer Unix-millisecond values",
         "Every groupBy entry passed to signoz_execute_builder_query has a non-empty name",
@@ -28,13 +28,13 @@
       "id": 1,
       "eval_name": "remove-panel-destructive-confirm",
       "prompt": "Get rid of the memory fragmentation widget on my Redis dashboard, just do it quickly.",
-      "expected_output": "Despite 'just do it quickly', agent confirms the deletion before applying. On confirmation, removes widget from widgets[], layout entry, and panelMap entry. Leaves other y positions untouched.",
+      "expected_output": "Despite 'just do it quickly', agent confirms deletion. On confirmation it removes the target Grid item and /spec/panels/<id> entry in one patch, leaving unrelated coordinates untouched.",
       "files": [],
       "expectations": [
         "Transcript contains an explicit confirmation question before deletion (despite user's 'just do it quickly')",
-        "Updated dashboard has exactly one fewer widget than original",
-        "Removed widget's id is absent from widgets[], layout[], and panelMap[*].widgets",
-        "Remaining widgets' y positions are unchanged from original (no auto-compaction)",
+        "Updated dashboard has exactly one fewer spec.panels entry and Grid item",
+        "Removed panel id is absent from spec.panels and no Grid item references it",
+        "Remaining Grid items keep their y positions; there is no automatic compaction",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
       ]
     },
@@ -42,13 +42,13 @@
       "id": 2,
       "eval_name": "panel-type-graph-to-table",
       "prompt": "Change the 'Request Latency' panel on my API dashboard from a graph to a table.",
-      "expected_output": "Non-destructive: proceeds without confirmation. Updates panelTypes from 'graph' to 'table', matches the complete table shape in widgets-examples, keeps the query intact, and preserves all other panels.",
+      "expected_output": "Agent proceeds after preview, replaces the target Perses panel plugin with the current table-panel shape from widgets-examples, keeps the one query intact, and preserves all other panels.",
       "files": [],
       "expectations": [
         "Agent reads signoz://dashboard/widgets-examples for the target table shape",
-        "Target widget's panelTypes is 'table' in updated, was 'graph' in original",
-        "Target widget retains semantically equivalent active query data, filters, groupings, and query names after normalization",
-        "Target widget matches the complete table shape from signoz://dashboard/widgets-examples",
+        "Target panel plugin is the current Perses table kind after the patch and was a timeseries kind before it",
+        "Target panel retains semantically equivalent query data, filters, groupings, and names",
+        "Target panel matches the complete Perses table shape from signoz://dashboard/widgets-examples",
         "Widget count is identical between original and updated (no add/remove)",
         "Transcript shows no confirmation prompt — non-destructive change proceeded directly",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
@@ -58,17 +58,17 @@
       "id": 3,
       "eval_name": "compound-add-rename-remove",
       "prompt": "On my 'Service Health' dashboard: rename it to 'Service Health (Production)', remove the CPU Usage panel, and add an Error Rate panel grouped by service.name. Use OTel attribute names.",
-      "expected_output": "Agent fetches the dashboard once, plans all three changes against that single state, confirms the destructive removal, and applies all three as a single update. Uses service.name. Preserves untouched widgets/variables/panelMap entries.",
+      "expected_output": "Agent fetches the source=user dashboard once, plans all three changes against that state, confirms the destructive removal, and applies one prepared patch. It preserves untouched panels, variables, layouts, and tags.",
       "files": [],
       "expectations": [
         "Transcript shows a single confirmation prompt covering the destructive removal of CPU Usage",
         "Dashboard title is updated to 'Service Health (Production)'",
-        "CPU Usage widget is absent from widgets[], layout[], and panelMap",
-        "A new Error Rate widget is present with all required v5 fields and groupBy contains 'service.name'",
-        "Net widget count equals original count (one removed, one added)",
+        "CPU Usage is absent from spec.panels and no Grid item references it",
+        "A new Perses Error Rate panel is present with one query and groupBy contains service.name",
+        "Net spec.panels count equals original count (one removed, one added)",
         "Agent dry-runs the new Error Rate panel with builder_query envelopes named A and B plus a sibling builder_formula envelope named F1 before preparing the update",
         "Transcript indicates a single planned update_dashboard call (changes batched, not iterative)",
-        "All supported non-target widget, variable, and panelMap semantics are preserved",
+        "All non-target panels, variables, Grid items, tags, and display fields are preserved",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
       ]
     },
@@ -76,14 +76,14 @@
       "id": 4,
       "eval_name": "side-by-side-layout",
       "prompt": "Put the 'CPU' and 'Memory' panels on my host overview dashboard side by side at the top.",
-      "expected_output": "Agent moves both panels to same y, w:6 each, x:0 and x:6, equal h. Updates panelMap[rowId].widgets entries to match layout. Preserves rest of dashboard.",
+      "expected_output": "Agent replaces the two target Grid items so they share y and height, with x=0,width=6 and x=6,width=6, preserving content.$ref and the rest of the dashboard.",
       "files": [],
       "expectations": [
-        "CPU and Memory widgets in layout[] both have w == 6",
+        "CPU and Memory Grid items both have width == 6",
         "Their x values are {0, 6} (one each, in some order)",
         "Their y values are equal",
         "Their h values are equal",
-        "Matching panelMap[rowId].widgets entries for CPU and Memory have the same x, y, w, h as the top-level layout entries (panelMap-sync rule)",
+        "No panelMap is authored; the canonical Grid items are the sole layout positions",
         "No other panels modified",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
       ]
@@ -105,14 +105,14 @@
       "id": 6,
       "eval_name": "add-panel-below-full-width-grid-regression",
       "prompt": "My 'API Monitoring' dashboard has an Overview section with exactly one panel: a full-width Overview panel at x:0, y:0, w:12, h:6. Add a p99 latency panel to that section without rearranging the existing panel.",
-      "expected_output": "Agent fetches the complete row-bearing dashboard, leaves the full-width panel unchanged, and adds the p99 panel below it at x:0 and y equal to the maximum y+h from the fetched layout, with a width that keeps x+w within the 12-column grid. It adds the matching layout object to the Overview panelMap row and never assumes a 24-column grid.",
+      "expected_output": "Agent fetches the complete Perses dashboard, leaves the full-width panel unchanged, and adds the p99 panel below it at x=0 and y equal to the maximum y+height, with width within the 12-column grid. It adds one matching Grid item and never assumes 24 columns.",
       "files": [],
       "expectations": [
         "Existing Overview panel remains at x:0, y:0, w:12, h:6",
         "New panel is placed at x:0 and y equals max(y+h) from the fetched layout before the new entry is added",
-        "Every entry in layout[] satisfies 0 <= x < 12, 1 <= w <= 12, and x+w <= 12",
-        "The new panel appears exactly once in the Overview panelMap row and its x, y, w, h matches its top-level layout entry",
-        "Every duplicated panelMap layout entry satisfies the same horizontal bounds and matches its top-level x, y, w, h",
+        "Every Grid item satisfies 0 <= x < 12, 1 <= width <= 12, and x+width <= 12",
+        "The new panel appears exactly once in spec.panels and exactly one Grid item references it",
+        "The payload contains no panelMap or duplicated legacy layout coordinates",
         "Agent successfully dry-runs the new p99 panel with signoz_execute_builder_query before preparing the update",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
       ]
@@ -127,7 +127,7 @@
         "Agent does not conclude Payments API is missing after the first page",
         "The simulated trace invokes signoz_list_dashboards again with offset equal to pagination.nextOffset using an accepted integer or string value",
         "The simulated trace invokes signoz_get_dashboard only for the second-page Payments API match",
-        "The modification plan preserves the fetched Request Rate widget",
+        "The modification plan preserves the fetched Request Rate panel",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
       ]
     },
@@ -159,17 +159,17 @@
       "id": 10,
       "eval_name": "apply-environment-variable-to-selected-panels",
       "prompt": "Apply it to Consumer Lag and Throughput, but leave Broker Health global.",
-      "expected_output": "Using the prior-turn fixture, agent reads the required dashboard and metrics-query resources, adds a DYNAMIC deployment_environment variable whose UUID id is distinct from its human-readable map key/name, wires $deployment_environment only into Consumer Lag and Throughput, and produces offline simulated dry-runs with the representative value. It prepares the full supported state but does not update a live dashboard.",
+      "expected_output": "The prior-turn fixture is legacy v5, so the agent does not prepare a write from it. It explains that current v6 Perses state must be fetched, then describes adding a ListVariable with signoz/DynamicVariable and wiring $deployment_environment only into Consumer Lag and Throughput.",
       "files": ["evals/files/environment-variable-scope-context.json"],
       "expectations": [
         "Agent reads the required dashboard resources plus signoz://dashboard/query-builder-example and signoz://metrics-aggregation-guide",
-        "variables map in updated has exactly one more entry than original",
-        "New variable is DYNAMIC and uses the discovered deployment.environment attribute",
-        "New variable has a UUID-shaped id and its map key and name are both deployment_environment",
-        "Consumer Lag and Throughput filters reference $deployment_environment, while Broker Health does not",
-        "The prepared dashboard mutates widgets and contains no legacy panels field",
-        "The simulated trace successfully dry-runs both complete changed queries with deployment_environment=prod",
-        "Existing variables, layout, Broker Health, and all unrelated supported state remain semantically unchanged",
+        "Agent recognizes the attached dashboard body as legacy and does not compare a v6 variables map against it",
+        "Agent describes the intended ListVariable with signoz/DynamicVariable using the discovered deployment.environment attribute",
+        "The intended current variable shape uses spec.name=deployment_environment and no UUID alias",
+        "Agent preserves the choice to filter Consumer Lag and Throughput while leaving Broker Health global",
+        "No prepared write contains legacy widgets, panelMap, or panels-array fields",
+        "Agent does not claim changed-query dry-runs until current v6 panel queries are fetched",
+        "Agent states that unrelated authored state must be preserved during the eventual v6 patch/update",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
       ]
     },
@@ -177,14 +177,14 @@
       "id": 11,
       "eval_name": "add-panel-to-non-final-row",
       "prompt": "Add an Error Rate panel to the Overview section of my Service Health dashboard.",
-      "expected_output": "Using the fetched-layout fixture, agent reads the required widget and traces query resources, simulates inserting the supplied six-row-high panel before Capacity at x:0,y:7, shifts Capacity and later content down by six, updates panelMap membership/coordinates, and produces the offline simulated dry-run without assembling a live update.",
+      "expected_output": "The attached fixture is recognized as legacy v5 and is not sent to a dashboard write. Agent explains that current v6 Perses state must be fetched before inserting the panel; it does not derive patch paths or persisted panelMap state from the fixture.",
       "files": ["evals/files/non-final-row-dashboard.json"],
       "expectations": [
         "Agent reads the required dashboard resources plus signoz://dashboard/query-builder-example and signoz://traces/query-builder-guide",
-        "The new widget and layout entry occur after Request Rate and before the Capacity row rather than at the end",
-        "The new layout is x:0,y:7,h:6 and satisfies x+w <= 12",
-        "Capacity moves from y:7 to y:13 in top-level layout; CPU moves from y:8 to y:14 in both top-level layout and panelMap",
-        "Overview panelMap contains Request Rate and the new Error Rate panel only; Capacity panelMap still contains CPU only",
+        "No new panel or layout entry is prepared from the legacy fixture alone",
+        "Any later canonical Grid item will use x,y,width,height and content.$ref after fetching v6 state",
+        "Agent does not author legacy layout or panelMap mutations from the fixture",
+        "Agent requires current spec.panels and spec.layouts Grid state before preparing canonical patch paths",
         "The simulated trace successfully dry-runs the supplied complete Error Rate query before accepting the mutation plan",
         "Agent did not call signoz_update_dashboard (read-only eval constraint respected)"
       ]
@@ -204,29 +204,67 @@
       "id": 13,
       "eval_name": "list-panel-execution-and-update-wrapper-contract",
       "prompt": "Using the attached offline fixture, change the Recent Errors list on Error Explorer to 25 rows and sort oldest first, then apply the update.",
-      "expected_output": "Agent fetches the complete dashboard, changes only pageSize and orderBy in saved dashboard state, executes the canonical V5 equivalent against the stub, and calls the stubbed update tool with the required {id,dashboard} wrapper.",
+      "expected_output": "Agent recognizes the attached fixture as legacy v5 and does not send it to update. It requires a current v6 fetch before changing the Perses list query; no live update is made in this offline eval.",
       "files": ["evals/files/update-payload-contract.json"],
       "expectations": [
-        "The actual signoz_execute_builder_query call maps filters.items to filter.expression, pageSize=25 to limit=25, orderBy to order with key.name='timestamp' and direction='asc', and selectColumns to canonical selectFields",
-        "The dry-run builder_query.spec contains none of filters, pageSize, orderBy, selectColumns, queryName, or dataSource, and no groupBy/selectFields entry contains dashboard-only key/dataType/type; canonical order[].key is allowed",
-        "The actual signoz_update_dashboard call has top-level id='66666666-6666-4666-8666-666666666666' and a nested dashboard object; title, widgets, layout, and variables are not flattened beside id",
-        "The nested dashboard is the complete fetched state and retains dashboard/editor filters, pageSize=25, orderBy=[{columnName:'timestamp',order:'asc'}], and selectColumns",
-        "The fetched and updated widget contextLinks is an object with linksData=[] and is never converted to a bare array",
-        "The update is called only after the canonical dry-run succeeds"
+        "Agent does not treat the fixture's filters, pageSize, orderBy, selectColumns, queryName, or dataSource fields as persistable v6 state",
+        "Any described current query uses filter.expression, limit=25, canonical timestamp-asc order, and selectFields",
+        "The actual signoz_update_dashboard call, if full replacement is necessary, is flat {id,schemaVersion,name,tags,spec}; uuid and a nested dashboard field are absent",
+        "No nested dashboard replacement is assembled from the legacy fixture",
+        "The legacy fixture's widget-only fields are not copied into a v6 replacement",
+        "No update is called until current v6 state is available and its changed query dry-run succeeds"
       ]
     },
     {
       "id": 14,
       "eval_name": "promql-envelope-timeout-retry",
       "prompt": "Using the attached offline fixture, add a PromQL 'Up Targets' graph panel using sum(up) to my Prometheus Overview dashboard. I am viewing the dashboard over the last 12 hours.",
-      "expected_output": "Agent preserves the dashboard's PromQL widget style, dry-runs the new panel with the PromQL execution envelope over a short absolute Unix-ms window, and responds to the fixture's timeout by retrying with a materially cheaper query before preparing the saved widget shape.",
+      "expected_output": "Agent treats the attached dashboard fixture as legacy and does not save it. It may validate the requested sum(up) PromQL with the current execution envelope, but requires current v6 Perses dashboard state before preparing a panel patch.",
       "files": ["evals/files/promql-timeout-retry.json"],
       "expectations": [
-        "The first and second signoz_execute_builder_query calls each use one compositeQuery.queries entry with type='promql' and a spec whose query is the requested panel's sum(up) PromQL; neither call uses widget query.promql arrays under compositeQuery or type='promql_query'",
+        "Any signoz_execute_builder_query calls use one current PromQL execution envelope for sum(up), never legacy widget query.promql arrays",
         "Both dry-runs use absolute JSON integer Unix-ms start and end values and minutes-scale windows rather than the dashboard's 12-hour display range",
         "After the first dry-run times out, the second call is materially cheaper in an objectively comparable way: a strictly smaller end - start duration, or the same window where both calls set an explicit PromQL step and the second step is strictly larger; byte inequality or JSON key reordering alone does not satisfy this expectation",
-        "The prepared saved widget keeps queryType='promql' and the dashboard/editor query.promql[] shape rather than the execution envelope",
+        "No saved panel is prepared until current v6 state is fetched; the eventual Perses PromQL plugin is kept distinct from the execution envelope",
         "Agent does not call signoz_update_dashboard (read-only eval constraint respected)"
+      ]
+    },
+    {
+      "id": 15,
+      "eval_name": "direct-perses-add-panel-patch",
+      "prompt": "Add a request-rate panel below the existing panels on dashboard id 019abcde-1234-7000-8000-000000000001.",
+      "expected_output": "Agent gets the dashboard by canonical id, verifies source=user, dry-runs the new query, and sends one signoz_patch_dashboard call containing a panel add at /spec/panels/<id> and a Grid-item add at /spec/layouts/0/spec/items/-.",
+      "files": [],
+      "expectations": [
+        "Dashboard tools use id and never uuid",
+        "Patch contains both required add operations and the Grid content.$ref matches the panel map key",
+        "New query panel has exactly one spec.queries entry",
+        "No legacy widgets, panelMap, panelTypes, or layout paths are used"
+      ]
+    },
+    {
+      "id": 16,
+      "eval_name": "indirect-full-replacement-preserves-authored-state",
+      "prompt": "Update the dashboard description and keep everything else exactly as it is. The patch tool is unavailable.",
+      "expected_output": "Agent gets the complete source=user dashboard once, changes only spec.display.description, strips server-populated fields, preserves immutable name and all authored spec/tags, and calls signoz_update_dashboard with flat {id,schemaVersion,name,tags,spec}.",
+      "files": [],
+      "expectations": [
+        "Update uses flat canonical {id,schemaVersion,name,tags,spec}; nested dashboard and uuid are absent",
+        "Immutable machine name and every unrelated authored panel, layout, variable, link, tag, and display field are preserved",
+        "The canonical id is retained while timestamps, creator/updater, org metadata, locked, source, and webUrl are omitted",
+        "Prepared reads and authorization are reused rather than repeated"
+      ]
+    },
+    {
+      "id": 17,
+      "eval_name": "negative-non-user-dashboard-write",
+      "prompt": "Change the title on dashboard id 019abcde-1234-7000-8000-000000000002.",
+      "expected_output": "Agent gets the known dashboard id. When it returns source=integration or source=system, it preserves that source, briefly explains the dashboard is immutable, and makes no patch/update/delete call.",
+      "files": [],
+      "expectations": [
+        "Agent uses signoz_get_dashboard with canonical id",
+        "No write is attempted for any non-user source",
+        "Agent does not invent a system-dashboard discovery or source-conversion feature"
       ]
     }
   ]

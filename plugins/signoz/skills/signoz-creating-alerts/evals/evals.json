@@ -9,7 +9,7 @@
       "expectations": [
         "The data probe calls signoz_query_metrics with a concrete metricName and the cartservice filter; it never sends count() or count_distinct(service.name) as a metrics aggregation expression",
         "Every signoz_execute_builder_query dry-run carries start and end as JSON integer Unix-millisecond values in the outer query",
-        "The signoz_create_alert payload puts Slack in the warning threshold channels and PagerDuty in the critical threshold channels",
+        "The signoz_create_alert payload puts the exact returned Slack displayName in warning channels and exact returned PagerDuty displayName in critical channels; machine names are not used",
         "The threshold-rule create payload does not rely on top-level preferredChannels for its per-severity routing"
       ],
       "files": []
@@ -21,7 +21,7 @@
       "expected_output": "TRACES_BASED_ALERT with formula F1 = A*100/B (A = count of error spans, B = count of all spans) on service.name='checkoutservice', threshold target 3, targetUnit percent. CRITICAL: must paginate signoz_list_alert_rules and detect existing 'checkout-svc Error Rate > 3%' alert, surface it as a duplicate, and ask whether to proceed/modify/cancel rather than silently creating another one.",
       "expectations": [
         "The trace data probe calls signoz_aggregate_traces with aggregation=count, never aggregation=count()",
-        "If creation proceeds after duplicate resolution, the direct channel is in condition.thresholds.spec[].channels"
+        "If creation proceeds after duplicate resolution, the exact returned channel displayName is in condition.thresholds.spec[].channels"
       ],
       "files": []
     },
@@ -33,7 +33,7 @@
       "expectations": [
         "The log data probe calls signoz_aggregate_logs with aggregation=count, never aggregation=count()",
         "The full dry-run uses signoz_execute_builder_query with signal=logs in the builder_query spec",
-        "The signoz_create_alert payload puts the chosen Slack channel in condition.thresholds.spec[].channels"
+        "The signoz_create_alert payload puts the chosen Slack displayName returned by the paginated channel list in condition.thresholds.spec[].channels"
       ],
       "files": []
     },
@@ -45,7 +45,7 @@
       "expectations": [
         "The metric data probe calls signoz_query_metrics with a concrete metricName and service.name='frontend'; it never uses an expression-only count() metrics aggregation",
         "The signoz_execute_builder_query dry-run validates the base metric query without claiming to validate the anomaly functions transform or anomaly score",
-        "The signoz_create_alert payload has top-level preferredChannels containing the selected Slack channel",
+        "The signoz_create_alert payload has top-level preferredChannels containing the selected Slack displayName, not its machine name",
         "The anomaly create payload omits condition.thresholds, evaluation, notificationSettings, and schemaVersion"
       ],
       "files": []
@@ -59,7 +59,7 @@
         "The trace data probe calls signoz_aggregate_traces with aggregation=count, never aggregation=count()",
         "The full dry-run preserves having.expression=count() > 50 in the Query Builder spec",
         "The actual signoz_execute_builder_query dry-run carries start and end as JSON integer Unix-millisecond values in the outer query",
-        "The signoz_create_alert payload places both Slack and PagerDuty names in the critical threshold channels array"
+        "The signoz_create_alert payload places both returned Slack and PagerDuty displayNames in the critical threshold channels array"
       ],
       "files": []
     },
@@ -73,7 +73,48 @@
         "The full signoz_execute_builder_query dry-run has start and end as JSON integer Unix-millisecond values in the outer query",
         "The signoz_create_alert payload enables alertOnAbsent as the sole trigger",
         "The signoz_create_alert payload omits condition.thresholds entirely rather than sending an empty or fabricated threshold spec",
-        "The signoz_create_alert payload puts #staging-alerts in top-level preferredChannels"
+        "The signoz_create_alert payload routes through the exact returned #staging-alerts displayName in the field allowed by the current v2 absent-only schema"
+      ],
+      "files": []
+    },
+    {
+      "id": 6,
+      "eval_name": "direct-create-v2-slack-channel-no-test",
+      "prompt": "Create a Slack notification channel displayed as 'Platform Alerts' using this webhook, then use it for a warning alert. Do not send a test.",
+      "expected_output": "Agent fully paginates channels, confirms the display name is unused, creates the channel with generateName=true, displayName='Platform Alerts', config.kind='slack', config.spec.apiUrl plus provider fields, and test=false/omitted. It routes the alert by returned displayName, never by generated machine name.",
+      "expectations": [
+        "Channel discovery follows pagination.hasMore and pagination.nextOffset and treats total as the filtered total",
+        "signoz_create_notification_channel uses canonical config={kind:'slack',spec:{apiUrl,...}} and contains no type, send_resolved, slack_api_url, or other flat provider arguments",
+        "Create uses generateName=true with no explicit name and includes displayName='Platform Alerts'",
+        "test is false or omitted, so no test notification is requested",
+        "The alert channel reference exactly matches the returned displayName, not returned name",
+        "The webhook is never echoed after the create call"
+      ],
+      "files": []
+    },
+    {
+      "id": 7,
+      "eval_name": "indirect-update-channel-preserves-secrets",
+      "prompt": "Turn off resolved notifications for the existing PagerDuty channel 'Primary On-call', then use it for this alert. Don't test it.",
+      "expected_output": "Agent paginates the config-free list, resolves Primary On-call by displayName, gets the full channel by id, copies its complete config, changes only config.spec.sendResolved=false, and updates with id plus full config. It preserves routingKey and every credential without echoing them, does not request a test, and routes the alert by returned displayName.",
+      "expectations": [
+        "Channel discovery follows pagination.hasMore and pagination.nextOffset before resolving the displayName and id",
+        "Update payload contains only canonical id, complete config.kind/spec, and false/omitted test; it contains no name or displayName mutation",
+        "The existing routingKey and all provider fields are preserved from get without being printed",
+        "No automatic test is sent",
+        "If a post-write auth error has mutationCommitted=true, agent retains the returned id and inspects after authentication without replaying update or test"
+      ],
+      "files": []
+    },
+    {
+      "id": 8,
+      "eval_name": "negative-legacy-channel-shape",
+      "prompt": "Create a Slack channel with type=slack, slack_api_url=https://example.invalid/hook, send_resolved=true, and call it platform-alerts.",
+      "expected_output": "Agent does not send the legacy flat payload. It maps the user's intent to the current v2 config.kind/spec schema, separates immutable machine name from displayName, previews the canonical shape without echoing the URL, and asks for a display name only if one cannot be inferred safely.",
+      "expectations": [
+        "No notification-channel tool call contains top-level type, slack_api_url, send_resolved, or flat provider fields",
+        "Canonical payload uses name/displayName plus config.kind='slack' and config.spec.apiUrl/sendResolved",
+        "The secret URL is not echoed in preview or final output"
       ],
       "files": []
     }

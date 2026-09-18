@@ -1,109 +1,238 @@
-# Dashboard JSON to Query Builder v5
+# Perses dashboard query to Query Builder v5 execution
 
-<!-- Keep this file byte-identical in both dashboard skills. -->
+## Contents
 
-Saved dashboard/editor JSON and `signoz_execute_builder_query` use different
-contracts. Use the current tool schema to decide what MCP accepts and the
-required Query Builder resources to build supported fields. This file only maps
-the contract boundary; never pass widget JSON to the execution tool.
+- [Purpose](#purpose)
+- [Authoritative resources](#authoritative-resources)
+- [Persisted dashboard shape](#persisted-dashboard-shape)
+- [Queryless text panels](#queryless-text-panels)
+- [Find the one panel query](#find-the-one-panel-query)
+- [Translate query plugins](#translate-query-plugins)
+- [Builder query mapping](#builder-query-mapping)
+- [Formula mapping](#formula-mapping)
+- [Trace operator mapping](#trace-operator-mapping)
+- [PromQL and ClickHouse mapping](#promql-and-clickhouse-mapping)
+- [Variables](#variables)
+- [Request envelope](#request-envelope)
+- [Heatmap boundary](#heatmap-boundary)
+- [Validation gaps](#validation-gaps)
+- [Save discipline](#save-discipline)
+- [Checklist](#checklist)
 
-## Lossless gate
+## Purpose
 
-Inventory every result-affecting field, including disabled dependencies. If a
-field has no exact equivalent in the current MCP tool schema, do not omit it and
-claim validation. Name the gap and write only after the user explicitly accepts
-an unvalidated panel. Treat Builder `functions` and formula `order`/`limit` as
-unsupported unless the tool schema exposes them. `legend` may remain saved-only.
+Perses dashboard panels and `signoz_execute_builder_query` use related but
+different representations. Persist the Perses panel unchanged. Build a separate
+Query Builder v5 execution request only to validate its query.
 
-## Translate one panel
+This guide is a translation checklist, not a schema copy. Tool schemas and MCP
+resources remain authoritative.
 
-Saved panels persist no time range. Build the complete outer `query` with
-absolute `start` / `end` as JSON integer Unix-ms (for example, the last hour),
-request type, composite queries, format options, and representative variable
-values; omitted bounds fail with `missing start or end timestamp`.
-Start every dry-run with the shortest representative window likely to contain
-data, usually the last 30-60 minutes; never use the panel's display range by reflex.
-If empty, widen according to signal cadence and report the exact windows tested
-rather than concluding telemetry is absent. A dry-run validates execution only
-for that window, not correctness across every dashboard range. A PromQL range
-selector looks backward from each evaluation timestamp: widening outer `start` /
-`end` adds evaluations rather than "covering" a long selector, and long selectors
-such as `[12h]` remain costly even with short outer bounds.
+## Authoritative resources
 
-On a timeout, never resend the identical payload. Shrink the window, coarsen the
-type-appropriate interval when available (PromQL `step`; Builder
-`stepInterval`; ClickHouse has no equivalent), or reduce query cost first.
+Read these before translating:
 
-Dashboard request types are: graph/bar/histogram -> `time_series`;
-table/pie/value -> `scalar`; trace -> `trace`; list -> `raw`. These are the only
-execution values; never invent `aggregate`, `table`, or `timeseries`. MCP
-dashboard writes validate `panelTypes` against
-graph/value/table/list/bar/pie/histogram only; never author a new trace panel.
-Use a list panel with raw trace rows instead; keep `trace` -> `trace` only when
-executing an existing saved panel.
+1. `signoz://dashboard/instructions`
+2. `signoz://dashboard/widgets-instructions`
+3. `signoz://dashboard/widgets-examples`
+4. `signoz://dashboard/query-builder-example`
+5. The relevant logs, traces, metrics, PromQL, or ClickHouse resource
 
-Put every dependency in one `compositeQuery.queries` array: `queryData[]` ->
-`builder_query`; `queryFormulas[]` -> sibling `builder_formula`;
-`queryTraceOperator[]` -> sibling `builder_trace_operator`.
+If a resource and this guide differ, follow the resource.
 
-For each `builder_query`:
+## Persisted dashboard shape
 
-- `queryName` -> `name`; `dataSource` -> `signal`.
-- Use `filter.expression`, or convert `filters.items[]` and `filters.op` exactly.
-  Saved operators use underscore enums (`NOT_IN`); execution expressions use
-  SQL-ish forms (`NOT IN`). Translate, never mix representations, and keep both
-  forms semantically aligned when saved JSON contains both. Never send `filters`.
-- Saved `groupBy[].key/dataType/type` -> execution
-  `name/fieldDataType/fieldContext`; set `signal` from the field or enclosing
-  query. For "by <dimension>", `name` is the actual attribute key and never
-  empty; omit `groupBy` when ungrouped. Send no dashboard aliases.
-- `selectColumns[]` -> `selectFields[]`: `name` from `name` or `key`,
-  `fieldDataType` from `fieldDataType` or `dataType`, `fieldContext` from
-  `fieldContext` or `type`, plus `signal`. Send only canonical metadata.
-- For table/list use `limit`, falling back to `pageSize`; otherwise use `limit`.
-  `{columnName,order}` -> `{key:{name:columnName},direction:order}`.
-- Preserve schema-supported fields such as `disabled`, `source`, and
-  `stepInterval`; map `offset` only for raw/trace requests.
-- Metrics: emit one V5 aggregation from `aggregations[0]`, falling back to
-  `aggregateAttribute.key/temporality` and top-level time/space aggregation;
-  include `reduceTo` for table/pie/value.
-- Logs/traces: split function calls inside combined `aggregations[].expression`
-  values into separate V5 aggregations, preserve aliases, default to `count()`
-  only when none exists, and omit for raw requests.
-- Preserve `having.expression`. The frontend drops a non-empty saved HAVING
-  clause array: never execute that array or claim an expression probe validates
-  it; warn that the saved panel may ignore it.
+A v6 dashboard keeps panels in `spec.panels`, a map keyed by panel id.
 
-Formula: set `spec.name` from `queryName`, preserve `expression`/`disabled` and
-supported `legend`; map `orderBy` -> `order` and copy `limit` only when the tool
-schema accepts them.
+Each rendered panel has one Grid item in
+`spec.layouts[n].spec.items`. The link is:
 
-Trace operator: emit a raw-preserved `builder_trace_operator` with `name` from
-`queryName`, `expression`, applicable mappings above, and trace V5 aggregations
-(`count()` for a count panel; omit for raw). Never coerce it to `builder_query`,
-copy dashboard aliases, or invent `signal`, `filter`, `functions`, or `disabled`.
+`content.$ref: "#/spec/panels/<panel-id>"`
 
-## PromQL and ClickHouse panels
+Patch a panel at `/spec/panels/<panel-id>`. Patch its position at
+`/spec/layouts/<layout-index>/spec/items/<item-index>`.
 
-These bypass the Builder crosswalk, but their execution envelopes are fixed. Saved
-widgets use `query.promql[]` / `query.clickhouse_sql[]` with `queryType`; never
-copy those arrays under execution `compositeQuery`.
-Map each saved `query.promql[]` item to one `compositeQuery.queries[]` entry:
-`{"type": "promql", "spec": {"name": "A", "query": "<promql>"}}`. Optional
-spec fields are `disabled`, `step`, `stats`, and `legend`. The type is exactly
-`promql`, never `promql_query`.
-Map each saved `query.clickhouse_sql[]` item to one `compositeQuery.queries[]`
-entry: `{"type": "clickhouse_sql", "spec": {"name": "A", "query": "<sql>"}}`;
-optional spec fields are `disabled` and `legend`.
-Always set `requestType` with the Builder panel mapping above. The server's
-`time_series` default when PromQL omits it is fallback only; ClickHouse has no
-default. Substitute representative literals for `$var` in dry-runs only; saved
-panels keep `$var`. Read `signoz://promql/instructions` for selector syntax and
-the matching `signoz://dashboard/clickhouse-*` resources for ClickHouse schema.
+Do not create or retain legacy `widgets`, `layout`, `panelMap`,
+`panelTypes`, `queryData`, `selectedLogFields`, or
+`selectedTracesFields`.
 
-## Saved payload invariant
+## Queryless text panels
 
-Dashboard writes keep editor aliases: `queryName`, `dataSource`, `filters`,
-`pageSize`, `orderBy`, `selectColumns`, clause-array HAVING,
-`queryTraceOperator`, and `groupBy[].key/dataType/type`. Canonical names belong
-only in `signoz_execute_builder_query`.
+A `signoz/TextPanel` is intentionally queryless.
+
+It must use mode `markdown` or `text` and a non-null empty `queries: []`.
+Do not invent an execution query for it. Skip discovery and dry-run for that
+panel.
+
+Every other supported query panel has exactly one entry in
+`panel.spec.queries`.
+
+## Find the one panel query
+
+Read `spec.panels[panelId].spec.queries[0]`.
+
+That entry may directly contain a query plugin or a
+`signoz/CompositeQuery`. A composite query still counts as the panel's one
+query; its internal entries become sibling execution envelopes.
+
+Never append a second item to `panel.spec.queries`.
+
+## Translate query plugins
+
+Translate only the query plugin content. Do not send the Perses panel display,
+layout, links, visual plugin configuration, or dashboard metadata to the
+executor.
+
+Keep the persisted plugin unchanged. The execution request is temporary.
+
+A direct query plugin becomes one execution query envelope. A
+`signoz/CompositeQuery` becomes its ordered internal query/formula/operator
+entries under `compositeQuery.queries`.
+
+Preserve names, enabled/disabled state, legends, limits, order, filters,
+aggregations, and plugin-specific semantics that the execution schema supports.
+
+## Builder query mapping
+
+Map a Perses `signoz/BuilderQuery` to a Query Builder v5
+`builder_query` envelope.
+
+The execution spec uses canonical fields:
+
+- `name`
+- `signal`
+- `source` when applicable
+- `stepInterval`
+- `aggregations`
+- `filter: {expression}`
+- `groupBy`
+- `having: {expression}`
+- `limit`
+- `order`
+- `legend`
+- `disabled`
+
+Group-by entries use `name`, `fieldContext`, `fieldDataType`, and
+`signal`. Do not translate them back to old dashboard keys such as `key`,
+`type`, or `dataType`.
+
+Use the aggregation guide for metric temporality and valid aggregation pairs.
+Use exact discovered metric and field names.
+
+For raw log/trace lists, preserve canonical `selectFields`, limit, and order.
+Do not reintroduce editor-only `selectColumns`, `pageSize`, or `orderBy`
+unless the current resource explicitly presents them as input to translate.
+
+## Formula mapping
+
+Map a Perses formula to a `builder_formula` envelope. Preserve:
+
+- `name`
+- numeric `expression`
+- `legend`
+- `limit`
+- `order`
+- `disabled`
+- supported bucket options for raw heatmap execution
+
+A common computed-series pattern has disabled metric inputs and one enabled
+formula. An enabled metric output may also depend on disabled metric inputs.
+Keep the authored topology.
+
+Do not put comparisons into a numeric formula. Do not silently remove formula
+fields merely to make validation pass.
+
+## Trace operator mapping
+
+Map each trace relationship plugin to a `builder_trace_operator` envelope in
+the same composite execution request as the referenced trace queries.
+
+Preserve the operator expression and query names. Do not validate only the base
+queries and claim the relationship was tested.
+
+## PromQL and ClickHouse mapping
+
+Map PromQL and ClickHouse plugins to the exact envelope type required by the
+current executor schema. Preserve query text byte-for-byte except for
+representative dashboard-variable substitution in the temporary dry-run.
+
+Read `signoz://promql/instructions` for dotted OpenTelemetry metric names.
+Read the relevant ClickHouse schema and example resources before authoring SQL.
+
+Do not save the execution envelope into the dashboard.
+
+## Variables
+
+The executor does not expand dashboard variables.
+
+For a dry-run, replace each `$variable` with one representative discovered
+literal. Preserve the original variable reference in the Perses panel.
+
+Record which values were substituted so the validation result is interpretable.
+Do not wire a new variable into panels until the user chooses all panels or a
+specific subset.
+
+## Request envelope
+
+Call `signoz_execute_builder_query` with the mandatory tool wrapper:
+
+`{searchContext: "<original request>", query: {schemaVersion, start, end, requestType, compositeQuery, formatOptions, variables}}`
+
+The object inside `query` is the execution payload. Use absolute JSON integer
+Unix-millisecond `start` and `end`, the appropriate `requestType`, and the
+translated sibling entries under `query.compositeQuery.queries`.
+
+Do not pass the execution payload directly as the tool arguments, and do not
+add another `query` or `compositeQuery` wrapper inside `query`.
+
+## Heatmap boundary
+
+Raw heatmaps use `requestType: "heatmap"` with
+`signoz_execute_builder_query`. They do not use the convenience
+`signoz_query_metrics` contract.
+
+`bucketOptions` may be present on the effective enabled metric query or
+formula as described by `signoz://metrics-aggregation-guide`. Preserve bucket
+boundaries, counts, and overflow metadata in the result.
+
+There is no advertised dashboard HeatmapPanel plugin. Do not translate a raw
+heatmap execution into a saved heatmap panel.
+
+## Validation gaps
+
+If the executor schema cannot represent a persisted query field, do not delete
+that field and call the reduced request equivalent.
+
+Explain the exact unsupported semantic. The user may choose whether to save
+despite the gap.
+
+Do not pass a persisted HAVING array to an execution field that expects
+`having.expression`, or claim one validates the other, unless the current MCP
+resource explicitly defines the translation.
+
+## Save discipline
+
+After a successful dry-run, save or patch the original Perses query, not the
+temporary execution request.
+
+For full dashboard replacement, preserve all unchanged authored fields and
+strip only known server-populated fields. For targeted changes, prefer
+`signoz_patch_dashboard`.
+
+Do not replay a write after an ambiguous failure.
+
+## Checklist
+
+- The dashboard is v6 Perses.
+- The panel exists in `spec.panels`.
+- Its Grid item references `#/spec/panels/<id>`.
+- A TextPanel has `queries: []` and no dry-run.
+- Every query panel has exactly one panel query entry.
+- Composite internals became sibling execution envelopes.
+- Metric/field names came from discovery.
+- Dashboard variables were substituted only in the dry-run.
+- Absolute integer millisecond bounds were used.
+- No legacy dashboard fields entered the saved payload.
+- Unsupported semantics were surfaced rather than stripped.
+- Raw heatmap output was not advertised as a dashboard panel.
+- The persisted Perses query remained unchanged after translation.

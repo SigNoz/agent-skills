@@ -135,6 +135,25 @@ and values also require a non-empty discovered `name`.
 | Trace aggregation (count, avg, percentiles) | `signoz_aggregate_traces` | Plain totals, grouped counts, and top-N by one aggregation. |
 | Complex log/trace formula or shaping | `signoz_execute_builder_query` | Use when ratios, shaping, ordering, or cardinality control exceed the convenience tools; never hand-build a plain grouped count. |
 
+**Canonical log search contract (v0.142.0+):**
+
+- `signoz_search_logs` accepts `filter`; the former `query` alias is
+  rejected.
+- `searchText` is body-only convenience and maps to a body `CONTAINS`
+  predicate. Do not describe it as attribute or resource search.
+- For explicit cross-field search, use `filter: "search('timeout')"`.
+  The `search()` scopes documented by `signoz://logs/query-builder-guide`
+  support body, attribute, resource, log, or their allowed combinations.
+  Unscoped `search()` means all supported log fields; enumerate scopes when
+  the user requests only a subset.
+- Prefer a direct known-field predicate such as
+  `service.name = 'payments'` when the field is known, or use the `service`
+  shortcut; the server composes that shortcut into the same ANDed
+  `service.name` predicate. Discover unfamiliar fields first.
+- When constructing a search literal, escape backslashes first and apostrophes
+  second. Leave a caller-authored raw `filter` untouched; do not escape it
+  again.
+
 For `signoz_aggregate_logs` / `signoz_aggregate_traces`, `aggregation` is one
 bare token: `count`, `count_distinct`, `avg`, `sum`, `min`, `max`, `p50`, `p75`,
 `p90`, `p95`, `p99`, or `rate`. Never include parentheses or a column; put the
@@ -153,12 +172,36 @@ envelopes passed to `signoz_execute_builder_query`, use only:
 
 | Signal | Valid `requestType` |
 |---|---|
-| metrics | `time_series`, `scalar` |
+| metrics | `time_series`, `scalar`, `heatmap` |
 | traces | `raw`, `trace`, `scalar`, `time_series` |
 | logs | `raw`, `scalar`, `time_series` |
 
 Never invent `aggregate`, `table`, `timeseries`, or `series`. This matrix does
 not apply to PromQL or ClickHouse SQL envelopes.
+
+**Raw heatmaps (v0.142.0+):** Use `signoz_execute_builder_query` with
+`requestType: "heatmap"`. The convenience `signoz_query_metrics` contract
+remains unchanged and does not expose heatmaps.
+
+A heatmap has one effective enabled output: one enabled metric query (which may
+depend on disabled metric inputs), one enabled formula over disabled metric
+inputs, or a supported enabled PromQL/ClickHouse SQL query. Put
+`bucketOptions` on the enabled metric query or formula:
+
+- linear: `kind=linear`, finite `maxValue > 0`; omitted or zero
+  `numBuckets` uses the backend default of 60, otherwise use 1–512;
+- log: `kind=log`; optional `scale` is -4 through 4 and defaults to 4.
+
+Classic histogram metrics with an `le` axis do not take `bucketOptions`.
+Exponential histograms are unsupported for this heatmap contract. Do not enable
+`fillGaps`; absent and `false` are equivalent and accepted, and the MCP payload
+may serialize the zero value as `fillGaps: false`. Do not add post-query
+`functions` or `having` to a heatmap builder query. Preserve returned bucket
+boundaries, per-point counts, and overflow metadata. Do not flatten the result
+into ordinary time-series points.
+
+Raw execution support does not imply a dashboard HeatmapPanel plugin or
+saved-view heatmap rendering.
 
 ### Step 4: Execute the query
 

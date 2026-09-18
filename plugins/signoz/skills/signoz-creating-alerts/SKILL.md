@@ -354,25 +354,29 @@ alert that will never fire.
 Resolve at least one channel after dry-run and final severity; otherwise the
 alert saves but never notifies.
 
-1. Call `signoz_list_notification_channels` and follow
-   `pagination.nextOffset` while `pagination.hasMore` is true.
-2. If the user named a channel ("send to slack-infra"), use it if it exists;
-   if not, fall through.
-3. Otherwise present the user with two options:
-   - **Pick from existing** — list channels with their type (Slack, PagerDuty,
-     email, webhook) so the user can choose.
-   - **Create new inline** — call `signoz_create_notification_channel` with
-     channel parameters the user provides (name, type, type-specific config
-     like Slack webhook URL or PagerDuty integration key).
-4. If neither path resolves a channel, stop and ask the user for a
-   notification channel (see *Required inputs* above).
-
-Channel creation is admin-gated. On `PERMISSION_DENIED`, have an admin create it
-out of band or configure a dedicated, short-lived minimum-role credential via
-the host's environment/secret store; never request an elevated key in chat or
-tracked config.
-
-Place the resolved channel according to the rule schema:
+Reuse channel results, resources, probes, and authorization from the same
+prepared operation; refresh only when state may have changed.
+1. Call `signoz_list_notification_channels`. Its config-free response has
+   `channels`, filtered `total`, and pagination metadata; follow
+   `nextOffset` while `hasMore`. Limit defaults to 20 and caps at 200.
+2. If the user named a channel ("send to Platform Alerts"), match its returned
+   `displayName`. Alert routing uses this immutable display name, not the
+   DNS-1123 machine `name`.
+3. Present fully paginated choices with `displayName` and `kind`. If none
+   fits, offer creation from user-provided config; never create automatically.
+4. Create uses `config: {kind, spec}`. Supported kinds are `slack`, `email`,
+   `webhook`, `pagerduty`, `opsgenie`, `msteams`, `googlechat`, `jira`,
+   `jsmops`, and `incidentio`. Provider fields come from the MCP schema.
+   Legacy `type`, `send_resolved`, and provider-prefixed fields are rejected.
+5. Use explicit `name` plus `displayName`, or `generateName: true` with no
+   name plus `displayName`. Both are immutable; `test` defaults false and
+   requires an explicit post-write test request.
+6. If neither listing nor user-provided creation resolves a channel, stop and
+   ask the user for one (see *Required inputs* above).
+Channel creation is admin-gated. On `PERMISSION_DENIED`, use an admin-created
+channel or a short-lived minimum-role credential from the host's secret store;
+never request an elevated key in chat or tracked config.
+Place the exact returned `displayName` according to the rule schema:
 
 - `threshold_rule` / `promql_rule` (v2alpha1): attach direct-routing channels
   to each `condition.thresholds.spec[N].channels` array — typically warning →
@@ -385,7 +389,18 @@ Place the resolved channel according to the rule schema:
 Never put a chosen anomaly or absent-only channel in a nonexistent thresholds
 block, or substitute `preferredChannels` for per-tier multi-severity routing.
 
-#### Handling secret-bearing channel config
+#### Updating or handling secret-bearing channel config
+
+`signoz_update_notification_channel` is full replacement: resolve `id`, get
+the channel, copy complete `config`, change requested fields, then send `id`
+plus full `config`. Do not send or change `name` or `displayName`. Preserve
+credentials and effective `sendResolved` without echoing them. A kind change
+needs the complete new provider config. Update tests require explicit opt-in.
+
+If a requested test fails after a successful write, report mutation and test
+status separately. On a post-write auth error with `mutationCommitted: true`,
+retain the id and inspect after authentication; do not replay mutation or test.
+Transport success does not prove final provider delivery.
 
 Slack webhook URLs, PagerDuty integration keys, and similar webhook tokens
 are secrets. When the user supplies them inline, treat them as opaque
@@ -394,8 +409,8 @@ inputs and follow these rules:
 - **Do not echo the secret back.** Never include the webhook URL,
   integration key, or any password-like token in chat output, previews,
   confirmation messages, summaries, or the `<navigation_suggestions>`
-  payload. Refer to the channel by its `name` only ("Slack channel
-  `slack-infra` created") and omit the value entirely.
+  payload. Refer to the channel by its `displayName` only ("Slack channel
+  `Platform Alerts` created") and omit the value entirely.
 - **Do not stash secrets in clarification context.** If you need to ask the
   user a follow-up question after they pasted a secret, do not include
   the secret value in the clarification `message`, `discovered_context`,
@@ -404,7 +419,7 @@ inputs and follow these rules:
 - **One-pass only.** Pass the secret directly to
   `signoz_create_notification_channel` and do not retain it in any
   intermediate prose. After the create call succeeds, refer to the
-  channel by name; after a failure, ask the user to re-paste rather than
+  channel by display name; after a failure, ask the user to re-paste rather than
   echoing what they sent.
 - **If the user instead asks "how do I set up a Slack channel?"** — that
   is a docs question, not a create-channel request. Answer with the docs
@@ -455,15 +470,16 @@ does).
   `LOGS_BASED_ALERT`. Mismatches fail validation.
 - **Anomaly rules are metrics-only** `anomaly_rule` + non-metric alertType
   is rejected.
-- **Channels must exist and use the rule's routing field.** Use exact names
-  from `signoz_list_notification_channels`; put them in per-threshold
+- **Channels must exist and use the rule's routing field.** Use exact returned
+  `displayName` values from the fully paginated
+  `signoz_list_notification_channels`; put them in per-threshold
   `channels` for threshold/PromQL rules, or top-level `preferredChannels` for
   anomaly and absent-only threshold/PromQL rules without thresholds.
 - **Never echo channel secrets.** Slack webhook URLs, PagerDuty integration
   keys, and similar webhook tokens are secrets. Pass them to
   `signoz_create_notification_channel` once and never repeat the
   value in chat output, previews, confirmations, summaries, clarification
-  payloads, or navigation suggestions. Refer to the channel by name only
+  payloads, or navigation suggestions. Refer to the channel by display name only
   after creation; ask the user to re-paste on failure rather than
   reproducing what they sent.
 
