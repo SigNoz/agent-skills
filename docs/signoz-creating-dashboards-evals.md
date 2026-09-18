@@ -44,6 +44,7 @@ Dashboards use the **Perses schema (`schemaVersion: "v6"`)**: panels are a map, 
 | `signoz/ListPanel` | 15, 25 |
 | `signoz/BarChartPanel` | 16 |
 | `signoz/PieChartPanel` | 8, 16 |
+| `signoz/TextPanel` | 26 |
 | Grid sections | 6, 16 |
 | `signoz/HistogramPanel` | _intentionally uncovered — niche distribution panel_ |
 
@@ -58,7 +59,7 @@ Dashboards use the **Perses schema (`schemaVersion: "v6"`)**: panels are a map, 
 | Duplicate found on a later page → present choices before any write | 18 |
 | Broad/ambiguous request → present multiple template options | 2 |
 | Vague request → emit `needs_input` / clarify scope | 5 |
-| No template match → custom build | 6, 8, 9, 10, 12, 14, 15, 16, 17, 19, 20, 21, 22, 23, 24, 25 |
+| No template match → custom build | 6, 8, 9, 10, 12, 14, 15, 16, 17, 19, 20, 21, 22, 23, 24, 25, 26 |
 
 ### Guardrails exercised
 
@@ -98,6 +99,9 @@ Dashboards use the **Perses schema (`schemaVersion: "v6"`)**: panels are a map, 
 | Filters are one `filter.expression` string | 14, 24 |
 | Result bounds preserved: 100 standalone, 10000 formula inputs, 100 `__result` formula output | 9, 10, 16, 22 |
 | One query per panel — multi-series via `signoz/CompositeQuery` (backend-enforced, not schema-enforced) | 9, 16 |
+| Text panels use `signoz/TextPanel`, non-null `queries: []`, and no query dry-run | 26 |
+| Known system dashboard ids can be fetched, but non-user sources cannot be modified | 27 |
+| Legacy dashboard payload fields are rejected instead of mixed with v6 Perses fields | 28 |
 
 ## Eval-by-eval coverage
 
@@ -127,6 +131,9 @@ Dashboards use the **Perses schema (`schemaVersion: "v6"`)**: panels are a map, 
 | 23 | `trace-operator-sibling-envelope-contract` | Trace operator as a composite member | traces | TimeSeries | `builder_trace_operator` sibling, no coercion to `builder_query` |
 | 24 | `saved-not-in-to-execution-not-in` | Logs table excluding checkout and frontend services | logs | Table | discover the log-side service field; one `filter.expression` with `NOT IN`; non-empty groupBy `name`; short absolute Unix-ms dry-run window |
 | 25 | `custom-build-raw-log-stable-order` | 20 newest ERROR logs with stable ordering | logs | List | `raw` query kind, `limit` + two-key `order`, `selectFields` |
+| 26 | `direct-text-panel-perses` | Markdown notes beside a query panel | metrics | TextPanel, TimeSeries | Perses panel map and Grid references, TextPanel `queries: []`, queryless panel skips dry-run |
+| 27 | `indirect-system-dashboard-known-id` | Known system dashboard fetched by id | (any) | n/a | preserve returned `source`; stop before update, patch, delete, lock, or public-state writes |
+| 28 | `negative-legacy-dashboard-payload` | Reject a mixed legacy/v6 create request | (any) | n/a | no `widgets`, `panelMap`, `panelTypes`, `queryData`, or legacy selected-field structures |
 
 ## Intentionally uncovered
 

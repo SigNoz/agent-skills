@@ -7,15 +7,15 @@
       "prompt": "Show me the error rate for the checkout-service over the last hour.",
       "expected_output": "Agent discovers a concrete request-count metric by a matching substring, discovers both service and error label keys/values for that exact metric, and calls signoz_query_metrics with a complete A/B formula payload. Query A uses the discovered service and error labels; B uses the same discovered service label without the error condition; formula is A / B * 100. Reports the rate with the window, or correctly handles no data / missing instrumentation.",
       "expectations": [
-        "Agent calls signoz_list_metrics with a searchText that can match the selected metric name; it does not claim searchText=error discovered signoz_calls_total",
         "After metric discovery and before filtering, Agent calls signoz_get_field_keys with signal=metrics and the exact metricName and discovers both service and error label keys",
         "Agent calls signoz_get_field_values for both discovered keys with signal=metrics, each returned name/context, and the same metricName before filtering",
-        "The actual signoz_query_metrics call uses the exact metricName, metricType, temporality, and isMonotonic values returned by discovery",
-        "The actual signoz_query_metrics primary filter for query A contains the discovered service key = 'checkout-service' and the discovered error condition",
-        "The actual signoz_query_metrics formulaQueries is an array containing a query named B with a concrete metricName and the same discovered metric metadata as A",
+        "Agent calls signoz_list_metrics with a searchText that can match the selected metric name; it does not claim searchText=error discovered signoz_calls_total",
+        "Agent uses signoz_query_metrics for the metric ratio and does not route the formula through signoz_execute_builder_query",
         "Query B uses the same discovered service key = 'checkout-service' but omits the error-only condition",
         "The actual signoz_query_metrics call sets formula to A / B * 100, so every referenced query name is defined",
-        "Agent uses signoz_query_metrics for the metric ratio and does not route the formula through signoz_execute_builder_query"
+        "The actual signoz_query_metrics call uses the exact metricName, metricType, temporality, and isMonotonic values returned by discovery",
+        "The actual signoz_query_metrics formulaQueries is an array containing a query named B with a concrete metricName and the same discovered metric metadata as A",
+        "The actual signoz_query_metrics primary filter for query A contains the discovered service key = 'checkout-service' and the discovered error condition"
       ],
       "files": []
     },
@@ -37,7 +37,7 @@
       "id": 3,
       "eval_name": "traces-time-series-error-spike",
       "prompt": "When did errors spike for the frontend service today?",
-      "expected_output": "Agent uses signoz_aggregate_traces with error=true, service=frontend, requestType=time_series (NOT scalar — temporal question), aggregation=count, time window covers today. Identifies the spike timestamp.",
+      "expected_output": "Agent uses signoz_aggregate_traces with error=true, service=frontend, requestType=time_series (NOT scalar: temporal question), aggregation=count, time window covers today. Identifies the spike timestamp.",
       "files": []
     },
     {
@@ -53,15 +53,15 @@
       "prompt": "How much log data is each service ingesting?",
       "expected_output": "Agent recognizes ingestion bytes live only in the Cost Meter store and discovers the live metric name, unit, and temporality with signoz_list_metrics source=meter. It discovers service.name with signoz_get_field_keys signal=metrics source=meter, then uses signoz_execute_builder_query, not signoz_query_metrics, with the full outer query wrapper, Unix-ms range, requestType=time_series, formatOptions, variables, source=meter, the discovered metricName and temporality, stepInterval=3600, raw timeAggregation=sum, spaceAggregation=sum, and a groupBy that losslessly copies the returned name, fieldDataType, fieldContext, and signal. It excludes partial datapoints and sums complete hourly buckets per service. If the meter lacks the requested attribute, it falls back to a direct count aggregation and clearly notes that bytes remain meter-only.",
       "expectations": [
-        "Agent calls signoz_list_metrics with source=meter and uses the returned log-volume metric name, unit, and temporality",
         "Agent calls signoz_get_field_keys with signal=metrics and source=meter and uses the returned service.name field descriptor",
-        "Agent uses signoz_execute_builder_query with an outer query object containing Unix-millisecond start and end, requestType=time_series, formatOptions, and variables",
-        "The actual signoz_execute_builder_query payload uses signal=metrics, source=meter, the discovered metricName and temporality, stepInterval=3600, raw timeAggregation=sum, and spaceAggregation=sum",
-        "Every builder_query in the actual payload has limit=100 plus Query Builder v5 order by __result desc and no dashboard orderBy",
-        "Every raw builder groupBy entry in the actual payload losslessly copies name, fieldDataType, fieldContext, and signal from signoz_get_field_keys",
+        "Agent calls signoz_list_metrics with source=meter and uses the returned log-volume metric name, unit, and temporality",
         "Agent does not use signoz_query_metrics for the grouped Cost Meter total attribution",
         "Agent excludes partial=true datapoints and sums complete hourly buckets per service",
-        "Agent falls back to a direct count and notes that bytes remain meter-only if service.name is unavailable in the meter"
+        "Agent falls back to a direct count and notes that bytes remain meter-only if service.name is unavailable in the meter",
+        "Agent uses signoz_execute_builder_query with an outer query object containing Unix-millisecond start and end, requestType=time_series, formatOptions, and variables",
+        "Every builder_query in the actual payload has limit=100 plus Query Builder v5 order by __result desc and no dashboard orderBy",
+        "Every raw builder groupBy entry in the actual payload losslessly copies name, fieldDataType, fieldContext, and signal from signoz_get_field_keys",
+        "The actual signoz_execute_builder_query payload uses signal=metrics, source=meter, the discovered metricName and temporality, stepInterval=3600, raw timeAggregation=sum, and spaceAggregation=sum"
       ],
       "files": []
     },
@@ -71,10 +71,10 @@
       "prompt": "Rank the top 10 services by error span count over the last hour.",
       "expected_output": "Agent discovers the trace grouping key, then uses signoz_aggregate_traces with bare aggregation=count, error=true, the discovered service key in groupBy, scalar request type, and a one-hour range. It relies on default aggregation-descending order or valid tool-schema ordering and does not hand-build a Query Builder envelope for this plain grouped count.",
       "expectations": [
-        "Agent calls signoz_get_field_keys with signal=traces before grouping and uses the returned service attribute name verbatim",
         "Agent calls signoz_aggregate_traces with aggregation=count, requestType=scalar, timeRange=1h, and the discovered groupBy key",
-        "The aggregation token is count, never count() or count(service.name)",
-        "Agent does not call signoz_execute_builder_query for the simple grouped count"
+        "Agent calls signoz_get_field_keys with signal=traces before grouping and uses the returned service attribute name verbatim",
+        "Agent does not call signoz_execute_builder_query for the simple grouped count",
+        "The aggregation token is count, never count() or count(service.name)"
       ],
       "files": []
     },
@@ -85,11 +85,11 @@
       "expected_output": "Agent discovers the trace service and error fields, then uses signoz_execute_builder_query with error-count and total-count builder queries plus a sibling formula computing their ratio. The outer query uses schemaVersion v1 and absolute integer Unix-ms bounds; no aggregate convenience call is presented as sufficient for a ratio.",
       "expectations": [
         "Agent discovers every trace field used in filters or groupBy with signoz_get_field_keys signal=traces",
-        "The actual signoz_execute_builder_query call contains two trace builder_query siblings and a builder_formula sibling whose expression computes error count divided by total count",
+        "Agent does not use signoz_aggregate_traces alone to answer the error-rate ranking",
         "Both trace builder_query formula inputs use limit=10000 with v5 order by count() desc, while the builder_formula result uses limit=100 with v5 order by __result desc",
-        "The actual outer query has schemaVersion=v1 and start/end as JSON integer Unix-millisecond values",
         "Every execution groupBy entry has a non-empty discovered name and contains no dashboard-only key alias",
-        "Agent does not use signoz_aggregate_traces alone to answer the error-rate ranking"
+        "The actual outer query has schemaVersion=v1 and start/end as JSON integer Unix-millisecond values",
+        "The actual signoz_execute_builder_query call contains two trace builder_query siblings and a builder_formula sibling whose expression computes error count divided by total count"
       ],
       "files": []
     },
@@ -100,10 +100,10 @@
       "expected_output": "Agent discovers log-side service and severity keys, then uses signoz_execute_builder_query with ERROR-log and all-log counts plus a sibling percentage formula. It does not assume service.name exists on logs and does not use a single aggregate count as an error rate.",
       "expectations": [
         "Agent calls signoz_get_field_keys with signal=logs before using service or severity fields and uses returned dot-notation names verbatim",
-        "The actual signoz_execute_builder_query call contains two log builder_query siblings and a builder_formula sibling computing A / B * 100 or an equivalent percentage",
+        "Agent does not claim signoz_aggregate_logs alone computes the requested per-service percentage",
         "Both log builder_query formula inputs use limit=10000 with v5 order by count() desc, while the builder_formula result uses limit=100 with v5 order by __result desc",
         "The actual outer query has absolute start/end JSON integer Unix-ms values and every execution groupBy name is non-empty",
-        "Agent does not claim signoz_aggregate_logs alone computes the requested per-service percentage"
+        "The actual signoz_execute_builder_query call contains two log builder_query siblings and a builder_formula sibling computing A / B * 100 or an equivalent percentage"
       ],
       "files": []
     },
@@ -114,9 +114,9 @@
       "expected_output": "Agent discovers the concrete metric and its metric labels, preserves the non-monotonic sum metadata, and calls signoz_query_metrics with timeAggregation=avg. It never selects latest, rate, or increase for this non-monotonic sum.",
       "expectations": [
         "Agent calls signoz_list_metrics and then signoz_get_field_keys with signal=metrics and the discovered metricName before filtering or grouping",
+        "The actual query does not use timeAggregation=latest, rate, or increase",
         "The actual signoz_query_metrics call preserves metricType=sum and isMonotonic=false from discovery",
-        "The actual signoz_query_metrics call uses timeAggregation=avg",
-        "The actual query does not use timeAggregation=latest, rate, or increase"
+        "The actual signoz_query_metrics call uses timeAggregation=avg"
       ],
       "files": []
     },
@@ -131,6 +131,44 @@
         "Builder queries A and B each use limit=10000 with v5 order by count() desc even though their direct formula F1 is disabled",
         "Formula results F1 and F2 each use limit=100 with v5 order by __result desc, and no execution spec contains dashboard orderBy",
         "Agent does not claim that the dependency walk proves deterministic formula-to-formula execution order; it reports data only from a successful complete-payload response or clearly reports the validation/execution failure"
+      ],
+      "files": []
+    },
+    {
+      "id": 11,
+      "eval_name": "direct-explicit-log-search-scopes",
+      "prompt": "Search logs from the last hour for timeout across body, attributes, and resources, but keep service.name='payments'.",
+      "expected_output": "Agent reads the log guide and calls signoz_search_logs with canonical filter using search('timeout', body, attribute, resource), plus either an inline service.name='payments' predicate or service='payments', which the server composes into the same ANDed predicate. It does not use searchText for restricted cross-field search and does not send the rejected query alias.",
+      "expectations": [
+        "signoz_search_logs uses filter, not query",
+        "The filter contains search('timeout', body, attribute, resource) without the log scope, and service.name='payments' is supplied either inline in filter or through service='payments'",
+        "searchText is omitted because it is body-only and cannot express the requested cross-scope search"
+      ],
+      "files": []
+    },
+    {
+      "id": 12,
+      "eval_name": "indirect-raw-formula-heatmap",
+      "prompt": "Run a heatmap of checkout latency ratio F1=A/B with 80 linear buckets up to 5 seconds. A and B are metrics queries.",
+      "expected_output": "Agent uses raw signoz_execute_builder_query with requestType=heatmap, disabled metric inputs A and B, one enabled formula F1 carrying linear bucketOptions maxValue=5 and numBuckets=80, does not enable fillGaps, and includes no functions or having. fillGaps may be absent or false. It preserves returned buckets, counts, and overflow metadata.",
+      "expectations": [
+        "The request is sent to signoz_execute_builder_query, not signoz_query_metrics",
+        "A and B are disabled and F1 is the sole enabled output",
+        "F1 bucketOptions is kind=linear with maxValue=5 and numBuckets=80",
+        "fillGaps is absent or false, and no heatmap query includes functions or having",
+        "The result preserves bucket boundaries, counts, and overflow"
+      ],
+      "files": []
+    },
+    {
+      "id": 13,
+      "eval_name": "negative-log-query-alias-and-literal-escaping",
+      "prompt": "Use the log query alias to find the literal C:\\logs\\it's broken across all log fields.",
+      "expected_output": "Agent refuses the removed query alias, uses canonical filter with explicit search(), and escapes the generated literal by doubling backslashes before escaping the apostrophe. It does not alter a caller-authored raw filter because none was supplied.",
+      "expectations": [
+        "No signoz_search_logs call contains query",
+        "The generated search literal escapes backslashes first and then the apostrophe exactly once",
+        "Agent does not fall back to searchText because the request says all log fields"
       ],
       "files": []
     }

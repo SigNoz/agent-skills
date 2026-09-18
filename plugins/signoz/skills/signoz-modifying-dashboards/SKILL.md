@@ -64,8 +64,15 @@ Examine the response to understand:
 - Current panels and their ids (`spec.panels` is a map keyed by panel id)
 - Current grid item positions (x, y, width, height in the 12-column grid)
 - Current variables
-- Current query on each panel (exactly one per panel)
+- Current query on each query-bearing panel (exactly one); a
+  `signoz/TextPanel` instead has non-null `queries: []`
 - The `spec.layouts` structure: one Grid per section, each with its own items
+
+The fetched `source` is `user`, `system`, or `integration`. Only `source=user`
+dashboards are mutable. If it is `system` or `integration`, explain that it is
+immutable and stop. The v2 list excludes system rows, but a known system id can
+still be fetched. Do not search for a special system discovery tool or attempt
+to change `source`.
 
 ### Step 3: Plan the modification
 
@@ -159,7 +166,12 @@ first removal from each array.
 
 - **Editing a panel's query:** Replace the query at `/spec/panels/<id>/spec/queries/0`
   and keep all other panel fields intact; never append a second one, since a
-  panel holds exactly one query.
+  query-bearing panel holds exactly one query. A TextPanel is queryless.
+
+- **Adding or editing text:** Use `signoz/TextPanel` with mode `markdown` or
+  `text`, a non-null empty `queries: []`, and the current resource's display
+  shape. Add the panel and its Grid item together. Skip query discovery and
+  dry-run for TextPanels. Do not invent a row panel.
 
 - **Changing panel type:** Update the plugin `kind` and the query envelope `kind`
   together (`signoz/TimeSeriesPanel` + `time_series` → `signoz/TablePanel` +
@@ -200,6 +212,10 @@ absolute Unix-ms window, usually the last 30-60 minutes, never the panel's
 display range by reflex; apply the reference's dry-run hygiene rules before
 widening or retrying after a timeout. Use representative variable values in the
 dry-run copy and keep `$var` in saved state.
+
+There is no advertised dashboard heatmap plugin. Do not turn a valid raw
+`requestType: "heatmap"` execution into a fictional saved panel; hand raw
+heatmap exploration to `signoz-generating-queries`.
 
 Preserve or add explicit result bounds on every changed builder query/formula:
 the saved spec carries a positive `limit` plus non-empty `order`, and the dry-run
@@ -259,6 +275,10 @@ signoz_update_dashboard({
 })
 ```
 
+Also omit read-only `source`, generated links, lock/public metadata, and other
+server-populated fields from the update body. Preserve their meaning by refusing
+non-user writes, not by sending them back.
+
 ### Step 5: Report the result
 
 Briefly tell the user what was changed. Offer further modifications if relevant.
@@ -297,6 +317,10 @@ Briefly tell the user what was changed. Offer further modifications if relevant.
   grid item's `content.$ref`; keep each variable's `spec.name` identical to the
   `$handle` its queries use, and keep query names such as `A`, `B`, and `F1`
   stable.
+- **Perses and source only**: Use canonical v6 Perses paths and fields. TextPanel
+  uses `queries: []`; every query panel has one query. Never persist legacy
+  `widgets`, `panelMap`, `panelTypes`, `queryData`, `selectedLogFields`, or
+  `selectedTracesFields`. Never write a non-user dashboard.
 - **Real dashboard IDs only**: Never send a sentinel such as `"unused"` as a
   dashboard id. Resolve it through `signoz_list_dashboards` and
   `signoz_get_dashboard` first.
