@@ -17,10 +17,9 @@ SigNoz MCP Server docs and adds OpenCode's native config shape.
 - Keep each file's existing server key. The plugin-root `mcp.json` used by
   Agent Plugins v1 and Codex, the bundled Cursor file, and native client
   configs use `signoz`; the bundled Claude Code file
-  (`.signoz_claude_mcp.json`) uses `mcp`. Do not rename either key. Leave the
-  Claude file's `${user_config.SIGNOZ_MCP_URL}` placeholder intact and update
-  the persisted plugin option instead. In the portable file, also preserve the
-  canonical `$schema` and `type: "streamable-http"`.
+  (`.signoz_claude_mcp.json`) uses `mcp`. Do not rename either key. In the
+  portable file, also preserve the canonical `$schema` and
+  `type: "streamable-http"`.
 - Prefer SigNoz Cloud OAuth over header-based auth whenever the client supports
   interactive OAuth.
 - Do not write service account API keys, bearer tokens, or header-based auth
@@ -78,45 +77,24 @@ Apply the portable endpoint eligibility and native-client routing rules from
 
 ### Bundled Claude Code plugin
 
-Do not edit `.signoz_claude_mcp.json` in the installed plugin cache. It must
-keep the server key (`mcp`), `type: "http"`, and the user-configuration
-placeholder:
+In the active plugin root's `.signoz_claude_mcp.json` path supplied by
+`SKILL.md` Step 4, replace only `mcpServers.mcp.url` with the resolved endpoint.
+Keep the server key (`mcp`) and `type: "http"`:
 
 ```json
 {
   "mcpServers": {
     "mcp": {
       "type": "http",
-      "url": "${user_config.SIGNOZ_MCP_URL}"
+      "url": "https://mcp.us.signoz.cloud/mcp"
     }
   }
 }
 ```
 
-Use `claude plugin list --json` to identify the exact enabled SigNoz plugin ID.
-Update only `pluginConfigs[<plugin-id>].options.SIGNOZ_MCP_URL` in
-`~/.claude/settings.json`, regardless of the plugin's installation scope, and
-preserve every unrelated setting and option. Claude ignores `pluginConfigs` in
-project and local settings. For example, with the actual marketplace suffix in
-place of `<marketplace>`:
-
-```json
-{
-  "pluginConfigs": {
-    "signoz@<marketplace>": {
-      "options": {
-        "SIGNOZ_MCP_URL": "https://mcp.us.signoz.cloud/mcp"
-      }
-    }
-  }
-}
-```
-
-If managed settings or a `--settings` source supplies this option, it outranks
-user settings; report the controlling source and have its owner change it.
-Otherwise `/plugin` -> installed SigNoz plugin -> **Customize** writes the same
-user setting. Persisted plugin options survive plugin updates; cached plugin
-files do not.
+Run `/reload-plugins` after the edit and verify the effective URL with `/mcp`
+or `claude mcp list`. A plugin update can restore the packaged `us` endpoint,
+so rerun `signoz-mcp-setup` afterward when the target differs.
 
 ### Codex Agent Plugins v1 package
 
@@ -190,14 +168,17 @@ config opened by the `MCP: Open User Configuration` command.
 }
 ```
 
-### Claude Desktop
+### Claude.ai and Claude Desktop hosted connector
 
-For SigNoz Cloud or a **publicly reachable** self-hosted HTTP endpoint, add
-SigNoz through **Settings → Connectors → Add custom connector** and enter the
-resolved MCP URL. Complete OAuth when SigNoz Cloud prompts for it. Claude
-Desktop remote connectors originate from Anthropic's cloud, so `localhost`,
-VPN-only, and private-network endpoints are not reachable through this path;
-use a local stdio registration for those deployments.
+For the Anthropic & Partners plugin, if its `mcp` connector is **Not added**,
+select **Connect** and replace the URL in the connector modal before adding it.
+If it was already added, remove it, then reopen and re-add the plugin connector
+with the resolved URL; do not keep a second connector alongside it. For a
+standalone connector, use **Settings → Connectors → Add custom connector**.
+Complete OAuth when SigNoz Cloud prompts for it. Hosted connectors originate
+from Anthropic's cloud, so `localhost`, VPN-only, and private-network endpoints
+are not reachable through this path; use a local stdio registration in Claude
+Desktop for those deployments.
 
 Do not put a remote `url` entry in `claude_desktop_config.json`; Claude Desktop
 does not use that file for remote MCP custom connectors. The file is only for a
@@ -608,8 +589,9 @@ Edit `opencode.json` or `opencode.jsonc`.
   `signoz` server if prompted, and complete authentication for SigNoz Cloud.
   A self-hosted endpoint needs no OAuth unless its MCP server runs with
   `OAUTH_ENABLED=true`.
-- Claude Desktop hosted/public HTTP: reconnect the custom connector, then
-  complete authentication when applicable.
+- Claude Desktop hosted/public HTTP: add the connector with the resolved URL if
+  it is **Not added**. If it was already added, remove and re-add it with the
+  resolved URL; do not keep a second connector. Then complete authentication.
 - Claude Desktop local stdio: restart Claude Desktop so it reloads the local
   command entry in `claude_desktop_config.json`; do not add a remote URL there.
 - Claude Code: run `/reload-plugins`, then `/mcp`; select the `signoz` plugin's
