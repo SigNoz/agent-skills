@@ -48,7 +48,7 @@ guesses create noisy alerts on the wrong service:
 |---|---|---|
 | Alert intent (NL goal) | yes | `$ARGUMENTS` or recent user turn |
 | Resource attribute filter (e.g. `service.name`, `k8s.namespace.name`, `host.name`) | yes | discover via `signoz_get_field_keys` + `signoz_get_field_values` |
-| Threshold value(s) | threshold / PromQL rules | derive a sensible default and surface in the preview; never substitute one for an absent-only request |
+| Threshold value(s) | threshold / PromQL rules | use the user/SLO target or derive from sufficient data in Step 6; never substitute one for an absent-only request |
 | Severity | inferred from intent | default `warning`; promote to `critical` only if user said "page", "wake up", "critical" |
 | Notification routing | yes | direct: verified channel name(s); policy: confirmation that an existing org policy should route this rule |
 
@@ -275,9 +275,10 @@ ClickHouse SQL. The conventions that don't live in the schema:
 - **p99 latency:** the query emits nanoseconds, but express the threshold in
   the user's unit (for example `target: 2`, `targetUnit: "s"`); SigNoz converts
   it during evaluation.
-- **Low-traffic percentile guard:** put `count() > N` in the percentile
-  query's `having.expression` and set `stepInterval` to the requested bucket
-  size (for example, `60` for “per minute”). Do not invent comparison operators
+- **Low-traffic percentile guard (logs/traces):** include the percentile first
+  and `count()` second in `aggregations` before using `count() > N` in
+  `having.expression`. Keep `stepInterval` at the requested bucket size
+  (for example, `60` for “per minute”). Do not invent comparison operators
   inside a formula such as `A * (B >= N)`.
 - **Log volume spike:** prefer `groupBy: service.name` over a hard
   filter when the user said "any service"; groupBy provides the
@@ -296,10 +297,10 @@ Step 4 confirmed data flows. Step 6 does two things:
    proceeding to (2). `disabled: true` on formula component queries
    (A, B in `A * 100 / B`) is the *recommended* pattern, not a failure
    (see Step 5).
-2. **Calibrate the threshold.** Given the validated query, would the
-   alert have fired a sensible number of times in the last hour?
+2. **Calibrate the threshold.** Check sample sufficiency and historical
+   breaches; returned data alone does not justify a threshold.
 
-Run the full primary query (or formula) over the last hour:
+Run the full primary query (or formula), starting with the last hour:
 - `signoz_execute_builder_query` for **all** builder, formula,
   and PromQL queries: set `compositeQuery.queries[].type` to
   `builder_query` / `builder_formula` / `promql` as appropriate. Alert PromQL
@@ -340,23 +341,35 @@ Preserve the fields when copying the validated query into the alert. If expected
 formula-input cardinality can exceed 10000, narrow the filters/grouping and tell
 the user completeness cannot otherwise be guaranteed.
 
-Compute how many evaluation points breached the proposed threshold.
-Surface in the preview as **"would have fired N times in the last 1h"**.
-A 1h window is too short to grade most alerts; only the upper extreme
-is actionable:
-   - **N is large (e.g. > 30)** → likely alert storm. Surface and
-     recommend tightening or adding hysteresis (`recoveryTarget`).
-   - **N = 0** → expected for a healthy system; do not nudge the user
-     to loosen. Only flag if the user said they'd expect the alert
-     firing right now (e.g. during an active incident).
-   - **N is small and non-zero** → report the count; the user decides
-     whether the threshold is right. One hour can't distinguish "tuned
-     well" from "barely caught a transient".
+For percentile alerts, measure observation counts with matching filters,
+grouping, and bucket size, before any count guard. Report empty-bucket fraction
+and typical active-bucket counts; histograms need observation counts, not metric
+datapoint counts. Widen sparse lookbacks only while older data may exist, within
+retention (e.g. 24h or 7d), keeping the bucket size. Exclude known pre-ingestion
+periods from coverage. More history does not add samples inside each bucket.
+
+With only a handful of observations per bucket, p95/p99 is effectively the
+maximum. Do not derive a threshold or invent a minimum count from this evidence.
+Offer a slow-request-count rule or longer buckets with a justified count guard;
+ask before changing explicit user intent.
+New ingestion or limited history does not block a user/SLO target after query
+validation. Preserve it and report limited calibration, sparsity, or frequent
+breaches. If no target exists and data cannot support one, ask for a target.
+
+Report "N of M returned query points breached over [range]", with the bucket
+size, baseline range, and sample evidence in the preview. Missing or guarded-out
+buckets are not healthy observations. These are not incident or notification
+counts: those depend on evaluation windows, match type, and alert state.
+Zero breaches do not justify loosening or prove calibration; frequent breaches merit a tuning suggestion.
+
 3. **Exceptions:**
    - **Anomaly alerts**: execute the underlying metric query without the
      anomaly `functions` transform to verify its shape and data, then skip the
      breach count (Z-scores aren't directly comparable to raw values). Be
      explicit that this validates the base query, not anomaly scoring.
+     Check bucket coverage and history for the chosen seasonality against
+     `signoz://alert/instructions`; if sparse or insufficient, explain the gap
+     and offer a threshold/count rule instead of creating an anomaly rule.
    - **Log-based crash / panic / OOMKilled / FATAL alerts**: these
      intentionally have zero matches in a healthy system. Step 4 has
      already surfaced the zero-match result and obtained user confirmation;
@@ -439,7 +452,7 @@ does).
 > **Summary**: This alert fires when [condition] for [resource scope],
 > evaluated every [frequency] over the last [window]. Thresholds:
 > warning at X, critical at Y. Notifications route through [direct channels / confirmed org policy]. Dry-run on
-> the last hour: would have fired N times.
+> [range]: N of M query points breached; [baseline and sample sufficiency, or calibration limitation].
 
 ### Step 9: Save and report
 
@@ -453,7 +466,7 @@ does).
    - The alert ID and name.
    - What it watches and at what threshold.
    - How notifications route (direct channels or the confirmed org policy).
-   - The dry-run summary ("would have fired N times in last 1h").
+   - The dry-run range, breach-point count, and calibration limitations.
 
 ## Guardrails
 

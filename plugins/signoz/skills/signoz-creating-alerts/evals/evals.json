@@ -51,7 +51,8 @@
         "The signoz_execute_builder_query dry-run validates the base metric query without claiming to validate the anomaly functions transform or anomaly score",
         "The persisted base metric builder_query and its signoz_execute_builder_query dry-run each have limit=100 plus Query Builder v5 order by __result desc and no dashboard orderBy",
         "The signoz_create_alert payload has top-level preferredChannels containing the selected Slack channel",
-        "The anomaly create payload omits condition.thresholds, evaluation, notificationSettings, and schemaVersion"
+        "The anomaly create payload omits condition.thresholds, evaluation, notificationSettings, and schemaVersion",
+        "Before creating an anomaly rule, the agent checks bucket coverage and sufficient history for its seasonality; sparse or insufficient history leads to clarification or an offered alternative, not creation"
       ],
       "files": []
     },
@@ -59,13 +60,14 @@
       "id": 4,
       "eval_name": "formula-gated-p99-with-count-guard",
       "prompt": "alert me when paymentservice p99 latency exceeds 1 second, but ONLY when request count is above 50 per minute — don't want to be paged on low-traffic noise. critical severity, send to both #staging-alerts slack AND 'test pager send resolved' pagerduty.",
-      "expected_output": "TRACES_BASED_ALERT with query A = p99(duration_nano) on service.name='paymentservice', stepInterval=60, and having.expression='count() > 50' to suppress low-traffic one-minute buckets. selectedQueryName='A'. Threshold target 1 with targetUnit='s', op='above', critical severity, and both channels attached. It does not invent a comparison inside a numeric formula. Runs the exact guarded query through signoz_execute_builder_query before save and explains the count guard in the preview.",
+      "expected_output": "TRACES_BASED_ALERT whose query A uses aggregations p99(duration_nano) first and count() second on service.name='paymentservice', stepInterval=60, and having.expression='count() > 50' to suppress low-traffic one-minute buckets. selectedQueryName='A'. Threshold target 1 with targetUnit='s', op='above', critical severity, and both channels attached. It does not invent a comparison inside a numeric formula. Runs the exact guarded query through signoz_execute_builder_query before save and explains the count guard in the preview.",
       "expectations": [
         "The trace data probe calls signoz_aggregate_traces with aggregation=count, never aggregation=count()",
         "The full dry-run preserves having.expression=count() > 50 in the Query Builder spec",
         "The actual signoz_execute_builder_query dry-run carries start and end as JSON integer Unix-millisecond values in the outer query",
         "The signoz_create_alert payload places both Slack and PagerDuty names in the critical threshold channels array",
-        "The trace builder_query persisted and dry-run has limit=100 plus Query Builder v5 order by p99(duration_nano) desc"
+        "The trace builder_query persisted and dry-run has limit=100 plus Query Builder v5 order by p99(duration_nano) desc",
+        "Both the dry-run and saved trace query include p99(duration_nano) first and count() second in aggregations so the HAVING reference resolves and the alert evaluates latency"
       ],
       "files": []
     },
@@ -105,6 +107,70 @@
         "The agent does not call signoz_create_notification_channel, signoz_create_alert, or otherwise create a channel or alert before clarification",
         "The clarification asks for confirmation of an existing matching org policy and its relevant matcher labels or threshold tier",
         "The agent does not silently fall back to a direct channel or invent policy-match labels"
+      ],
+      "files": []
+    },
+    {
+      "id": 8,
+      "eval_name": "sparse-percentile-calibration",
+      "prompt": "Offline Step 6 replay only; use the supplied query results, make no live calls or writes, and state any further query you would request. User: Create a sensible latency regression alert for chips using five-minute buckets; choose the threshold. Would anomaly detection work better? The validated trace p99 query returns three points in the last hour. A matching unguarded count query shows one request per active bucket. If you request longer history, the fixture returns a 30-day review: 84% of five-minute buckets empty, median active count 1, maximum count 3, and p99 above 500 ms in 18% of active buckets. The available latency histogram has the same observation counts. State the calibration decision and preview or clarification.",
+      "expected_output": "Requests a wider lookback without changing five-minute buckets, rejects automatic percentile calibration and anomaly creation on this sparse history, explains near-maximum latency behavior, and offers a slow-request-count rule or a longer bucket without inventing its parameters.",
+      "expectations": [
+        "Requests a longer lookback with unchanged filters, grouping, and five-minute bucket size",
+        "Uses observations per bucket and empty-bucket fraction, not three returned percentile points as evidence of sufficient samples",
+        "Does not derive a latency threshold or arbitrary minimum count from the sparse history; explains that p99 is effectively the maximum and wider history does not fix per-bucket counts",
+        "Does not choose anomaly detection as a sparse-data workaround; offers a count-based or longer-bucket alternative and asks for the missing target or choice",
+        "Reports the historical range and sparse-data evidence without labeling breaching buckets as incidents or notifications"
+      ],
+      "files": []
+    },
+    {
+      "id": 9,
+      "eval_name": "dense-percentile-calibration",
+      "prompt": "Offline Step 6 replay only; use the supplied query results and make no live calls or writes. User: Choose a p99 latency threshold for checkout using five-minute buckets. Query shape is valid. Matching unguarded counts show 10000 requests in each bucket. The last hour is representative of the retained seven-day history: all 2016 five-minute buckets populated, each with 10000 requests, p99 ranges from 180 to 240 ms, and no points exceed a candidate 500 ms. State your calibration decision and preview.",
+      "expected_output": "Proposes a threshold based on the dense observed baseline, reports count and coverage evidence plus the actual historical range, and does not require more history when representative evidence is already available.",
+      "expectations": [
+        "Proposes a numeric latency threshold with a rationale tied to the 180-240 ms baseline and 10000 observations per bucket",
+        "Uses the representative seven-day history and unchanged five-minute buckets without requiring an automatic 30-day scan",
+        "Reports the observed breach-point count and historical range without claiming zero breaches proves good calibration or zero notifications"
+      ],
+      "files": []
+    },
+    {
+      "id": 10,
+      "eval_name": "explicit-threshold-sparse-history",
+      "prompt": "Offline Step 6 replay only; use the supplied query results and make no live calls or writes. User: Alert when chips p99 exceeds 500 ms in five-minute buckets. Keep that threshold and bucket size. Query shape is valid. A representative 30-day review with identical filters and grouping has 84% empty buckets, median one request per active bucket, maximum three, and 18% of active query points above 500 ms. State the preview and any tuning recommendation.",
+      "expected_output": "Preserves the explicit 500 ms threshold and five-minute bucket, reports sparse samples and the 18% breach-point rate, and offers alternatives without silently adding a count guard or claiming an incident frequency.",
+      "expectations": [
+        "Preserves the requested 500 ms threshold and five-minute buckets; does not silently add a count guard or replace the rule",
+        "Warns that p99 with one to three observations behaves like maximum latency and that 18% of active points breached",
+        "Reports the 30-day range and 84% empty buckets without treating missing buckets as healthy samples",
+        "Offers tuning as a choice and does not describe 18% of active points as an incident or notification rate"
+      ],
+      "files": []
+    },
+    {
+      "id": 11,
+      "eval_name": "new-ingestion-explicit-targets",
+      "prompt": "Offline Step 6 replay only; use supplied query results and make no live calls or writes. User: Ingestion for checkout started exactly 30 minutes ago. Create CPU above 80% and p99 latency above our 500 ms SLO, with five-minute buckets. Both full queries are valid and have data in all six buckets since ingestion began. CPU values are 30-40%; trace counts are one to three requests per bucket and p99 is 100-200 ms. Earlier buckets have no telemetry because ingestion had not started. State the calibration decisions and any further queries needed.",
+      "expected_output": "Proceeds to preview both explicit targets with a limited-calibration caveat; identifies sparse p99 samples, counts coverage only since ingestion began, and does not search for nonexistent history or require request counts for CPU.",
+      "expectations": [
+        "Keeps CPU 80% and p99 500 ms with five-minute buckets; lack of history does not block preview or require the user to reconfirm these targets",
+        "Reports six populated buckets over the observed 30 minutes and excludes pre-ingestion time from missing-bucket coverage",
+        "Does not request older lookbacks or apply percentile observation-count checks to the CPU gauge",
+        "Explains sparse p99 samples and limited baseline confidence without labeling either alert historically calibrated"
+      ],
+      "files": []
+    },
+    {
+      "id": 12,
+      "eval_name": "new-ingestion-without-target",
+      "prompt": "Offline Step 6 replay only; use supplied query results and make no live calls or writes. User: Ingestion for checkout began ten minutes ago. Choose a latency regression threshold, or use daily anomaly detection if better. The trace p99 query and available latency histogram query are valid, with two populated five-minute buckets, three observations each, and values 100 and 150 ms. No user target or SLO is known, and no earlier data exists. State the next step.",
+      "expected_output": "Explains that sparse startup data cannot establish a baseline, asks for an acceptable latency target, and offers to create a target-based alert once supplied; does not scan nonexistent history or choose daily anomalies.",
+      "expectations": [
+        "Does not derive a numeric target or a minimum-count guard from two sparse startup buckets",
+        "Asks for a latency target or SLO and explains that a target-based alert can be created without waiting for historical calibration",
+        "Does not request older data or choose daily anomaly detection without adequate history"
       ],
       "files": []
     }
