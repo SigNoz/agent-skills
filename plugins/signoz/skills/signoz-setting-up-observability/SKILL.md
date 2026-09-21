@@ -395,10 +395,10 @@ What this orchestration layer adds on top of that skill:
   exists in the ingested data, burn-rate isn't buildable yet, so fall back
   to a baseline-tuned threshold rather than emit a broken rule. Let
   `signoz-creating-alerts` + `signoz://alert/*` pick the
-  version-correct rule shape. Note that creating-alerts' "would have
-  fired N times in the last 1h" calibration can't grade a 6h/3d
-  burn-rate window, so don't read a "fired 0 times" there as tuned; the
-  Phase 9 re-tune-after-a-week loop is the real calibration.
+  version-correct rule shape. Its calibration reports breaching query points,
+  not incidents. Use available history covering the 6h/3d burn-rate windows
+  and relevant traffic patterns; disclose insufficient history. Zero breaches
+  do not establish calibration; revisit tuning in Phase 9 after a week.
 - **Burn-rate only covers ratio SLIs, so schedule the non-ratio failure
   modes too.** A service that stops emitting, or whose traffic
   collapses, never burns error budget (the SLI ratio is undefined at
