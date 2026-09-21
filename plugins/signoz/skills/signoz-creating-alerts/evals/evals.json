@@ -173,6 +173,28 @@
         "Does not request older data or choose daily anomaly detection without adequate history"
       ],
       "files": []
+    },
+    {
+      "id": 13,
+      "eval_name": "percentile-intermediate-sample-counts",
+      "prompt": "Offline Step 6 replay only; make no live calls or writes. Choose p99 latency thresholds for two endpoints with representative seven-day history and five-minute buckets. All buckets are populated: endpoint A has 20 requests per bucket and endpoint B has 80. Both have p99 between 180 and 240 ms. No SLO or user target exists. State the calibration decision.",
+      "expected_output": "Declines automatic calibration for both endpoints because each has less than one expected upper-tail observation per bucket; asks for a target or offers alternatives.",
+      "expectations": [
+        "Applies n × (1 − p) < 1 to both 20 and 80 observations at p99, without choosing a numeric latency threshold",
+        "Explains that more history does not increase per-bucket samples, and that passing this count check would not alone establish reliability"
+      ],
+      "files": []
+    },
+    {
+      "id": 14,
+      "eval_name": "histogram-observation-counts-unavailable",
+      "prompt": "Offline Step 6 replay only; make no live calls or writes. Two validated histogram p99 queries have representative seven-day history, all five-minute buckets populated, with p99 from 180 to 240 ms. Observation counts cannot be retrieved; only the number of returned metric datapoints is known. User asks you to choose a threshold for endpoint A and use their 500 ms SLO for endpoint B. State both calibration decisions.",
+      "expected_output": "Asks for a target for A, preserves 500 ms for B with a limited-calibration disclosure, and does not mistake metric datapoints for histogram observations.",
+      "expectations": [
+        "Does not infer a threshold for A from populated metric datapoints or invent observation counts",
+        "Preserves the explicit 500 ms SLO for B and discloses unavailable counts and limited calibration"
+      ],
+      "files": []
     }
   ]
 }

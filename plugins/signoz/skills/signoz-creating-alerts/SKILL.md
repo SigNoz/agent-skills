@@ -297,10 +297,12 @@ Step 4 confirmed data flows. Step 6 does two things:
    proceeding to (2). `disabled: true` on formula component queries
    (A, B in `A * 100 / B`) is the *recommended* pattern, not a failure
    (see Step 5).
-2. **Calibrate the threshold.** Check sample sufficiency and historical
-   breaches; returned data alone does not justify a threshold.
+2. **Calibrate the threshold.** Check sample sufficiency and historical breaches; data alone does not justify a threshold.
 
-Run the full primary query (or formula), starting with the last hour:
+Choose a calibration lookback that covers the alert’s evaluation window and relevant traffic patterns.
+Start with 1h when useful; expand when data is sparse or unrepresentative, within available history
+and keeping bucket size fixed. Stop when evidence is sufficient or no older data exists.
+Run the full primary query (or formula):
 - `signoz_execute_builder_query` for **all** builder, formula,
   and PromQL queries: set `compositeQuery.queries[].type` to
   `builder_query` / `builder_formula` / `promql` as appropriate. Alert PromQL
@@ -341,25 +343,23 @@ Preserve the fields when copying the validated query into the alert. If expected
 formula-input cardinality can exceed 10000, narrow the filters/grouping and tell
 the user completeness cannot otherwise be guaranteed.
 
-For percentile alerts, measure observation counts with matching filters,
-grouping, and bucket size, before any count guard. Report empty-bucket fraction
-and typical active-bucket counts; histograms need observation counts, not metric
-datapoint counts. Widen sparse lookbacks only while older data may exist, within
-retention (e.g. 24h or 7d), keeping the bucket size. Exclude known pre-ingestion
-periods from coverage. More history does not add samples inside each bucket.
+For percentile alerts, measure observation counts with matching filters, grouping, and bucket size,
+before any count guard. Report empty-bucket fraction and typical active-bucket counts.
+Histograms need observation counts, not metric datapoint counts. If counts are unavailable,
+do not infer a threshold; preserve user/SLO targets with a limited-calibration disclosure.
+Exclude pre-ingestion periods from coverage. More history does not add samples inside each bucket.
 
-With only a handful of observations per bucket, p95/p99 is effectively the
-maximum. Do not derive a threshold or invent a minimum count from this evidence.
-Offer a slow-request-count rule or longer buckets with a justified count guard;
-ask before changing explicit user intent.
-New ingestion or limited history does not block a user/SLO target after query
-validation. Preserve it and report limited calibration, sparsity, or frequent
-breaches. If no target exists and data cannot support one, ask for a target.
+Treat buckets with n observations and n × (1 − p) < 1 as insufficient for automatic calibration:
+for p99 (p = 0.99), 20 or 80 requests give less than one expected upper-tail observation.
+Passing this check alone does not establish reliability. With a handful, p95/p99 is effectively
+maximum latency. Offer a slow-request-count rule or longer buckets with a justified count guard;
+do not invent a minimum count or change explicit user intent without asking.
+New ingestion or limited history does not block a user/SLO target after query validation.
+Disclose limited history, sparsity, or frequent breaches; ask for a target if none is supplied or supportable.
 
-Report "N of M returned query points breached over [range]", with the bucket
-size, baseline range, and sample evidence in the preview. Missing or guarded-out
-buckets are not healthy observations. These are not incident or notification
-counts: those depend on evaluation windows, match type, and alert state.
+Report "N of M returned query points breached over [range]", with bucket size, baseline range,
+and sample evidence in the preview. Missing or guarded-out buckets are not healthy observations.
+These are not incident or notification counts: those depend on evaluation windows, match type, and alert state.
 Zero breaches do not justify loosening or prove calibration; frequent breaches merit a tuning suggestion.
 
 3. **Exceptions:**
