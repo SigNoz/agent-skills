@@ -383,7 +383,8 @@ Creation uses `config: {kind, spec}` for `slack`, `email`, `webhook`,
 `pagerduty`, `opsgenie`, `msteams`, `googlechat`, `jira`, `jsmops`, or
 `incidentio`; legacy flat provider fields are rejected. Use explicit `name`
 plus `displayName`, or `generateName: true` with only `displayName`. `test`
-defaults false and requires explicit opt-in. On `PERMISSION_DENIED`, use an
+defaults false: ask whether the user wants a test notification and set
+`test: true` only if they agree. On `PERMISSION_DENIED`, use an
 admin-created channel or a short-lived minimum-role credential from the host's
 secret store. If routing remains unresolved, stop and ask.
 
