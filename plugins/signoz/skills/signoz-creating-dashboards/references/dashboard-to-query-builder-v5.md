@@ -15,7 +15,6 @@
 - [PromQL and ClickHouse mapping](#promql-and-clickhouse-mapping)
 - [Variables](#variables)
 - [Request envelope](#request-envelope)
-- [Heatmap boundary](#heatmap-boundary)
 - [Validation gaps](#validation-gaps)
 - [Save discipline](#save-discipline)
 - [Checklist](#checklist)
@@ -134,7 +133,6 @@ Map a Perses formula to a `builder_formula` envelope. Preserve:
 - `limit`
 - `order`
 - `disabled`
-- supported bucket options for raw heatmap execution
 
 A common computed-series pattern has disabled metric inputs and one enabled
 formula. An enabled metric output may also depend on disabled metric inputs.
@@ -201,23 +199,6 @@ translated sibling entries under `query.compositeQuery.queries`.
 Do not pass the execution payload directly as the tool arguments, and do not
 add another `query` or `compositeQuery` wrapper inside `query`.
 
-## Heatmap boundary
-
-Raw heatmaps use `requestType: "heatmap"` with
-`signoz_execute_builder_query`. They do not use the convenience
-`signoz_query_metrics` contract.
-
-Heatmaps require exactly one enabled metric query, formula, PromQL query, or
-ClickHouse query; logs/traces builder signals are invalid. Disabled formula
-inputs are allowed. `bucketOptions` may be present only on the effective
-enabled metric query or formula as described by
-`signoz://metrics-aggregation-guide`. `fillGaps: false` or omission is valid;
-`fillGaps: true`, functions, and non-empty HAVING are rejected. Preserve bucket
-boundaries, counts, overflow metadata, and the raw upstream result.
-
-There is no advertised dashboard HeatmapPanel plugin. Do not translate a raw
-heatmap execution into a saved heatmap panel.
-
 ## Validation gaps
 
 If the executor schema cannot represent a persisted query field, do not delete
@@ -254,5 +235,4 @@ Do not replay a write after an ambiguous failure.
 - Absolute integer millisecond bounds were used.
 - No legacy dashboard fields entered the saved payload.
 - Unsupported semantics were surfaced rather than stripped.
-- Raw heatmap output was not advertised as a dashboard panel.
 - The persisted Perses query remained unchanged after translation.

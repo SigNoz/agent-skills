@@ -129,10 +129,6 @@ For prose, headings, or instructions, use `signoz/TextPanel` with mode
 queryless: skip discovery and query dry-run for that panel. Do not invent row
 panels; use text panels and grid placement for visual sections when useful.
 
-There is no advertised heatmap dashboard-panel plugin in this contract. A user
-asking to execute a raw heatmap can use `signoz-generating-queries`; do not
-promise to save that rendering as a dashboard panel.
-
 ### 6. Variables and layout
 
 Prefer a `ListVariable` with `signoz/DynamicVariable` for live attribute values.
@@ -193,7 +189,6 @@ ambiguous or fails, do not replay automatically.
 - Never claim a template import or create succeeded unless the tool returned
   success.
 - Do not modify a duplicate from this skill; hand it off.
-- Do not advertise saved heatmap panels.
 - Never send legacy dashboard fields or the `uuid` alias.
 
 ## Additional examples

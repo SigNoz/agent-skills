@@ -213,10 +213,6 @@ display range by reflex; apply the reference's dry-run hygiene rules before
 widening or retrying after a timeout. Use representative variable values in the
 dry-run copy and keep `$var` in saved state.
 
-There is no advertised dashboard heatmap plugin. Do not turn a valid raw
-`requestType: "heatmap"` execution into a fictional saved panel; hand raw
-heatmap exploration to `signoz-generating-queries`.
-
 Preserve or add explicit result bounds on every changed builder query/formula:
 the saved spec carries a positive `limit` plus non-empty `order`, and the dry-run
 sends those same values unchanged. List

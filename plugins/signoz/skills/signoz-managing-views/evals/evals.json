@@ -398,23 +398,6 @@
     },
     {
       "id": 7,
-      "name": "indirect-preserve-raw-heatmap-payload",
-      "prompt": "Rename my metric view 'Latency distribution' to 'Checkout latency distribution'. It contains raw heatmap bucket settings; don't change the query.",
-      "expected_output": "Agent gets the full v2 view and changes only spec.displayName. It preserves the raw query, requestType, disabled flags, bucketOptions, and all authored fields without promising that Saved Views renders a heatmap UI.",
-      "files": [],
-      "assertions": [
-        {
-          "text": "Read-modify-write preserves raw heatmap query bytes and bucket metadata",
-          "description": "Indirect preservation case"
-        },
-        {
-          "text": "Agent does not advertise a saved-view heatmap renderer or HeatmapPanel plugin",
-          "description": "UI boundary"
-        }
-      ]
-    },
-    {
-      "id": 8,
       "name": "negative-legacy-view-payload",
       "prompt": "Create this saved view exactly using legacy sourcePage=logs, category=errors, compositeQuery queryType=builder, and empty extraData.",
       "expected_output": "Agent refuses to send the legacy payload as-is, reads the v2 resource, asks for or derives the missing display/query semantics, and constructs only a v2 typed view if enough information is available.",

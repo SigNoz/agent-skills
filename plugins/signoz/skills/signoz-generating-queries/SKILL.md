@@ -59,7 +59,7 @@ Map the user's intent to the right signal:
 | "How many X per Y" (count/rate grouped by dimension) | **traces** or **logs** (aggregate) | Use `signoz_aggregate_traces` or `signoz_aggregate_logs` for grouped counts. |
 
 Traces have no unqualified full-text search; use `CONTAINS` against a discovered
-structured trace field. `searchText`-style body search is logs-only.
+structured trace field. `searchText` convenience search is logs-only.
 
 If the signal is genuinely ambiguous, ask the user before proceeding. The
 host application decides how the question is surfaced (e.g. a structured
@@ -129,18 +129,23 @@ and values also require a non-empty discovered `name`.
 |---|---|---|
 | Metric time series, scalar, ratio, or formula | `signoz_query_metrics` | Ordinary metrics queries, Cost Meter trends/rates, and metric ratios via `formula` + `formulaQueries`. |
 | Cost Meter total or grouped total attribution | `signoz_execute_builder_query` | Use the discovered meter metric with raw `timeAggregation: "sum"`; sum complete hourly buckets. Do not use `signoz_query_metrics` for totals. |
-| Log search (find matching entries) | `signoz_search_logs` | Finding specific log lines. Use `searchText` for body text, `filter` for field filters, `severity` for level filtering. |
+| Log search (find matching entries) | `signoz_search_logs` | Finding specific log lines. Use `searchText` for literal text (`searchScope` picks where it matches, default body), `filter` for field filters, `severity` for level filtering. |
 | Trace search (find matching spans) | `signoz_search_traces` | Finding specific traces/spans. Use `service`, `operation`, `error`, `minDuration`/`maxDuration` shortcuts plus `filter` for field filters. |
 | Log aggregation (count, avg, percentiles) | `signoz_aggregate_logs` | Plain totals, grouped counts, and top-N by one aggregation. |
 | Trace aggregation (count, avg, percentiles) | `signoz_aggregate_traces` | Plain totals, grouped counts, and top-N by one aggregation. |
 | Complex log/trace formula or shaping | `signoz_execute_builder_query` | Use when ratios, shaping, ordering, or cardinality control exceed the convenience tools; never hand-build a plain grouped count. |
 
-**Canonical log search contract (v0.142.0+):**
+**Canonical log search contract:**
 
 - `signoz_search_logs` accepts `filter`; the former `query` alias is
   rejected.
-- `searchText` is body-only convenience and maps to a body `CONTAINS`
-  predicate. Do not describe it as attribute or resource search.
+- `searchText` is literal text to find, escaped automatically. `searchScope`
+  chooses where it matches: `body` (default, a body `CONTAINS` predicate),
+  `attribute`, `resource`, or `all` (unscoped `search()`). `searchScope`
+  without `searchText` is a validation error. Keep the `body` default for
+  message text, use a specific scope or a field predicate when the field is
+  known, and use `all` only when the field is unknown, with a narrow time
+  range: it is slow on wide ranges, and SigNoz may reject an over-budget scan.
 - For explicit cross-field search, use `filter: "search('timeout')"`.
   The `search()` scopes documented by `signoz://logs/query-builder-guide`
   support body, attribute, resource, log, or their allowed combinations.
@@ -190,36 +195,12 @@ envelopes passed to `signoz_execute_builder_query`, use only:
 
 | Signal | Valid `requestType` |
 |---|---|
-| metrics | `time_series`, `scalar`, `heatmap` |
+| metrics | `time_series`, `scalar` |
 | traces | `raw`, `trace`, `scalar`, `time_series` |
 | logs | `raw`, `scalar`, `time_series` |
 
 Never invent `aggregate`, `table`, `timeseries`, or `series`. This matrix does
 not apply to PromQL or ClickHouse SQL envelopes.
-
-**Raw heatmaps (v0.142.0+):** Use `signoz_execute_builder_query` with
-`requestType: "heatmap"`. The convenience `signoz_query_metrics` contract
-remains unchanged and does not expose heatmaps.
-
-A heatmap has one effective enabled output: one enabled metric query (which may
-depend on disabled metric inputs), one enabled formula over disabled metric
-inputs, or a supported enabled PromQL/ClickHouse SQL query. Put
-`bucketOptions` on the enabled metric query or formula:
-
-- linear: `kind=linear`, finite `maxValue > 0`; omitted or zero
-  `numBuckets` uses the backend default of 60, otherwise use 1–512;
-- log: `kind=log`; optional `scale` is -4 through 4 and defaults to 4.
-
-Classic histogram metrics with an `le` axis do not take `bucketOptions`.
-Exponential histograms are unsupported for this heatmap contract. Do not enable
-`fillGaps`; absent and `false` are equivalent and accepted, and the MCP payload
-may serialize the zero value as `fillGaps: false`. Do not add post-query
-`functions` or `having` to a heatmap builder query. Preserve returned bucket
-boundaries, per-point counts, and overflow metadata. Do not flatten the result
-into ordinary time-series points.
-
-Raw execution support does not imply a dashboard HeatmapPanel plugin or
-saved-view heatmap rendering.
 
 ### Step 4: Execute the query
 
