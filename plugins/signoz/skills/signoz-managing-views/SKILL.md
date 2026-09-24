@@ -129,7 +129,9 @@ Read both MCP resources by URI using your client's resource-read mechanism:
    desc as appropriate. Time-series top-N ranks groups over the whole selected
    window and can omit a short-lived local spike.
    Preserve raw query entries exactly where the v2 resource permits them,
-   including disabled flags and PromQL or SQL envelopes.
+   including disabled flags and PromQL or SQL envelopes. On create, a PromQL
+   or SQL envelope must come verbatim from the user or an existing view;
+   `signoz-generating-queries` does not author it, so validate it in Step 5.
 4. **Enforce the signal rule** in every `builder_query` spec.
    - For `traces` / `logs` / `metrics`: `signal == source`. A
      `source:"traces"` view with `signal:"logs"` is a server-side error.
@@ -151,6 +153,9 @@ Read both MCP resources by URI using your client's resource-read mechanism:
      from `spec.aggregations[0].metricName`, **`source=meter`**, the same
      filter, `timeRange=24h` (Cost Meter rolls up hourly, so a 1h window
      can be a single partial bucket), `requestType=scalar`.
+   - PromQL or SQL envelope → `signoz_execute_builder_query` with that exact
+     envelope over a short recent window. The builder probes above do not
+     apply to it.
 
    Required even if Step 3 ran cleanly: the sub-skill validates the
    query *it* authored, not whatever you persist after edits or lifts.

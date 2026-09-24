@@ -35,17 +35,25 @@ resolve.
 
 ### 1. Check for an existing dashboard
 
-Call `signoz_list_dashboards` with a distinctive `filter` when available and
-`limit=50`, following `offset` pagination until `total` is covered before
-concluding that no match exists. A later-page error blocks the write. The v2
-list excludes system dashboards.
+If the user supplies a dashboard `id`, call `signoz_get_dashboard` with it
+first; the list below cannot find system dashboards. Keep the returned
+`source` as returned. To base a new dashboard on it, read its definition as
+reference and continue with a separate create. Never update, patch, or delete
+a non-user source.
+
+Otherwise, call `signoz_list_dashboards` with a distinctive `filter` when
+available and `limit=50`, following `offset` pagination until `total` is
+covered before concluding that no match exists. A later-page error blocks the
+write. The v2 list excludes system dashboards.
 It may contain user and integration dashboards; only `source=user` dashboards
 are mutable. Compare names, descriptions, and tags by real domain relevance.
 
 If a likely duplicate exists, show its name, canonical `id`, source, and update
-time. Ask whether to modify it, create another, or stop. If modification is
-chosen, hand off the canonical `id` and intent to
-`signoz-modifying-dashboards`. Dashboard tools use `id`; never send `uuid`.
+time. For a `source=user` match, ask whether to modify it, create another, or
+stop; if modification is chosen, hand off the canonical `id` and intent to
+`signoz-modifying-dashboards`. For an integration match, explain that it is
+immutable and ask whether to create another or stop. Dashboard tools use `id`;
+never send `uuid`.
 
 ### 2. Prefer a matching template
 
@@ -125,9 +133,10 @@ disabled metric inputs. PromQL and ClickHouse SQL are also valid where the
 panel and resources allow them.
 
 For prose, headings, or instructions, use `signoz/TextPanel` with mode
-`markdown` or `text` and a non-null empty `queries: []`. It is intentionally
+`markdown` and a non-null empty `queries: []`. It is intentionally
 queryless: skip discovery and query dry-run for that panel. Do not invent row
-panels; use text panels and grid placement for visual sections when useful.
+panels. For named sections, add a separate `Grid` entry to `spec.layouts` with
+its own `spec.display.title`; use text panels for prose within a section.
 
 ### 6. Variables and layout
 

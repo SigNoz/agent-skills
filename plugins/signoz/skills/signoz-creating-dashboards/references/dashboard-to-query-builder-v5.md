@@ -60,7 +60,7 @@ Do not create or retain legacy `widgets`, `layout`, `panelMap`,
 
 A `signoz/TextPanel` is intentionally queryless.
 
-It must use mode `markdown` or `text` and a non-null empty `queries: []`.
+It must use mode `markdown` and a non-null empty `queries: []`.
 Do not invent an execution query for it. Skip discovery and dry-run for that
 panel.
 

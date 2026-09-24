@@ -27,7 +27,6 @@
         "No groupBy entry passed to signoz_execute_builder_query contains the dashboard-only key, dataType, or type fields",
         "One new Grid item has content.$ref equal to #/spec/panels/<new-panel-id>",
         "The actual dry-run outer query contains start and end as JSON integer Unix-millisecond values",
-        "The actual signoz_execute_builder_query call maps queryName='A' to name='A' and dataSource='traces' to signal='traces', and maps groupBy to name='service.name', fieldDataType='string', fieldContext='resource', signal='traces'",
         "The actual signoz_execute_builder_query call sends the panel's query spec unchanged inside a builder_query envelope, with requestType='time_series' taken from the query kind",
         "The new panel has exactly one Grid item and no panelMap or legacy layout entry is authored",
         "The new saved panel query has limit=100 plus order by p99(duration_nano) desc, and the dry-run sends that same limit and order",
@@ -74,8 +73,7 @@
         "Target panel retains semantically equivalent query data, filters, groupings, and query names after normalization",
         "Target panel's plugin kind is 'signoz/TablePanel' in updated, was 'signoz/TimeSeriesPanel' in original",
         "Target panel's query envelope kind is 'scalar' in updated, was 'time_series' in original",
-        "Transcript shows no confirmation prompt: non-destructive change proceeded directly",
-        "Widget count is identical between original and updated (no add/remove)"
+        "Transcript shows no confirmation prompt: non-destructive change proceeded directly"
       ]
     },
     {
@@ -100,7 +98,6 @@
         "Every new saved and dry-run base query referenced by the formula uses limit=10000 with the signal-specific aggregation order; every formula result uses limit=100 with __result ordering, and the saved panel and dry-run carry the same values",
         "Net panel count equals original count (one removed, one added)",
         "Net spec.panels count equals original count (one removed, one added)",
-        "Transcript indicates a single planned update_dashboard call (changes batched, not iterative)",
         "Transcript indicates a single planned write call (changes batched, not iterative)",
         "Transcript shows a single confirmation prompt covering the destructive removal of CPU Usage"
       ]
@@ -119,7 +116,6 @@
         "Each changed grid item keeps its original content.$ref, and spec.panels is untouched (position lives only in the layout)",
         "No other panels modified",
         "No panelMap is authored; the canonical Grid items are the sole layout positions",
-        "Their h values are equal",
         "Their height values are equal",
         "Their x values are {0, 6} (one each, in some order)",
         "Their y values are equal"

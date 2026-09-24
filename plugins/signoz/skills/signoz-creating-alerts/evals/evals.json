@@ -116,9 +116,10 @@
     {
       "id": 8,
       "eval_name": "direct-create-v2-slack-channel-no-test",
-      "prompt": "Create a Slack notification channel displayed as 'Platform Alerts' using this webhook, then use it for a warning alert. Do not send a test.",
-      "expected_output": "Agent fully paginates channels, confirms the display name is unused, creates the channel with generateName=true, displayName='Platform Alerts', config.kind='slack', config.spec.apiUrl plus provider fields, and test=false/omitted. It routes the alert by returned displayName, never by generated machine name.",
+      "prompt": "Create a Slack notification channel displayed as 'Platform Alerts' using webhook https://hooks.slack.com/services/EXAMPLE/EXAMPLE/EXAMPLE, then use it for a warning alert when checkoutservice p99 latency exceeds 800 ms over a 5-minute window. Do not send a test.",
+      "expected_output": "After the normal duplicate check, data probe, and full-query dry-run, agent prepares a TRACES_BASED_ALERT on p99(duration_nano) filtered to service.name='checkoutservice' with a warning threshold of 800 ms. It fully paginates channels, confirms the display name is unused, creates the channel with generateName=true, displayName='Platform Alerts', config.kind='slack', config.spec.apiUrl plus provider fields, and test=false/omitted. It routes the warning threshold by returned displayName, never by generated machine name.",
       "expectations": [
+        "The alert is a TRACES_BASED_ALERT on p99(duration_nano) filtered to service.name='checkoutservice' with a warning-tier threshold equivalent to 800 ms, and its exact query is dry-run before any write",
         "Channel discovery follows pagination.hasMore and pagination.nextOffset and treats total as the filtered total",
         "signoz_create_notification_channel uses canonical config={kind:'slack',spec:{apiUrl,...}} and contains no type, send_resolved, slack_api_url, or other flat provider arguments",
         "Create uses generateName=true with no explicit name and includes displayName='Platform Alerts'",

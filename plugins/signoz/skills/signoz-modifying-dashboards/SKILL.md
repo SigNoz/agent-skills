@@ -168,8 +168,8 @@ first removal from each array.
   and keep all other panel fields intact; never append a second one, since a
   query-bearing panel holds exactly one query. A TextPanel is queryless.
 
-- **Adding or editing text:** Use `signoz/TextPanel` with mode `markdown` or
-  `text`, a non-null empty `queries: []`, and the current resource's display
+- **Adding or editing text:** Use `signoz/TextPanel` with mode `markdown`,
+  a non-null empty `queries: []`, and the current resource's display
   shape. Add the panel and its Grid item together. Skip query discovery and
   dry-run for TextPanels. Do not invent a row panel.
 

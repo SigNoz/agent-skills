@@ -374,17 +374,15 @@ skill does not create policies. If the policy or match criteria are not
 confirmed, stop and ask. Anomaly rules are direct-only.
 
 For direct routing, reuse a fully paginated same-operation channel result or
-call `signoz_list_notification_channels` through `hasMore=false`, following
-`nextOffset` (default 20, cap 200); its config-free `total` is filtered. Match
-and route by immutable `displayName`,
-not DNS-1123 `name`; show `displayName` and `kind` when asking the user to pick.
+page `signoz_list_notification_channels` until `hasMore=false`; its `total`
+counts filtered matches. Match and route by immutable `displayName`, not the
+machine `name`; show `displayName` and `kind` when asking the user to pick.
 Offer creation only from user-provided config and never create automatically.
-Creation uses `config: {kind, spec}` for `slack`, `email`, `webhook`,
-`pagerduty`, `opsgenie`, `msteams`, `googlechat`, `jira`, `jsmops`, or
-`incidentio`; legacy flat provider fields are rejected. Use explicit `name`
-plus `displayName`, or `generateName: true` with only `displayName`. `test`
-defaults false: ask whether the user wants a test notification and set
-`test: true` only if they agree. On `PERMISSION_DENIED`, use an
+Build `signoz_create_notification_channel` arguments from its current input
+schema, which defines the supported provider kinds and identity fields:
+provider settings go inside `config`, never as flat fields. Ask whether the
+user wants a test notification and send `test: true` only if they agree. On
+`PERMISSION_DENIED`, use an
 admin-created channel or a short-lived minimum-role credential from the host's
 secret store. If routing remains unresolved, stop and ask.
 
