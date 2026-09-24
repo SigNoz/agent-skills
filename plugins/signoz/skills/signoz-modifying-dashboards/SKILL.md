@@ -207,13 +207,13 @@ first removal from each array.
     panels.
 
 **Dry-run modified panels (mandatory).** For every added or changed query-bearing
-panel, read the compact
-[`dashboard-to-query-builder-v5` reference](./references/dashboard-to-query-builder-v5.md).
+panel, follow "Dry-run a panel query" in
+`signoz://dashboard/widgets-instructions`.
 The panel already stores the execution spec, so lift it into the outer envelope and
 call `signoz_execute_builder_query` with that payload. Dry-run over a short
 absolute Unix-ms window, usually the last 30-60 minutes, never the panel's
-display range by reflex; apply the reference's dry-run hygiene rules before
-widening or retrying after a timeout. Use representative variable values in the
+display range by reflex; apply that section's empty-result and timeout rules
+before widening or retrying. Use representative variable values in the
 dry-run copy and keep `$var` in saved state.
 
 Preserve or add explicit result bounds on every changed builder query/formula:
@@ -234,7 +234,7 @@ by `__result`, in the saved panel and the dry-run alike. For time series, this
 top-N is chosen over the whole window, so a short-lived local spike can be
 omitted. Narrow filters/grouping if formula-input cardinality can exceed 10000.
 
-If the reference's safety gate finds an unsupported execution field, report the
+If the executor cannot represent a saved field, report the
 panel as unvalidated and continue only after explicit acceptance. Server or
 validation errors and unexpected empty results block unless explicitly accepted.
 
