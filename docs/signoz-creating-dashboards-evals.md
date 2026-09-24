@@ -31,14 +31,15 @@ Dashboards use the **Perses schema (`schemaVersion: "v6"`)**: panels are a map, 
 | Signal | Evals |
 |---|---|
 | metrics | 0, 1, 7, 9, 18, 21 |
-| traces | 8, 10, 12, 15, 16, 17, 19, 23 |
+| traces | 8, 10, 12, 15, 16, 17, 19, 23, 29 |
 | logs | 14, 20, 24 |
 
 ### Panel plugin kinds
 
 | Plugin kind | Evals |
 |---|---|
-| `signoz/TimeSeriesPanel` | 6, 8, 9, 10, 12, 14, 17, 19, 21, 23 |
+| `signoz/TimeSeriesPanel` | 6, 8, 9, 10, 12, 14, 17, 19, 21, 23, 29 |
+| `signoz/AreaChartPanel` | 29 |
 | `signoz/NumberPanel` (value) | 9, 14, 16 |
 | `signoz/TablePanel` | 14, 16, 20, 22, 24 |
 | `signoz/ListPanel` | 15, 25 |
@@ -102,6 +103,7 @@ Dashboards use the **Perses schema (`schemaVersion: "v6"`)**: panels are a map, 
 | Text panels use `signoz/TextPanel`, non-null `queries: []`, and no query dry-run | 26 |
 | Known system dashboard ids can be fetched, but non-user sources cannot be modified | 27 |
 | Legacy dashboard payload fields are rejected instead of mixed with v6 Perses fields | 28 |
+| Stacked area charts only for additive values; latency stays an unstacked timeseries | 29 |
 
 ## Eval-by-eval coverage
 
@@ -134,6 +136,7 @@ Dashboards use the **Perses schema (`schemaVersion: "v6"`)**: panels are a map, 
 | 26 | `direct-text-panel-perses` | Markdown notes beside a query panel | metrics | TextPanel, TimeSeries | Perses panel map and Grid references, TextPanel `queries: []`, queryless panel skips dry-run |
 | 27 | `indirect-system-dashboard-known-id` | Known system dashboard fetched by id | (any) | n/a | preserve returned `source`; stop before update, patch, delete, lock, or public-state writes |
 | 28 | `negative-legacy-dashboard-payload` | Reject a mixed legacy/v6 create request | (any) | n/a | no `widgets`, `panelMap`, `panelTypes`, `queryData`, or legacy selected-field structures |
+| 29 | `direct-stacked-area-volume` | Stacked request volume beside a p99 latency chart | traces | AreaChart, TimeSeries | `signoz/AreaChartPanel` with `stack: normal` for counts; p99 stays unstacked on `signoz/TimeSeriesPanel`; `fillMode` never `none` |
 
 ## Intentionally uncovered
 

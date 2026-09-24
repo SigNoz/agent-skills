@@ -177,6 +177,9 @@ first removal from each array.
   together (`signoz/TimeSeriesPanel` + `time_series` → `signoz/TablePanel` +
   `scalar`): follow the target type's complete shape in `widgets-examples`. Preserve the
   existing query and signal; change only visualization-specific fields.
+  `signoz/TimeSeriesPanel` and `signoz/AreaChartPanel` both keep the
+  `time_series` query, so switching between them changes only the plugin. Do
+  not stack latency, percentiles, or ratios in an area chart.
 
 - **Adding/editing variables:**
   1. For ambiguous or version-sensitive attributes, call `signoz_get_field_keys`

@@ -493,6 +493,21 @@
         "Any eventual create uses the canonical v6 Perses envelope"
       ],
       "files": []
+    },
+    {
+      "id": 29,
+      "eval_name": "direct-stacked-area-volume",
+      "prompt": "Create a dashboard for checkoutservice with a stacked chart of request volume by operation and a p99 latency chart.",
+      "expected_output": "Agent reads the widget resources, discovers the operation field with signoz_get_field_keys on the traces signal, and builds two panels. Request volume is a signoz/AreaChartPanel with visualization.stack='normal' over one time_series count() query grouped by the operation field, with a legend matching that groupBy key. p99 latency stays a signoz/TimeSeriesPanel and is not stacked, because summing percentiles is meaningless. Both panels are dry-run before signoz_create_dashboard.",
+      "expectations": [
+        "Agent reads signoz://dashboard/widgets-instructions and signoz://dashboard/widgets-examples before authoring",
+        "The request-volume panel uses plugin.kind='signoz/AreaChartPanel' with visualization.stack='normal' and exactly one time_series query using count()",
+        "The request-volume query groups by a discovered operation field on the traces signal, filters to checkoutservice, and sets a legend matching the groupBy key",
+        "The p99 latency panel uses plugin.kind='signoz/TimeSeriesPanel', not an area chart, and applies no stacking",
+        "Any chartAppearance.fillMode on the area panel is 'solid' or 'gradient', never 'none'",
+        "Both query panels are dry-run with signoz_execute_builder_query before signoz_create_dashboard"
+      ],
+      "files": []
     }
   ]
 }

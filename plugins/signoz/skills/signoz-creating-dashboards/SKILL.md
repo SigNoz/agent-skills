@@ -138,6 +138,13 @@ queryless: skip discovery and query dry-run for that panel. Do not invent row
 panels. For named sections, add a separate `Grid` entry to `spec.layouts` with
 its own `spec.display.title`; use text panels for prose within a section.
 
+For volume over time or how parts add up to a total, use
+`signoz/AreaChartPanel` with one `time_series` query. Stack only additive
+values such as counts or bytes (percent stacking shows each series' share);
+keep latency, percentiles, and ratios on `signoz/TimeSeriesPanel`, because a
+stacked total of them is meaningless. Take the stack and fill fields from
+`signoz://dashboard/widgets-instructions`.
+
 ### 6. Variables and layout
 
 Prefer a `ListVariable` with `signoz/DynamicVariable` for live attribute values.
