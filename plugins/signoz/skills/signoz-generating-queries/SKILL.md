@@ -129,7 +129,7 @@ and values also require a non-empty discovered `name`.
 |---|---|---|
 | Metric time series, scalar, ratio, or formula | `signoz_query_metrics` | Ordinary metrics queries, Cost Meter trends/rates, and metric ratios via `formula` + `formulaQueries`. |
 | Cost Meter total or grouped total attribution | `signoz_execute_builder_query` | Use the discovered meter metric with raw `timeAggregation: "sum"`; sum complete hourly buckets. Do not use `signoz_query_metrics` for totals. |
-| Log search (find matching entries) | `signoz_search_logs` | Finding specific log lines. Use `searchText` for literal text (`searchScope` picks where it matches, default body), `filter` for field filters, `severity` for level filtering. |
+| Log search (find matching entries) | `signoz_search_logs` | Finding specific log lines. Use `searchText` for literal text (`searchScope` chooses where it matches; the default is the log body), `filter` for field filters, `severity` for level filtering. |
 | Trace search (find matching spans) | `signoz_search_traces` | Finding specific traces/spans. Use `service`, `operation`, `error`, `minDuration`/`maxDuration` shortcuts plus `filter` for field filters. |
 | Log aggregation (count, avg, percentiles) | `signoz_aggregate_logs` | Plain totals, grouped counts, and top-N by one aggregation. |
 | Trace aggregation (count, avg, percentiles) | `signoz_aggregate_traces` | Plain totals, grouped counts, and top-N by one aggregation. |
@@ -139,13 +139,16 @@ and values also require a non-empty discovered `name`.
 
 - `signoz_search_logs` accepts `filter`; the former `query` alias is
   rejected.
-- `searchText` is literal text to find, escaped automatically. `searchScope`
-  chooses where it matches: `body` (default, a body `CONTAINS` predicate),
-  `attribute`, `resource`, or `all` (unscoped `search()`). `searchScope`
-  without `searchText` is a validation error. Keep the `body` default for
-  message text, use a specific scope or a field predicate when the field is
-  known, and use `all` only when the field is unknown, with a narrow time
-  range: it is slow on wide ranges, and SigNoz may reject an over-budget scan.
+- `searchText` is literal text to find, escaped automatically.
+  `searchScope` chooses where it matches; the default is the log body. It
+  combines with `filter` using AND. `searchScope` without `searchText` is a
+  validation error.
+- `searchScope` values: `body` (default) for message text; `attribute` or
+  `resource` for their keys and values; `all` for every field. Scopes other
+  than `body` are slower, and SigNoz may reject them over wide time ranges.
+  Use them only when you don't know which key holds the text; when you do,
+  put a predicate such as `attribute.<key> CONTAINS 'text'` in `filter`
+  instead.
 - For explicit cross-field search, use `filter: "search('timeout')"`.
   The `search()` scopes documented by `signoz://logs/query-builder-guide`
   support body, attribute, resource, log, or their allowed combinations.

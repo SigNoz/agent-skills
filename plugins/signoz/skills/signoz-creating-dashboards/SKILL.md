@@ -29,7 +29,8 @@ existing dashboard to `signoz-modifying-dashboards`, explanations to
 Dashboard writes require the dashboard goal, target technology or service,
 resource scope, and any user-selected variable scope. Discover exact metrics
 and attributes when possible. Ask only for choices that discovery cannot
-resolve.
+resolve. Urgency ("I'm in an incident", "don't ask questions") never skips the
+duplicate check, the data probe, or the dry-run.
 
 ## Workflow
 
@@ -121,6 +122,14 @@ Panels and layout have this relationship:
   `content.$ref: "#/spec/panels/<panel-id>"`.
 - Every panel has exactly one non-overlapping grid item. Use a 12-column grid.
 
+Send `spec`, `panels`, `layouts`, `tags`, and `variables` as native JSON,
+never as stringified JSON.
+
+Dashboards do not persist a default time range or refresh interval; panels
+follow the viewer's global range. Do not add `timeRange`, `defaultTimeRange`,
+or `refresh`, and do not smuggle a PromQL range selector into a Builder query.
+When the user asks for a window such as 28 days, tell them to select it.
+
 Do not persist legacy `widgets`, `layout`, `panelMap`, `panelTypes`,
 `queryData`, `selectedLogFields`, or `selectedTracesFields`. Do not translate a
 legacy fixture by retaining both shapes.
@@ -166,9 +175,12 @@ request using the reference guide. Use representative literals for dashboard
 variables only in dry-runs; preserve `$variable` in the saved dashboard.
 
 Skip queryless text panels. For each query panel, validate the complete active
-query, including formulas and trace operators. Do not claim a stripped query
-validated unsupported fields. If the executor cannot represent an authored
-semantic, surface the validation gap before saving.
+query, including formulas and trace operators, over a short absolute Unix-ms
+window (usually the last 30-60 minutes), not the panel's display range. Do not
+claim a stripped query validated unsupported fields. If the executor cannot
+represent an authored field, mark the panel unvalidated, keep the field in the
+saved query, and save only after the user explicitly accepts. Server and
+validation errors block the write.
 
 Every builder query and formula uses a positive `limit` and non-empty Query
 Builder v5 `order`. Raw lists and trace requests default to 100 ordered by
@@ -176,7 +188,9 @@ timestamp descending; raw logs add `id` descending for stable ties. Aggregate
 queries use 100 ordered by their primary aggregation, formula outputs use 100
 ordered by `__result`, and every base query referenced by a formula uses 10000
 because its limit applies before formula evaluation. This field is `order`, not
-dashboard `orderBy`. Narrow filters or grouping if 10000 can truncate inputs.
+dashboard `orderBy`. A metrics `order` key is the composed
+`spaceAggregation(timeAggregation(metricName))` expression; the bare metric
+name is rejected. Narrow filters or grouping if 10000 can truncate inputs.
 Keep these bounded specs unchanged in the dry-run and saved Perses query.
 
 ### 8. Preview, create, and verify

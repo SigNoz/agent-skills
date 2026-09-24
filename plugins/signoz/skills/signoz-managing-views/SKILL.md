@@ -176,9 +176,9 @@ For saved log filters, use
 such as `search('timeout', body)` only when that exact scope is intended. Once
 field discovery identifies the target, prefer a canonical field predicate such
 as `body CONTAINS 'timeout'`. Escape backslashes before apostrophes in literal
-values. The `signoz_search_logs.searchText` convenience (scoped by
-`searchScope`, default body) is not a substitute for preserving an authored
-`search()` filter.
+values. The `signoz_search_logs.searchText` convenience (`searchScope` chooses
+where it matches; the default is the log body) is not a substitute for
+preserving an authored `search()` filter.
 
 ### List or find views
 
