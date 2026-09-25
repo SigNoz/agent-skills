@@ -371,7 +371,7 @@ gate as Phase 4.
 ## Phase 8: Alerts
 
 `signoz-creating-alerts` owns every per-alert mechanic: channel
-resolution (create-first with a test message, name-not-UUID, secret
+resolution (`displayName` routing, an opt-in test notification, secret
 handling), severity defaults, `op`/`matchType`, units, annotations,
 `evalWindow`/`recoveryTarget`, anomaly-rule shape, and the mandatory
 dry-run. Drive it once per alert and don't restate any of that here.

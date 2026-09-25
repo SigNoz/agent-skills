@@ -59,7 +59,7 @@ Map the user's intent to the right signal:
 | "How many X per Y" (count/rate grouped by dimension) | **traces** or **logs** (aggregate) | Use `signoz_aggregate_traces` or `signoz_aggregate_logs` for grouped counts. |
 
 Traces have no unqualified full-text search; use `CONTAINS` against a discovered
-structured trace field. `searchText`-style body search is logs-only.
+structured trace field. `searchText` convenience search is logs-only.
 
 If the signal is genuinely ambiguous, ask the user before proceeding. The
 host application decides how the question is surfaced (e.g. a structured
@@ -129,11 +129,38 @@ and values also require a non-empty discovered `name`.
 |---|---|---|
 | Metric time series, scalar, ratio, or formula | `signoz_query_metrics` | Ordinary metrics queries, Cost Meter trends/rates, and metric ratios via `formula` + `formulaQueries`. |
 | Cost Meter total or grouped total attribution | `signoz_execute_builder_query` | Use the discovered meter metric with raw `timeAggregation: "sum"`; sum complete hourly buckets. Do not use `signoz_query_metrics` for totals. |
-| Log search (find matching entries) | `signoz_search_logs` | Finding specific log lines. Use `searchText` for body text, `filter` for field filters, `severity` for level filtering. |
+| Log search (find matching entries) | `signoz_search_logs` | Finding specific log lines. Use `searchText` for literal text (`searchScope` chooses where it matches; the default is the log body), `filter` for field filters, `severity` for level filtering. |
 | Trace search (find matching spans) | `signoz_search_traces` | Finding specific traces/spans. Use `service`, `operation`, `error`, `minDuration`/`maxDuration` shortcuts plus `filter` for field filters. |
 | Log aggregation (count, avg, percentiles) | `signoz_aggregate_logs` | Plain totals, grouped counts, and top-N by one aggregation. |
 | Trace aggregation (count, avg, percentiles) | `signoz_aggregate_traces` | Plain totals, grouped counts, and top-N by one aggregation. |
 | Complex log/trace formula or shaping | `signoz_execute_builder_query` | Use when ratios, shaping, ordering, or cardinality control exceed the convenience tools; never hand-build a plain grouped count. |
+
+**Canonical log search contract:**
+
+- `signoz_search_logs` accepts `filter`; the former `query` alias is
+  rejected.
+- `searchText` is literal text to find, escaped automatically.
+  `searchScope` chooses where it matches; the default is the log body. It
+  combines with `filter` using AND. `searchScope` without `searchText` is a
+  validation error.
+- `searchScope` values: `body` (default) for message text; `attribute` or
+  `resource` for their keys and values; `all` for every field. Scopes other
+  than `body` are slower, and SigNoz may reject them over wide time ranges.
+  Use them only when you don't know which key holds the text; when you do,
+  put a predicate such as `attribute.<key> CONTAINS 'text'` in `filter`
+  instead.
+- For explicit cross-field search, use `filter: "search('timeout')"`.
+  The `search()` scopes documented by `signoz://logs/query-builder-guide`
+  support body, attribute, resource, log, or their allowed combinations.
+  Unscoped `search()` means all supported log fields; enumerate scopes when
+  the user requests only a subset.
+- Prefer a direct known-field predicate such as
+  `service.name = 'payments'` when the field is known, or use the `service`
+  shortcut; the server composes that shortcut into the same ANDed
+  `service.name` predicate. Discover unfamiliar fields first.
+- When constructing a search literal, escape backslashes first and apostrophes
+  second. Leave a caller-authored raw `filter` untouched; do not escape it
+  again.
 
 For `signoz_aggregate_logs` / `signoz_aggregate_traces`, `aggregation` is one
 bare token: `count`, `count_distinct`, `avg`, `sum`, `min`, `max`, `p50`, `p75`,
