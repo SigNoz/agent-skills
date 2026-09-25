@@ -71,8 +71,8 @@ Read both MCP resources by URI using your client's resource-read mechanism:
 - `signoz://view/instructions`: SavedView field reference, `source`
   rules, the `spec` fields, the GET-then-replace update flow, the minimal
   create body.
-- `signoz://view/examples`: round-tripped v2 payloads (traces list, logs
-  list, metrics graph, and a Cost Meter graph) you can adapt verbatim.
+- `signoz://view/examples`: round-tripped v2 payloads to adapt only where they
+  match the current intent and schema.
 
 ## Operation flows
 
@@ -128,6 +128,10 @@ Read both MCP resources by URI using your client's resource-read mechanism:
    applied before evaluation. Order by the primary aggregation or `__result`
    desc as appropriate. Time-series top-N ranks groups over the whole selected
    window and can omit a short-lived local spike.
+   Preserve raw query entries exactly where the v2 resource permits them,
+   including disabled flags and PromQL or SQL envelopes. On create, a PromQL
+   or SQL envelope must come verbatim from the user or an existing view;
+   `signoz-generating-queries` does not author it, so validate it in Step 5.
 4. **Enforce the signal rule** in every `builder_query` spec.
    - For `traces` / `logs` / `metrics`: `signal == source`. A
      `source:"traces"` view with `signal:"logs"` is a server-side error.
@@ -149,6 +153,9 @@ Read both MCP resources by URI using your client's resource-read mechanism:
      from `spec.aggregations[0].metricName`, **`source=meter`**, the same
      filter, `timeRange=24h` (Cost Meter rolls up hourly, so a 1h window
      can be a single partial bucket), `requestType=scalar`.
+   - PromQL or SQL envelope → `signoz_execute_builder_query` with that exact
+     envelope over a short recent window. The builder probes above do not
+     apply to it.
 
    Required even if Step 3 ran cleanly: the sub-skill validates the
    query *it* authored, not whatever you persist after edits or lifts.
@@ -163,6 +170,15 @@ Read both MCP resources by URI using your client's resource-read mechanism:
 7. Call `signoz_create_view`. On success the response `data` carries the
    new view's `id` (HTTP 201 upstream). The server populates `id`,
    `createdAt/By`, `updatedAt/By`; never send those.
+
+For saved log filters, use
+`search('timeout')` for explicit cross-field full-text search. Use scoped forms
+such as `search('timeout', body)` only when that exact scope is intended. Once
+field discovery identifies the target, prefer a canonical field predicate such
+as `body CONTAINS 'timeout'`. Escape backslashes before apostrophes in literal
+values. The `signoz_search_logs.searchText` convenience (`searchScope` chooses
+where it matches; the default is the log body) is not a substitute for
+preserving an authored `search()` filter.
 
 ### List or find views
 
@@ -320,7 +336,7 @@ call.
 | Filing a Cost Meter view under `source:"metrics"` (with `source:"meter"`) | Cost Meter views go under `source:"meter"`; otherwise they're invisible in the Meter Explorer and mis-filed under Metrics. The server rejects `source:"meter"` on a non-`meter` source |
 | Partial update body (omitting unchanged fields) | GET full body first → modify only changed fields → replace with `source` + full `spec` |
 | Declaring "no such view" after only page 1 | Check `pagination.hasMore`; continue with `offset = pagination.nextOffset` |
-| Using PromQL or raw ClickHouse in a view | Builder envelopes are the supported path; offer a dashboard panel instead |
+| Normalizing away PromQL, SQL, disabled flags, selected fields, or unknown authored content | Preserve every field allowed by the current typed resource across read-modify-write; strip only known server-populated fields |
 
 ## Reporting back
 

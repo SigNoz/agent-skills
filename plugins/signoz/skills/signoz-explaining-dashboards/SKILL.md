@@ -89,7 +89,10 @@ by logical theme. For each panel:
 - **Title** and **panel type** in plain words, from the plugin `kind`:
   `signoz/TimeSeriesPanel`, `signoz/NumberPanel` (single value),
   `signoz/TablePanel`, `signoz/BarChartPanel`, `signoz/PieChartPanel`,
-  `signoz/HistogramPanel`, `signoz/ListPanel` (raw rows)
+  `signoz/HistogramPanel`, `signoz/ListPanel` (raw rows),
+  `signoz/AreaChartPanel` (filled series; `visualization.stack` `normal`
+  shows the total, `percent` each series' share), `signoz/TextPanel`
+  (static notes with no query)
 - **What it shows**: interpret the panel's one query in plain language. For
   `signoz/BuilderQuery`, explain the signal, aggregation, `filter.expression`,
   and `groupBy`. For a `signoz/CompositeQuery`, explain each member and how the

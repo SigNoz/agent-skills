@@ -50,7 +50,7 @@ guesses create noisy alerts on the wrong service:
 | Resource attribute filter (e.g. `service.name`, `k8s.namespace.name`, `host.name`) | yes | discover via `signoz_get_field_keys` + `signoz_get_field_values` |
 | Threshold value(s) | threshold / PromQL rules | derive a sensible default and surface in the preview; never substitute one for an absent-only request |
 | Severity | inferred from intent | default `warning`; promote to `critical` only if user said "page", "wake up", "critical" |
-| Notification routing | yes | direct: verified channel name(s); policy: confirmation that an existing org policy should route this rule |
+| Notification routing | yes | direct: verified channel display name(s); policy: confirmation that an existing org policy matches this rule |
 
 If a required input is missing and undiscoverable, **stop before any write**
 and ask through the host's supported clarification UI.
@@ -59,7 +59,7 @@ What to include in the question:
 
 - **What is missing**: name it concretely (e.g. "which resource-attribute
   filter to use").
-- **Candidate lists** from discovery, with concrete values per attribute, e.g.:
+- **Candidate lists** from discovery: concrete values per attribute, e.g.:
   `service.name` → `frontend`, `checkout`, `payments`;
   `host.name` → `prod-api-1`, `prod-db-1`.
 - **Free-form input** so the user can name an unsurfaced value.
@@ -78,7 +78,8 @@ Extract from the user's request:
 3. **Threshold**: numeric value and comparison ("above 80%", "below 100/s").
 4. **Severity**: implicit from urgency words ("page" → critical, default
    warning otherwise).
-5. **Routing**: explicit direct-channel name(s), or an explicit request to use a confirmed existing org notification policy.
+5. **Routing**: direct channel name(s), or an explicit request to use a
+   confirmed existing org notification policy.
 
 Map signal phrasing to alert type:
 
@@ -114,7 +115,7 @@ inputs* above). Do not pick one.
 
 Once the scope is resolved (either provided by the user or discovered in
 Step 2), check for existing alerts before probing data or authoring a
-new config; both are wasted work if the user wants to update an
+new config: both are wasted work if the user wants to update an
 existing rule instead.
 
 Call `signoz_list_alert_rules` and **paginate through every page**:
@@ -124,7 +125,7 @@ which returns currently triggered/active alert instances and will silently
 miss rules that are configured but not firing right now. Check for existing
 rules that match the user's intent (same signal + same scope + similar
 threshold). If a likely duplicate exists, surface it and ask whether to
-create a new one anyway, modify the existing one (out of scope here; use
+create a new one anyway, modify the existing one (out of scope here: use
 `signoz_update_alert`), or cancel.
 
 ### Step 4: Probe data existence for the chosen filter (fail fast)
@@ -132,7 +133,7 @@ create a new one anyway, modify the existing one (out of scope here; use
 Before authoring any alert config, confirm the **specific combination** the
 alert will watch (metric × service × any other filter) actually emits data.
 The most common silent failure is "metric exists in the catalog *and* the
-service exists in the catalog, but the service doesn't emit that metric":
+service exists in the catalog, but the service doesn't emit that metric";
 each piece checks out in isolation, the alert saves successfully, and it
 silently never fires.
 
@@ -173,6 +174,9 @@ result and ask the user to confirm before save. Treat this exception
 narrowly: it applies to "alert me when bad thing happens" log queries,
 not to alerts that depend on continuous data flow.
 
+This cheap probe catches no-data before the user reviews an alert that cannot
+fire.
+
 ### Step 5: Build the alert config
 
 The MCP server is the source of truth for the alert JSON schema, threshold
@@ -180,15 +184,11 @@ codes, and validation rules. Read the `signoz://alert/instructions` and
 `signoz://alert/examples` MCP resources for the canonical, version-current
 shape.
 
-Threshold/PromQL `condition.thresholds` requires `kind` (use `"basic"`) and a
-non-empty `spec[]`. Anomaly rules omit it.
-
-**Exact absent-only requests.** Current v2 cannot represent `alertOnAbsent` as
-the sole trigger: threshold/PromQL rules still require `condition.thresholds`.
-Stop before `signoz_create_alert`, explain that the exact alert is unavailable,
-and offer a combined threshold + absence rule only with explicit approval of
-its changed semantics; never select a threshold or substitute semantics
-silently.
+Threshold/PromQL `condition.thresholds` requires `kind` (use `"basic"`) and
+non-empty `spec[]`. Current v2 cannot represent `alertOnAbsent` as the sole
+trigger. For an exact absent-only request, stop before any write and offer a
+combined threshold + absence rule only with explicit approval. Anomaly rules
+omit thresholds.
 
 For most user intents, the config is one of a small number of patterns:
 
@@ -197,11 +197,11 @@ For most user intents, the config is one of a small number of patterns:
 | Single-metric threshold | "alert when CPU > 80%", "p99 latency > 2s" |
 | Log volume threshold | "more than N error logs/min" |
 | Trace-based count or p-tile | "p99 span duration > 2s on checkout" |
-| Error-rate formula (A/B*100); see "Common query shapes" below | "error rate > 5%" |
+| Error-rate formula (A/B*100): see "Common query shapes" below | "error rate > 5%" |
 | Anomaly detection (Z-score) | "alert me on anomalous traffic" |
 | Combined threshold + absence (only after approval) | "alert if data stops arriving" |
-| ClickHouse SQL alert; author SQL using the schema in `signoz://alert/examples` | non-trivial joins, custom aggregations the builder cannot express |
-| PromQL alert; delegate to `signoz-generating-queries` for the query, then return here | when user already has PromQL |
+| ClickHouse SQL alert: author SQL using the schema in `signoz://alert/examples` | non-trivial joins, custom aggregations the builder cannot express |
+| PromQL alert: delegate to `signoz-generating-queries` for the query, then return here | when user already has PromQL |
 
 **Threshold `op` and `matchType` values.** Prefer readable words; symbols and
 legacy numeric codes are accepted but discouraged. Valid `op` words are
@@ -218,11 +218,11 @@ Use `above` for anomaly rules: their absolute score covers spikes and drops.
 |  |  | last value breaches | `"last"` |
 
 **Defaults the skill applies (and surfaces in the preview):**
-- `evalWindow: 5m0s`, `frequency: 1m0s`; change only if the intent implies
+- `evalWindow: 5m0s`, `frequency: 1m0s`: change only if the intent implies
   a slower or faster cadence.
-- `matchType: "on_average"` for CPU / memory / latency, which smooths
+- `matchType: "on_average"` for CPU / memory / latency: smooths
   transient spikes.
-- `matchType: "at_least_once"` for error counts / error rates, which
+- `matchType: "at_least_once"` for error counts / error rates:
   catches any breach.
 
 **Severity defaults: derive intrinsic urgency, not just wording.** An explicit
@@ -263,14 +263,15 @@ dotted attribute name with underscores: `service.name` → `service_name`).
 
 #### Common query shapes: conventions
 
-Read `signoz://alert/examples` for the authoritative JSON patterns: error rate,
-p99 latency, log volume, combined threshold + absence, anomaly, PromQL, and
-ClickHouse SQL. The conventions that don't live in the schema:
+Read `signoz://alert/examples` for the authoritative JSON of all
+patterns (error rate, p99 latency, log volume, absent-data, anomaly,
+PromQL, ClickHouse SQL). The conventions that don't live in the
+schema:
 
 - **Error-rate formula:** set `disabled: true` on the component
   queries A and B so only the formula F1 renders in the alert chart
   and notification. The raw counts are intermediate, not the alert
-  signal, and forgetting this clutters the preview with three series and
+  signal: forgetting this clutters the preview with three series and
   confuses the on-call engineer reading the notification.
 - **p99 latency:** the query emits nanoseconds, but express the threshold in
   the user's unit (for example `target: 2`, `targetUnit: "s"`); SigNoz converts
@@ -280,7 +281,7 @@ ClickHouse SQL. The conventions that don't live in the schema:
   size (for example, `60` for “per minute”). Do not invent comparison operators
   inside a formula such as `A * (B >= N)`.
 - **Log volume spike:** prefer `groupBy: service.name` over a hard
-  filter when the user said "any service"; groupBy provides the
+  filter when the user said "any service": groupBy provides the
   scoping AND keeps the notification useful per-service.
 
 ### Step 6: Dry-run the full query and validate the threshold
@@ -289,7 +290,7 @@ Step 4 confirmed data flows. Step 6 does two things:
 
 1. **Validate query shape.** Run the full builder spec (with
    `groupBy`, formulas, disabled component queries, and non-string
-   filters). Step 4's bare `count()` probe doesn't exercise these.
+   filters): Step 4's bare `count()` probe doesn't exercise these.
    The create-alert schema accepts queries that error at evaluation
    (numeric `groupBy`, unquoted bool filter, mismatched aggregation).
    Any HTTP 5xx or "filter type mismatch" = fix the config before
@@ -319,30 +320,24 @@ Run the full primary query (or formula) over the last hour:
 - `signoz_aggregate_logs` / `signoz_aggregate_traces`
   when those fit better.
 - `signoz_query_metrics` when the alert query targets a single
-  known metric by `metricName`; the tool auto-applies aggregation
+  known metric by `metricName`: the tool auto-applies aggregation
   defaults and accepts `filter`, `groupBy`, and `formula` alongside.
   PromQL is not supported here; use `signoz_execute_builder_query`
   for that.
 
-For every persisted alert and dry-run, each `builder_query` and
-`builder_formula` spec must include a positive `limit` plus a non-empty Query
-Builder v5 `order`. Standalone queries and formula results use `limit: 100`.
-Every `builder_query` referenced by a formula uses `limit: 10000`, because
-SigNoz limits each component before formula evaluation; independently ranking
-the top 100 numerator and denominator groups can silently prevent an alert from
-firing. Find those inputs from every formula expression, including formulas
-with `disabled: true`, following formula references until all `builder_query`
-leaves are found. This dependency walk determines bounds only; it does not
-guarantee formula-to-formula evaluation order, so dry-run the complete composite
-payload. Use `__result desc` for metrics/formulas and the primary aggregation
-desc for logs/traces. This field is `order`, not dashboard editor `orderBy`.
-Preserve the fields when copying the validated query into the alert. If expected
-formula-input cardinality can exceed 10000, narrow the filters/grouping and tell
-the user completeness cannot otherwise be guaranteed.
+Every persisted alert and dry-run builder query or formula needs a positive
+`limit` and non-empty Query Builder v5 `order`. Standalone queries and formula
+results use 100; every formula input uses 10000 because its limit applies before
+evaluation. Find inputs from every formula expression, including disabled
+formulas, and follow references to all builder-query leaves. This walk sets
+bounds, not formula evaluation order, so dry-run the complete composite. Use
+`__result desc` for metrics/formulas and the primary aggregation descending for
+logs/traces. Preserve the same specs; narrow filters/grouping if input
+cardinality can exceed 10000.
 
 Compute how many evaluation points breached the proposed threshold.
 Surface in the preview as **"would have fired N times in the last 1h"**.
-A 1h window is too short to grade most alerts; only the upper extreme
+A 1h window is too short to grade most alerts: only the upper extreme
 is actionable:
    - **N is large (e.g. > 30)** → likely alert storm. Surface and
      recommend tightening or adding hysteresis (`recoveryTarget`).
@@ -370,38 +365,43 @@ alert that will never fire.
 ### Step 7: Resolve notification routing
 
 Choose direct or org-policy routing after dry-run and final severity. A missing
-channel does not by itself authorize policy routing.
+channel does not authorize policy routing.
 
-**Org-policy routing (`threshold_rule` / `promql_rule` only; `anomaly_rule` is direct-only):**
+For a confirmed existing org policy on a threshold/PromQL rule, set
+`notificationSettings.usePolicy: true`, preserve the confirmed matcher labels
+and threshold tier, and omit threshold channels and `preferredChannels`. This
+skill does not create policies. If the policy or match criteria are not
+confirmed, stop and ask. Anomaly rules are direct-only.
 
-- Use it only when the user or trusted task context explicitly confirms that an existing org notification policy should match this rule.
-- Set `notificationSettings.usePolicy: true`. Omit direct references in `condition.thresholds.spec[].channels`, and always omit top-level `preferredChannels`; preserve the confirmed user labels and threshold tier that the policy matches.
-- This skill does not create org policies; they are managed in the SigNoz UI or Terraform. Never imply the alert write created one; if its existence or match is unconfirmed, stop and ask.
-- If the payload includes any channel name, reuse a fully paginated result only from the same still-current prepared operation; otherwise call `signoz_list_notification_channels`, refreshing only if state may have changed. The backend validates supplied names even though policy routing ignores them for delivery.
+For direct routing, reuse a fully paginated same-operation channel result or
+page `signoz_list_notification_channels` until `hasMore=false`; its `total`
+counts filtered matches. Match and route by immutable `displayName`, not the
+machine `name`; show `displayName` and `kind` when asking the user to pick.
+Offer creation only from user-provided config and never create automatically.
+Build `signoz_create_notification_channel` arguments from its current input
+schema, which defines the supported provider kinds and identity fields:
+provider settings go inside `config`, never as flat fields. Ask whether the
+user wants a test notification and send `test: true` only if they agree. On
+`PERMISSION_DENIED`, use an
+admin-created channel or a short-lived minimum-role credential from the host's
+secret store. If routing remains unresolved, stop and ask.
 
-**Direct routing:**
+Put exact returned display names in each threshold's `channels`; anomaly rules
+use top-level `preferredChannels`. Never substitute one routing field for the
+other.
 
-1. Reuse a fully paginated `signoz_list_notification_channels` result only from the same still-current prepared operation; otherwise call it and follow `pagination.nextOffset` while `pagination.hasMore` is true. Refresh only if state may have changed.
-2. If the user named a channel ("send to slack-infra"), use it if it exists; otherwise offer the available choices.
-3. If no existing channel fits, offer to call `signoz_create_notification_channel` with the user-provided name, type, and provider-specific config.
-4. If neither path resolves a channel, stop and ask the user for one (see *Required inputs* above).
+#### Updating or handling secret-bearing channel config
 
-Channel creation is admin-gated. On `PERMISSION_DENIED`, have an admin create it
-out of band or configure a dedicated, short-lived minimum-role credential via
-the host's environment/secret store; never request an elevated key in chat or
-tracked config.
+`signoz_update_notification_channel` is full replacement: resolve `id`, get
+the channel, copy complete `config`, change requested fields, then send `id`
+plus full `config`. Do not send or change `name` or `displayName`. Preserve
+credentials and effective `sendResolved` without echoing them. A kind change
+needs the complete new provider config. Update tests require explicit opt-in.
 
-Place the resolved channel according to the rule schema:
-
-- `threshold_rule` / `promql_rule` (v2alpha1): attach direct-routing channels
-  to each `condition.thresholds.spec[N].channels` array, typically warning →
-  Slack only, critical → Slack + PagerDuty.
-- `anomaly_rule` (v1): direct routing only; thresholds are forbidden, so put channel names in top-level `preferredChannels`.
-
-Never put a chosen anomaly channel in a nonexistent thresholds block, or
-substitute `preferredChannels` for per-tier multi-severity routing.
-
-#### Handling secret-bearing channel config
+If a requested test fails after a successful write, report mutation and test
+status separately. On a post-write auth error with `mutationCommitted: true`,
+retain the id and inspect after authentication; do not replay mutation or test.
+Transport success does not prove final provider delivery.
 
 Slack webhook URLs, PagerDuty integration keys, and similar webhook tokens
 are secrets. When the user supplies them inline, treat them as opaque
@@ -410,8 +410,8 @@ inputs and follow these rules:
 - **Do not echo the secret back.** Never include the webhook URL,
   integration key, or any password-like token in chat output, previews,
   confirmation messages, summaries, or the `<navigation_suggestions>`
-  payload. Refer to the channel by its `name` only ("Slack channel
-  `slack-infra` created") and omit the value entirely.
+  payload. Refer to the channel by its `displayName` only ("Slack channel
+  `Platform Alerts` created") and omit the value entirely.
 - **Do not stash secrets in clarification context.** If you need to ask the
   user a follow-up question after they pasted a secret, do not include
   the secret value in the clarification `message`, `discovered_context`,
@@ -420,7 +420,7 @@ inputs and follow these rules:
 - **One-pass only.** Pass the secret directly to
   `signoz_create_notification_channel` and do not retain it in any
   intermediate prose. After the create call succeeds, refer to the
-  channel by name; after a failure, ask the user to re-paste rather than
+  channel by display name; after a failure, ask the user to re-paste rather than
   echoing what they sent.
 - **If the user instead asks "how do I set up a Slack channel?"**: that
   is a docs question, not a create-channel request. Answer with the docs
@@ -430,8 +430,8 @@ inputs and follow these rules:
 
 ### Step 8: Preview the prepared config
 
-Emit a one-paragraph plain-language summary of what will be created,
-with no raw JSON dump. The user-facing facts (what fires, on what scope, at
+Emit a one-paragraph plain-language summary of what will be created:
+no raw JSON dump. The user-facing facts (what fires, on what scope, at
 what threshold, where it routes) are captured by the summary; clicking
 through the JSON does not catch query-shape errors (Step 6's dry-run
 does).
@@ -457,41 +457,45 @@ does).
 
 ## Guardrails
 
-- **Strict inputs over guessing** Resource attribute and notification routing are
-  required. Direct routing needs a channel; policy routing needs confirmation of an existing matching policy.
+- **Strict inputs over guessing** Resource attribute and notification routing
+  are required. Direct routing needs a channel; policy routing needs a confirmed
+  existing match and does not require a direct channel.
 - **Always paginate `signoz_list_alert_rules`** Stopping at page 1 misses
   duplicates and produces noise.
 - **Dry-run is mandatory** Complete Steps 4 and 6 before
   `signoz_create_alert`; a never-firing alert creates false confidence.
 - **Threshold operators use canonical words** Prefer valid words, never
   `equals`. Numeric codes (`"1"`–`"7"`)
-  are accepted but discouraged, as with `matchType`
+  are accepted but discouraged: same goes for `matchType`
   (`"on_average"` / `"at_least_once"`, not `"3"` / `"1"`).
 - **Signal must match alertType** `signal: "logs"` requires
   `LOGS_BASED_ALERT`. Mismatches fail validation.
 - **Anomaly rules are metrics-only** `anomaly_rule` + non-metric alertType
   is rejected.
-- **Routing must match the selected mode.** Direct threshold/PromQL routes use exact names from `signoz_list_notification_channels`
-  in per-threshold `channels`; direct anomaly routes use `preferredChannels`. Confirmed policy routes (threshold/PromQL only) set
-  `notificationSettings.usePolicy: true` and may omit direct channels; verify every name supplied in either mode.
+- **Routing must be confirmed.** Direct routes use exact returned
+  `displayName` values from the fully paginated
+  `signoz_list_notification_channels`; put them in per-threshold
+  `channels` for threshold/PromQL rules or top-level `preferredChannels` for
+  anomaly rules. Confirmed policy routes set `notificationSettings.usePolicy`
+  and omit direct channel fields.
 - **Never echo channel secrets.** Slack webhook URLs, PagerDuty integration
   keys, and similar webhook tokens are secrets. Pass them to
   `signoz_create_notification_channel` once and never repeat the
   value in chat output, previews, confirmations, summaries, clarification
-  payloads, or navigation suggestions. Refer to the channel by name only
+  payloads, or navigation suggestions. Refer to the channel by display name only
   after creation; ask the user to re-paste on failure rather than
   reproducing what they sent.
 
 ## Examples
 
-Four canonical alert flows (multi-severity metric threshold,
-error-rate formula, log-volume groupBy, anomaly detection) live in
+Four canonical alert flows (multi-severity metric threshold, error-rate
+formula, log-volume groupBy, and anomaly detection) live in
 [`references/examples.md`](references/examples.md).
 
 ## Additional resources
 
-- `signoz://alert/instructions` and `signoz://alert/examples` MCP resources
-  hold the full alert config JSON schema, threshold codes, filter expression
+- `signoz://alert/instructions` and `signoz://alert/examples` MCP resources:
+  full alert config JSON schema, threshold codes, filter expression
   syntax, and version-current pattern examples. Always preferred over any
   transcribed copy.
 - `signoz-generating-queries` skill: for authoring PromQL or testing queries

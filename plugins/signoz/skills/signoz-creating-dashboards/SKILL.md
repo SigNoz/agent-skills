@@ -409,16 +409,16 @@ series carries a single `signoz/CompositeQuery` envelope holding both.
 
 ##### Step 3b-ii.6: Dry-run before save (mandatory)
 
-For every query-bearing panel, read the compact
-[`dashboard-to-query-builder-v5` reference](./references/dashboard-to-query-builder-v5.md).
+For every query-bearing panel, follow "Dry-run a panel query" in
+`signoz://dashboard/widgets-instructions`.
 The panel already stores the execution spec, so lift it into the outer envelope
 and call `signoz_execute_builder_query` with that payload, never panel JSON.
 Dry-run over a short absolute Unix-ms window (usually the last 30-60 minutes),
-never the panel's display range by reflex; apply the reference's dry-run hygiene
-rules before widening or retrying after a timeout. Use representative variable
+never the panel's display range by reflex; apply that section's empty-result and
+timeout rules before widening or retrying. Use representative variable
 values in the dry-run copy and keep `$var` in `signoz_create_dashboard`.
 
-If the reference's safety gate finds an unsupported execution field, report the
+If the executor cannot represent a saved field, report the
 panel as unvalidated and continue only after explicit user acceptance. Server or
 validation errors block. Unexpected empty results block unless the user already
 accepted absent telemetry.
