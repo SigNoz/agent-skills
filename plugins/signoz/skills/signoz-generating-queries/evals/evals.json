@@ -164,7 +164,7 @@
       "prompt": "Build and run one scalar Query Builder payload by host over the last hour: A is average CPU utilization, B is latest memory usage, hidden C is average per-second request rate from a monotonic request counter, and F=C*60 converts that average rate to requests per minute. Keep A, B, and F visible.",
       "expected_output": "Agent discovers the metrics and labels and puts an explicit reducer on every scalar metric aggregation, including the hidden counter input. It preserves the distinct requested statistics instead of using one reducer for the whole payload.",
       "expectations": [
-        "Every scalar metric aggregation in the executed builder payload has reduceTo, including disabled formula inputs",
+        "The executed builder payload uses requestType=scalar and absolute Unix-ms bounds for the last hour; every metrics aggregation has reduceTo, including disabled formula inputs",
         "CPU query A uses timeAggregation=avg and reduceTo=avg; memory query B uses timeAggregation=latest and reduceTo=last",
         "Hidden counter input C uses timeAggregation=rate and reduceTo=avg; visible formula F uses expression C*60 (allow equivalent spacing), preserving the requested average-rate statistic",
         "Metric and formula order keys use __result or a valid groupBy key, not a query name or __result_0",
@@ -179,8 +179,8 @@
       "prompt": "What is the average CPU utilization for checkout over the last hour?",
       "expected_output": "Agent discovers the gauge and metric labels, then uses signoz_query_metrics with requestType=scalar and average semantics rather than constructing raw Query Builder JSON.",
       "expectations": [
-        "Agent uses signoz_query_metrics for the scalar metric question",
-        "Metric names and service labels come from discovery",
+        "The actual signoz_query_metrics call uses requestType=scalar and timeRange=1h (or equivalent explicit start/end bounds)",
+        "Metric names, the service label, and the checkout value come from discovery; the actual query filters using that label and value",
         "Agent uses average semantics, not a sum or latest reducer"
       ],
       "files": []
@@ -189,11 +189,11 @@
       "id": 15,
       "eval_name": "aggregate-order-recovery",
       "prompt": "Run a trace error-rate ranking by service with count queries A and B and formula F=A/B*100. A prior attempt ordered both count queries by __result_0 and failed; the backend said valid keys are 0, count(), service.name. Order F by error percentage descending.",
-      "expected_output": "Agent discovers trace fields, fixes the count query order using a valid aggregation key, and keeps __result for the formula ranking. It does not copy formula ordering to trace aggregates or guess A or timestamp.",
+      "expected_output": "Agent discovers trace fields, fixes the count query order using a valid aggregation or discovered service group key, and keeps __result for the formula ranking. It does not copy formula ordering to trace aggregates or guess A or timestamp.",
       "expectations": [
-        "Trace count input order keys are count() or 0, not __result, __result_0, A, or timestamp",
+        "Trace count input order keys are count(), 0, or the discovered service groupBy key returned among the valid backend keys; they are not __result, __result_0, A, or timestamp",
         "The formula order uses __result desc",
-        "The actual builder payload keeps formula input limits at 10000 and result limit at 100",
+        "The actual builder payload uses requestType=scalar and absolute Unix-ms bounds for the last hour, with formula input limits at 10000 and result limit at 100",
         "No reduceTo is invented for log/trace aggregation expressions",
         "Both A and B group by the same discovered trace service key; A filters to error spans and B counts all spans so F ranks service error percentages"
       ],
