@@ -88,7 +88,7 @@ Dashboards use the **Perses schema (`schemaVersion: "v6"`)**: panels are a map, 
 | Selected-panel variable wiring and dry-run | 19 |
 | `ListVariable` + `signoz/DynamicVariable` shape | 17, 19 |
 | No `JSON.stringify` on `spec` / `panels` / `layouts` / `tags` / `variables` | 12 |
-| Per-panel required fields, plugin `kind`, and its single query envelope | 12, 14, 15 |
+| Query-panel required fields, plugin `kind`, and its single outer query wrapper | 12, 14, 15 |
 | Envelope: `schemaVersion` v6, no top-level `name`, `spec.display.name` as title, key/value tags | 12 |
 | 12-column bounds, no overlapping grid items | 16 |
 | Scope boundary — don't call `signoz_update_dashboard` or `signoz_patch_dashboard` from this skill | 11 |
@@ -99,7 +99,7 @@ Dashboards use the **Perses schema (`schemaVersion: "v6"`)**: panels are a map, 
 | Metrics `order` key is the composed `spaceAggregation(timeAggregation(metricName))` | 6 |
 | Filters are one `filter.expression` string | 14, 24 |
 | Result bounds preserved: 100 standalone, 10000 formula inputs, 100 `__result` formula output | 9, 10, 16, 22 |
-| One query per panel — multi-series via `signoz/CompositeQuery` (backend-enforced, not schema-enforced) | 9, 16 |
+| Exactly one outer query wrapper per query panel; nested `signoz/CompositeQuery` supports multiple queries and formulas where the panel supports them | 9, 16 |
 | Text panels use `signoz/TextPanel`, non-null `queries: []`, and no query dry-run | 26 |
 | Known system dashboard ids can be fetched, but non-user sources cannot be modified | 27 |
 | Legacy dashboard payload fields are rejected instead of mixed with v6 Perses fields | 28 |
