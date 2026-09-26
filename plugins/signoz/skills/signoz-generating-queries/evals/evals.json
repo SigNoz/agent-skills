@@ -165,9 +165,11 @@
       "expected_output": "Agent discovers the metrics and labels and puts an explicit reducer on every scalar metric aggregation, including the hidden counter input. It preserves the distinct requested statistics instead of using one reducer for the whole payload.",
       "expectations": [
         "Every scalar metric aggregation in the executed builder payload has reduceTo, including disabled formula inputs",
-        "The CPU average uses reduceTo=avg and latest memory uses reduceTo=last",
+        "CPU query A uses timeAggregation=avg and reduceTo=avg; memory query B uses timeAggregation=latest and reduceTo=last",
         "Hidden counter input C uses timeAggregation=rate and reduceTo=avg; visible formula F uses expression C*60 (allow equivalent spacing), preserving the requested average-rate statistic",
-        "Metric and formula order keys use __result or a valid groupBy key, not a query name or __result_0"
+        "Metric and formula order keys use __result or a valid groupBy key, not a query name or __result_0",
+        "A, B, and C group by the same discovered host key; A, B, and F remain visible while C is disabled",
+        "Hidden formula input C uses limit=10000; standalone A/B and formula result F each use limit=100"
       ],
       "files": []
     },
@@ -192,7 +194,8 @@
         "Trace count input order keys are count() or 0, not __result, __result_0, A, or timestamp",
         "The formula order uses __result desc",
         "The actual builder payload keeps formula input limits at 10000 and result limit at 100",
-        "No reduceTo is invented for log/trace aggregation expressions"
+        "No reduceTo is invented for log/trace aggregation expressions",
+        "Both A and B group by the same discovered trace service key; A filters to error spans and B counts all spans so F ranks service error percentages"
       ],
       "files": []
     }
