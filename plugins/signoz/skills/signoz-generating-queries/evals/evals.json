@@ -161,12 +161,12 @@
     {
       "id": 13,
       "eval_name": "scalar-metric-builder-reducers",
-      "prompt": "Build and run a scalar Query Builder comparison of average CPU utilization and the latest memory usage by host over the last hour. Keep both metric queries in one builder payload, and include a hidden monotonic request-counter input for a formula.",
+      "prompt": "Build and run one scalar Query Builder payload by host over the last hour: A is average CPU utilization, B is latest memory usage, hidden C is average per-second request rate from a monotonic request counter, and F=C*60 converts that average rate to requests per minute. Keep A, B, and F visible.",
       "expected_output": "Agent discovers the metrics and labels and puts an explicit reducer on every scalar metric aggregation, including the hidden counter input. It preserves the distinct requested statistics instead of using one reducer for the whole payload.",
       "expectations": [
         "Every scalar metric aggregation in the executed builder payload has reduceTo, including disabled formula inputs",
         "The CPU average uses reduceTo=avg and latest memory uses reduceTo=last",
-        "The counter reducer follows the intended statistic and the metrics aggregation guide",
+        "Hidden counter input C uses timeAggregation=rate and reduceTo=avg; visible formula F uses expression C*60 (allow equivalent spacing), preserving the requested average-rate statistic",
         "Metric and formula order keys use __result or a valid groupBy key, not a query name or __result_0"
       ],
       "files": []

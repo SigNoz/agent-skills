@@ -191,9 +191,8 @@ spike may fall outside the returned set.
 For scalar metric builder queries, set `reduceTo` on every metrics aggregation,
 including hidden formula inputs. Read `signoz://metrics-aggregation-guide` and
 choose the reducer for the intended statistic: `avg` for an average, `last` for
-the latest value, `sum` when summing the buckets is intended. The metric-type
-default is `sum` for monotonic counters and `avg` for gauges, non-monotonic sums,
-and histograms. Prefer `signoz_query_metrics` for ordinary scalar metrics; it
+the latest value, `sum` when summing the buckets is intended. Use the guide for
+current metric-type defaults. Prefer `signoz_query_metrics` for ordinary scalar metrics; it
 handles metadata and defaults. Keep explicit reducers in authored builder payloads
 so the query works when copied into an explorer or sent to a server without
 missing-reducer defaults.
