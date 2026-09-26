@@ -113,7 +113,7 @@
       "id": 9,
       "eval_name": "custom-build-slo-error-budget-formula",
       "prompt": "Build me an SLO dashboard for the checkout service: 99.9% availability target, 28-day rolling window, show error-budget burn rate and remaining budget.",
-      "expected_output": "SLO/error-budget dashboard has no catalog template. Agent paginates signoz_list_dashboards, checks signoz_list_dashboard_templates, discovers span metrics and the checkout service, then builds in Builder mode. With A=error requests and B=total requests, availability is (1-A/B)*100, remaining error budget is ((1-A/B)-0.999)/(1-0.999)*100, and burn rate is (A/B)/(1-0.999). Because a panel holds exactly one query, each computed panel wraps A, B, and the formula in a single signoz/CompositeQuery. The payload does not invent timeRange or refresh fields: panels follow the viewer-selected global range, so the summary tells the user to select 28d after creation. Filters use service.name, and every panel is dry-run before signoz_create_dashboard.",
+      "expected_output": "SLO/error-budget dashboard has no catalog template. Agent paginates signoz_list_dashboards, checks signoz_list_dashboard_templates, discovers span metrics and the checkout service, then builds in Builder mode. With A=error requests and B=total requests, availability is (1-A/B)*100, remaining error budget is ((1-A/B)-0.999)/(1-0.999)*100, and burn rate is (A/B)/(1-0.999). Each computed panel has exactly one outer query wrapper in spec.queries, with A, B, and the formula inside a nested signoz/CompositeQuery. The payload does not invent timeRange or refresh fields: panels follow the viewer-selected global range, so the summary tells the user to select 28d after creation. Filters use service.name, and every panel is dry-run before signoz_create_dashboard.",
       "expectations": [
         "Agent calls signoz_list_dashboard_templates and finds no matching SLO/error-budget template before custom build",
         "Agent calls signoz_list_metrics to discover signoz_calls_total or signoz_latency_bucket span metrics (or equivalent) before authoring",
@@ -126,7 +126,7 @@
         "Each dry-run base query carries the service restriction under filter.expression and does not send the dashboard filters alias",
         "Every saved base metric query referenced by the formula has limit=10000 plus order on its primary aggregation, while every formula-input builder_query in the dry-run has the same limit and order; saved and dry-run formulas each have limit=100 and use __result desc",
         "The actual signoz_execute_builder_query call contains builder_query envelopes named A and B plus a sibling builder_formula envelope named F1 with its expression; no execution spec contains dashboard-only queryName or dataSource",
-        "The actual signoz_execute_builder_query call contains builder_query envelopes named A and B plus a sibling builder_formula envelope named F1 with its expression; the panel holds those same three members inside one signoz/CompositeQuery",
+        "The actual signoz_execute_builder_query call contains builder_query envelopes named A and B plus a sibling builder_formula envelope named F1 with its expression; the panel has exactly one outer spec.queries entry whose spec.plugin is signoz/CompositeQuery, with those same three members in the nested plugin.spec.queries array",
         "The signoz_create_dashboard payload is v6 Perses with spec.panels and Grid layouts; formulas remain inside one panel query and no legacy queryData/queryFormulas fields are persisted"
       ],
       "files": []
@@ -148,7 +148,7 @@
       "id": 12,
       "eval_name": "shape-check-no-stringify",
       "prompt": "Create a dashboard with one timeseries panel showing service request rate for the checkout service. Walk me through the create call.",
-      "expected_output": "Agent walks the standard custom-build path: list_dashboards, list_dashboard_templates (no exact 'request rate one panel' template), discovery via list_metrics + get_field_keys, reads dashboard MCP resources. Builds the JSON, dry-runs the panel via signoz_execute_builder_query, then emits a plain-language summary and calls signoz_create_dashboard. CRITICAL: the payload sent to signoz_create_dashboard must have spec, panels, layouts, tags, and variables as native JSON objects/arrays: NOT as JSON.stringify'd strings. Required top-level fields are schemaVersion and spec; the title lives at spec.display.name and the top-level name is omitted so the server derives it. Each panel must include kind and spec with display, plugin, and exactly one query. Agent must NOT wrap any of these in a JSON string.",
+      "expected_output": "Agent walks the standard custom-build path: list_dashboards, list_dashboard_templates (no exact 'request rate one panel' template), discovery via list_metrics + get_field_keys, reads dashboard MCP resources. Builds the JSON, dry-runs the panel via signoz_execute_builder_query, then emits a plain-language summary and calls signoz_create_dashboard. CRITICAL: the payload sent to signoz_create_dashboard must have spec, panels, layouts, tags, and variables as native JSON objects/arrays: NOT as JSON.stringify'd strings. Required top-level fields are schemaVersion and spec; the title lives at spec.display.name and the top-level name is omitted so the server derives it. The query panel must include kind and spec with display, plugin, and exactly one outer query wrapper in spec.queries. Agent must NOT wrap any of these in a JSON string.",
       "expectations": [
         "Agent runs signoz_execute_builder_query as a dry-run for the panel before signoz_create_dashboard",
         "Each grid item's content.$ref is '#/spec/panels/<the panel id>', never a bare panel id",
@@ -459,12 +459,12 @@
       "id": 26,
       "eval_name": "direct-text-panel-perses",
       "prompt": "Create a dashboard with a markdown panel explaining the checkout SLO and one request-rate chart.",
-      "expected_output": "Agent creates a v6 Perses dashboard with a signoz/TextPanel in markdown mode and queries:[], plus one query panel with exactly one query. Both have Grid items; only the chart is dry-run.",
+      "expected_output": "Agent creates a v6 Perses dashboard with a signoz/TextPanel in markdown mode and non-null queries:[], plus one query panel with exactly one outer query wrapper in spec.queries. Both have Grid items; only the chart is dry-run.",
       "expectations": [
         "spec.panels is a map and every panel has one Grid item whose content.$ref points to #/spec/panels/<id>",
         "The signoz/TextPanel uses mode='markdown' and a non-null empty queries array",
         "No query discovery or signoz_execute_builder_query call is made for the TextPanel",
-        "The request-rate panel has exactly one query and is dry-run before create",
+        "The request-rate panel has exactly one outer query wrapper in spec.queries and is dry-run before create",
         "No legacy widgets, panelTypes, panelMap, queryData, or selectedLogFields fields are persisted"
       ],
       "files": []
