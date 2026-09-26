@@ -188,6 +188,23 @@ can exceed 10000. This wire field is `order`, not dashboard editor `orderBy`.
 Time-series top-N ranks groups over the whole window, so a short-lived local
 spike may fall outside the returned set.
 
+For scalar metric builder queries, set `reduceTo` on every metrics aggregation,
+including hidden formula inputs. Read `signoz://metrics-aggregation-guide` and
+choose the reducer for the intended statistic: `avg` for an average, `last` for
+the latest value, `sum` when summing the buckets is intended. Use the guide for
+current metric-type defaults. Prefer `signoz_query_metrics` for ordinary scalar metrics; it
+handles metadata and defaults. Keep explicit reducers in authored builder payloads
+so the query works when copied into an explorer or sent to a server without
+missing-reducer defaults.
+
+Choose `order[].key.name` for the actual signal and aggregation. For log/trace
+aggregates, use an aggregation expression such as `count()`, its declared alias,
+a zero-based aggregation index such as `"0"`, or a discovered `groupBy` key.
+Metrics and formula results use `__result`; raw rows use `timestamp`. A query
+name such as `A`, `__result_0`, or `timestamp` is not a generic aggregate order
+key. If an order fails, use the valid keys returned in the error for that query;
+do not cycle through guessed keys or silently change the requested ranking.
+
 **`requestType` decision for aggregations:**
 - `scalar` (default): "How many?", "What is the p99?", "Which service has the most?"
 - `time_series`: "When did errors spike?", "How did latency change?", "Show trend"
