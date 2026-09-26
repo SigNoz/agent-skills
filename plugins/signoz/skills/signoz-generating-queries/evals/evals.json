@@ -157,6 +157,44 @@
         "Agent does not use searchText with the default body scope because the request says all log fields"
       ],
       "files": []
+    },
+    {
+      "id": 13,
+      "eval_name": "scalar-metric-builder-reducers",
+      "prompt": "Build and run a scalar Query Builder comparison of average CPU utilization and the latest memory usage by host over the last hour. Keep both metric queries in one builder payload, and include a hidden monotonic request-counter input for a formula.",
+      "expected_output": "Agent discovers the metrics and labels and puts an explicit reducer on every scalar metric aggregation, including the hidden counter input. It preserves the distinct requested statistics instead of using one reducer for the whole payload.",
+      "expectations": [
+        "Every scalar metric aggregation in the executed builder payload has reduceTo, including disabled formula inputs",
+        "The CPU average uses reduceTo=avg and latest memory uses reduceTo=last",
+        "The counter reducer follows the intended statistic and the metrics aggregation guide",
+        "Metric and formula order keys use __result or a valid groupBy key, not a query name or __result_0"
+      ],
+      "files": []
+    },
+    {
+      "id": 14,
+      "eval_name": "scalar-metric-prefers-convenience-tool",
+      "prompt": "What is the average CPU utilization for checkout over the last hour?",
+      "expected_output": "Agent discovers the gauge and metric labels, then uses signoz_query_metrics with requestType=scalar and average semantics rather than constructing raw Query Builder JSON.",
+      "expectations": [
+        "Agent uses signoz_query_metrics for the scalar metric question",
+        "Metric names and service labels come from discovery",
+        "Agent uses average semantics, not a sum or latest reducer"
+      ],
+      "files": []
+    },
+    {
+      "id": 15,
+      "eval_name": "aggregate-order-recovery",
+      "prompt": "Run a trace error-rate ranking by service with count queries A and B and formula F=A/B*100. A prior attempt ordered both count queries by __result_0 and failed; the backend said valid keys are 0, count(), service.name. Order F by error percentage descending.",
+      "expected_output": "Agent discovers trace fields, fixes the count query order using a valid aggregation key, and keeps __result for the formula ranking. It does not copy formula ordering to trace aggregates or guess A or timestamp.",
+      "expectations": [
+        "Trace count input order keys are count() or 0, not __result, __result_0, A, or timestamp",
+        "The formula order uses __result desc",
+        "The actual builder payload keeps formula input limits at 10000 and result limit at 100",
+        "No reduceTo is invented for log/trace aggregation expressions"
+      ],
+      "files": []
     }
   ]
 }
