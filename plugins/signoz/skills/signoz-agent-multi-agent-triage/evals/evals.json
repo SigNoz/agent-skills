@@ -1,0 +1,59 @@
+{
+  "skill_name": "signoz-agent-multi-agent-triage",
+  "evals": [
+    {
+      "id": 0,
+      "eval_name": "tool-error-with-upstream",
+      "prompt": "My opencode agent is failing in a fleet with claude-code and codex. Service name is notch. Why did it fail?",
+      "expected_output": "Agent queries SigNoz for opencode's gen_ai spans filtered by gen_ai.agent.id, finds the STATUS_CODE_ERROR span, then runs the upstream handoff query (notch.handoff.to = opencode) to check whether claude-code handed off a corrupt payload. Classifies the failure (Tool/process error, or Upstream bad handoff if the upstream span errored), outputs a root-cause report with an Evidence section citing the specific span and timestamp, and offers signoz-creating-alerts for recurrence.",
+      "expectations": [
+        "Queries distributed_signoz_index_v3 with `resource_string_service$$name` = 'notch' and gen_ai.agent.id = 'opencode'",
+        "Identifies error spans by status_code = 2 (STATUS_CODE_ERROR), not by a text field",
+        "Runs the upstream handoff query filtering notch.handoff.to = 'opencode'",
+        "Ranks the cause using Error > Stall > Overflow > Budget > Bad handoff",
+        "Produces a report with Root cause, Evidence, and Suggested fix",
+        "Offers signoz-creating-alerts to catch a recurrence"
+      ],
+      "files": []
+    },
+    {
+      "id": 1,
+      "eval_name": "context-overflow-and-cost",
+      "prompt": "My planner agent is spending far more per turn than the others and slowing down. Fleet service: notch.",
+      "expected_output": "Agent pulls the planner's turn spans, then runs the GROUP BY query comparing avg input tokens and avg cost against the fleet baseline. Classifies as Context window overflow or Budget overrun when the planner's avg_tokens_in exceeds ~2x the fleet average, and suggests reducing the baton payload or adding a summariser step rather than blaming the model.",
+      "expectations": [
+        "Runs the fleet GROUP BY gen_ai.agent.id baseline query for avg input tokens and cost",
+        "Flags the agent when avg_tokens_in exceeds ~2x the fleet average",
+        "Classifies as Context window overflow or Budget overrun",
+        "Suggests reducing baton payload size or adding a summariser agent"
+      ],
+      "files": []
+    },
+    {
+      "id": 2,
+      "eval_name": "no-spans-never-ran",
+      "prompt": "The baton was passed to kiro but it shows 0 turns and nothing appears in SigNoz. Service: notch.",
+      "expected_output": "Agent queries SigNoz for kiro's spans, gets zero rows, and classifies as 'Not instrumented / never ran' rather than inventing a failure. Advises checking the OTel exporter and that the adapter sets gen_ai.agent.id on its spans, and does not fabricate root causes from empty data.",
+      "expectations": [
+        "Queries SigNoz for kiro spans and handles the zero-row result",
+        "Classifies as Not instrumented / never ran",
+        "Suggests checking the OTel exporter and the gen_ai.agent.id attribute",
+        "Does not fabricate a failure when there is no data"
+      ],
+      "files": []
+    },
+    {
+      "id": 3,
+      "eval_name": "healthy-no-invention",
+      "prompt": "Triage opencode in the notch fleet — did it fail on its last few turns?",
+      "expected_output": "Agent pulls opencode's recent gen_ai.agent.turn spans, finds every status_code = 1 (OK) with no error spans, and reports the agent as healthy with its turn count and slowest turn. It explicitly does not invent a failure or run the upstream/handoff drill-down when there is nothing wrong.",
+      "expectations": [
+        "Pulls opencode's recent gen_ai.agent.turn spans",
+        "Detects that all spans are status_code = 1 (OK)",
+        "Reports the agent as healthy with turn count and slowest turn",
+        "Does not fabricate a failure or run unnecessary drill-down queries"
+      ],
+      "files": []
+    }
+  ]
+}
