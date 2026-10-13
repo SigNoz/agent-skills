@@ -123,11 +123,7 @@ Report these as separate facts, each from its own source:
   `signoz_get_alert`.
 - **Notification delivery**: no SigNoz alert tool returns it. A firing
   transition, a configured channel, or a passed channel test does not show
-  that a notification was sent or received. If the user asks and the
-  workspace ingests SigNoz's own logs, `service.name = 'signoz'` logs with
-  body `Notify for alerts failed` show failed sends per `receiver` (channel),
-  not per rule. Successful sends are logged at debug level, so a missing
-  failure log does not prove delivery.
+  that a notification was sent or received.
 
 Do not derive one from another. A disabled rule can still have earlier fires
 in the lookback, and an empty history does not show the rule is inactive now.
