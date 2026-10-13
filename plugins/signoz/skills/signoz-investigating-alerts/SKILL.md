@@ -68,10 +68,10 @@ investigate. Respond with:
 > there is no fire window to investigate. Use `signoz-explaining-alerts` to
 > walk through the rule, or check whether the alert is enabled."
 
-Never shorten this to "has not fired": retention, a rule recreated under a new
-ID, or an unfetched page can empty the history. If a history call fails, say the
-history could not be read. Keep firing history, current `state`, `disabled`, and
-notification delivery (no MCP tool reports it) as separate facts.
+Never shorten this to "has not fired": retention or a rule recreated under a new
+ID can empty a complete history. If a history call fails or pagination stops
+early, say the history could not be fully read. Keep firing history, current
+`state`, `disabled`, and notification delivery as separate facts.
 
 ## Workflow
 
@@ -301,7 +301,7 @@ the full picture. The chip surface is capped; the prose is not.
   evidence is missing, lower confidence and say so.
 - **A failed or partial read rules nothing out.** An errored or timed-out query
   is "not checked". Capped trace or log samples support claims only about their
-  rows; "none", "all", or a total needs a complete aggregate.
+  rows; "none", "all", or a total for the window needs a complete aggregate.
 - **Show the supporting query** with each hypothesis so the user can
   reproduce and dig deeper.
 - **Keep it short and evidence-backed.** TL;DR is one or two sentences max; the

@@ -107,10 +107,10 @@ overall rule remains continuously firing.
 
 If the complete history has no firing transitions, report what the tool
 returned: "No firing events were returned for the last 7d." Do not shorten
-this to "has not fired" or "never fired". History can be missing because of
-retention, because the rule was recreated under a new ID, or because a page was
-never fetched. Add that caveat when the user relies on the answer, for example
-when they expected the alert to fire. If a history call fails or pagination
+this to "has not fired" or "never fired". Complete history can still miss
+fires because of retention or because the rule was recreated under a new ID.
+Add that caveat when the user relies on the answer, for example when they
+expected the alert to fire. If a history call fails or pagination
 stops before `nextCursor` is absent, say the history is incomplete and report
 any count as "at least N"; never report zero from a failed or partial read.
 
@@ -121,9 +121,10 @@ Report these as separate facts, each from its own source:
   instances from `signoz_list_alerts`.
 - **Configuration**: `disabled`, thresholds, and routing from
   `signoz_get_alert`.
-- **Notification delivery**: no SigNoz MCP tool reports it. A firing
-  transition or a configured channel does not show that a notification was
-  sent or received.
+- **Notification delivery**: report it only from a loaded tool that returns
+  delivery status; otherwise say delivery was not checked. A firing transition
+  or a configured channel does not show that a notification was sent or
+  received.
 
 Do not derive one from another. A disabled rule can still have earlier fires
 in the lookback, and an empty history does not show the rule is inactive now.

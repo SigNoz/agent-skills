@@ -250,12 +250,12 @@ each result:
    any response that reports more pages (`hasMore: true`, a `nextCursor`, or a
    "more results exist" note). Claims cover only the returned rows ("the 100
    most recent matching logs all come from pod-a"). Never present a count of
-   returned rows as a total, and never say "none" or "all" from a partial
-   result.
+   returned rows as a total, and never claim "none" or "all" for the full
+   scope or window from a partial result.
 3. **Complete result**: a successful aggregate over the full requested scope
    and window, or a raw search that returned fewer rows than `limit` with no
    further pages (including zero rows). Only this supports "none", "all", or a
-   total. For a total larger than one page, use `signoz_aggregate_logs` or
+   total over the full scope. For a total larger than one page, use `signoz_aggregate_logs` or
    `signoz_aggregate_traces` with `aggregation: count`.
 
 **Data returned:**
@@ -279,11 +279,14 @@ beyond it:
    suggest a wider range. Older data seen in a wider window is outside the
    requested window, not recent activity.
 3. **Not found in discovery**: the metric, field, or service is absent from
-   discovery results. Discovery is itself windowed (`signoz_list_services`
-   defaults to 6h and `signoz_list_metrics` to 1h), so report "not seen in
-   <window>" rather than "does not exist" or "not instrumented". Missing
-   instrumentation is one possibility to check, alongside a wider window or a
-   different name.
+   discovery results. Discovery is windowed (`signoz_list_services` defaults
+   to 6h and `signoz_list_metrics` to 1h) and capped. First make the list
+   complete: follow `signoz_list_services` pages until `hasMore=false`, and if
+   `signoz_list_metrics` reports more results, narrow it with `searchText`. A
+   miss in a truncated list shows nothing. From a complete list, report "not
+   seen in <window>" rather than "does not exist" or "not instrumented".
+   Missing instrumentation is one possibility to check, alongside a wider
+   window or a different name.
 
 **Drill-down:**
 - If an aggregation reveals an interesting pattern (spike, outlier service),
