@@ -1,5 +1,12 @@
 # Examples: `signoz-creating-alerts`
 
+## Contents
+
+- Metric threshold with multi-severity routing
+- Error-rate formula alert
+- Log-volume threshold with groupBy
+- Anomaly detection (z-score)
+
 Four canonical alert flows: simple metric threshold, error-rate formula,
 log-volume groupBy, and anomaly detection.
 
@@ -20,7 +27,8 @@ log-volume groupBy, and anomaly detection.
 5. Builds JSON: `METRIC_BASED_ALERT`, `threshold_rule`,
    `signal=metrics`, two thresholds named `warning` and `critical`
    (`op="above"`, `matchType="on_average"`, `targetUnit="percent"`),
-   `labels.severity: critical` (the highest tier), filter
+   `labels.severity: critical` (the highest tier; direct routing still sends
+   each tier to its own channels by `threshold.name`), filter
    `service.name = 'checkout'`.
 6. Dry-run via `signoz_execute_builder_query` over last 1h: returns data,
    would have fired 0 times (clean baseline).

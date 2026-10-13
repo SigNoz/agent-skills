@@ -174,9 +174,6 @@ result and ask the user to confirm before save. Treat this exception
 narrowly: it applies to "alert me when bad thing happens" log queries,
 not to alerts that depend on continuous data flow.
 
-This cheap probe catches no-data before the user reviews an alert that cannot
-fire.
-
 ### Step 5: Build the alert config
 
 The MCP server is the source of truth for the alert JSON schema, threshold
@@ -235,14 +232,16 @@ Use `above` for anomaly rules: their absolute score covers spikes and drops.
    stays `info`). A cue tied to one threshold ("page me at 90%") applies
    only to that tier. Ask when urgency cues conflict on the same tier.
 3. Name each threshold tier by its severity and set `labels.severity` to the
-   highest tier; anomaly rules have no tiers, so set only the label. The
-   Step 8 preview states each tier's severity and why: table row or user cue.
+   highest tier (the MCP server defaults a missing label to `warning`). Every
+   firing carries that label, so on a multi-tier rule only `threshold.name`
+   shows which tier fired. Anomaly rules have no tiers: SigNoz uses the label
+   as the tier name. The Step 8 preview states each tier's severity and why.
 
 | Alert intent | Default severity |
 |---|---|
 | Any single crash event: OOMKilled / CrashLoopBackOff / panic / FATAL log line | critical |
 | Service down / no-data on a production service | critical |
-| SLO burn rate | fast (14.4×): critical; slow (6×): warning; ticket-level (1×): info |
+| SLO burn rate | 14.4× or more: critical; 6× to under 14.4×: warning; under 6× (e.g. ticket-level 1×): info |
 | Error rate with a threshold above 1% | critical |
 | Error log or exception volume above a count threshold | warning |
 | Latency degradation (p95/p99 above target) | warning |
@@ -380,7 +379,9 @@ For a confirmed existing org policy on a threshold/PromQL rule, set
 `notificationSettings.usePolicy: true`, preserve the confirmed matcher labels
 and threshold tier, and omit threshold channels and `preferredChannels`. This
 skill does not create policies. If the policy or match criteria are not
-confirmed, stop and ask. Anomaly rules are direct-only.
+confirmed, stop and ask. Anomaly rules are direct-only. On a multi-tier rule,
+a policy matching `severity` routes every tier as the highest (Step 5); only
+`threshold.name` separates tiers, so say so if the policy relies on `severity`.
 
 For direct routing, reuse a fully paginated same-operation channel result or
 page `signoz_list_notification_channels` until `hasMore=false`; its `total`
@@ -475,9 +476,8 @@ does).
 - **Dry-run is mandatory** Complete Steps 4 and 6 before
   `signoz_create_alert`; a never-firing alert creates false confidence.
 - **Threshold operators use canonical words** Prefer valid words, never
-  `equals`. Numeric codes (`"1"`–`"7"`)
-  are accepted but discouraged: same goes for `matchType`
-  (`"on_average"` / `"at_least_once"`, not `"3"` / `"1"`).
+  `equals`. Numeric codes (`"1"`–`"7"`) are accepted but discouraged: same
+  goes for `matchType` (`"on_average"` / `"at_least_once"`, not `"3"` / `"1"`).
 - **Signal must match alertType** `signal: "logs"` requires
   `LOGS_BASED_ALERT`. Mismatches fail validation.
 - **Anomaly rules are metrics-only** `anomaly_rule` + non-metric alertType
