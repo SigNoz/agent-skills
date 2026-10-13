@@ -1,0 +1,633 @@
+{
+  "mode": "offline_mcp_fixture",
+  "instructions": "Use these responses to answer offline. Do not query a live tenant. The search succeeded; the count timed out.",
+  "responses": [
+    {
+      "tool": "signoz_search_logs",
+      "request": {
+        "service": "payments",
+        "searchText": "timeout",
+        "timeRange": "6h",
+        "limit": 100
+      },
+      "response": {
+        "data": {
+          "rows": [
+            {
+              "timestamp": 1750003600000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750003540000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750003480000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750003420000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750003360000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750003300000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750003240000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750003180000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750003120000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750003060000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750003000000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750002940000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750002880000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750002820000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750002760000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750002700000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750002640000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750002580000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750002520000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750002460000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750002400000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750002340000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750002280000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750002220000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750002160000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750002100000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750002040000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750001980000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750001920000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750001860000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750001800000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750001740000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750001680000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750001620000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750001560000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750001500000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750001440000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750001380000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750001320000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750001260000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750001200000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750001140000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750001080000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750001020000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750000960000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750000900000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750000840000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750000780000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750000720000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750000660000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750000600000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750000540000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750000480000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750000420000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750000360000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750000300000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750000240000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750000180000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750000120000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750000060000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1750000000000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749999940000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749999880000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749999820000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749999760000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749999700000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749999640000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749999580000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749999520000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749999460000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749999400000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749999340000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749999280000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749999220000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749999160000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749999100000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749999040000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749998980000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749998920000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749998860000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749998800000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749998740000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749998680000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749998620000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749998560000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749998500000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749998440000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749998380000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749998320000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749998260000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749998200000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749998140000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749998080000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749998020000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749997960000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749997900000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749997840000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749997780000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749997720000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            },
+            {
+              "timestamp": 1749997660000,
+              "body": "upstream request timeout",
+              "k8s.pod.name": "payments-7d9f-a",
+              "service.name": "payments"
+            }
+          ]
+        },
+        "note": "note: returned 100 rows (limit 100); more results likely exist (hasMore=true). Fetch the next page with offset=100."
+      }
+    },
+    {
+      "tool": "signoz_aggregate_logs",
+      "request": {
+        "service": "payments",
+        "filter": "body CONTAINS 'timeout'",
+        "aggregation": "count",
+        "groupBy": "k8s.pod.name",
+        "timeRange": "6h"
+      },
+      "error": "query timed out after 30s"
+    }
+  ]
+}

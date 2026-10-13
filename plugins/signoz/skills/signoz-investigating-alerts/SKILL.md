@@ -29,9 +29,7 @@ This skill calls SigNoz MCP server tools heavily (`signoz_get_alert`,
 `signoz_get_trace_details`, etc.). Before running the workflow,
 confirm the `signoz_*` tools are available. If they are not, the
 SigNoz MCP server is not installed or configured; run `signoz-mcp-setup` first
-to initialize or repair the MCP connection. The investigation depends on
-correlating multiple MCP queries; without the server there is no way to ground
-the analysis.
+to initialize or repair the MCP connection.
 
 ## When to use
 
@@ -63,11 +61,17 @@ If the alert name is fuzzy, this skill is **best-effort** (read-only):
    fire, tell me."
 3. Proceed.
 
-If no firing transition exists in the queried lookback window, **stop**: there is
-nothing to investigate. Respond with:
-> "Alert '[name]' has not fired in the last 7d, so there is no fire
-> window to investigate. Use `signoz-explaining-alerts` to walk through
-> the rule, or check whether the alert is enabled."
+If the complete history (every page fetched, no failed call) has no firing
+transition in the queried lookback window, **stop**: there is no fire window to
+investigate. Respond with:
+> "No firing events were returned for alert '[name]' in the last 7d, so
+> there is no fire window to investigate. Use `signoz-explaining-alerts` to
+> walk through the rule, or check whether the alert is enabled."
+
+Never shorten this to "has not fired": retention, a rule recreated under a new
+ID, or an unfetched page can empty the history. If a history call fails, say the
+history could not be read. Keep firing history, current `state`, `disabled`, and
+notification delivery (no MCP tool reports it) as separate facts.
 
 ## Workflow
 
@@ -190,7 +194,7 @@ specific failing operations.
      `<scope_filter>` AND `severity_text IN ('ERROR', 'FATAL')`. Cap
      at top 20 most recent.
    - Group by `body` pattern (or `exception.type` if present). Surface
-     the top 3 distinct messages with counts.
+     the top 3 distinct messages with their counts in the sample.
 
 3. Cross-reference: do the traces and logs point at the same
    downstream service, dependency, or code path? If so, that becomes
@@ -213,10 +217,6 @@ action. Example:
 > 14:32 UTC; most likely cause is payments-api timing out
 > (high confidence). Open trace `7af3a09b…` to see the failing call."
 
-If no hypothesis reaches medium confidence, the leading line is
-"No clear root cause found." rather than a low-confidence guess
-dressed up as the answer.
-
 **2. What fired**
 The alert (id, name), the fire window (absolute UTC + relative),
 peak magnitude ("error rate hit 12.4% vs. 5% threshold, 148% over"),
@@ -225,8 +225,9 @@ fire duration, and the fire pattern (`one-off` / `sustained` /
 
 **3. Investigation trail**
 A scannable list of what was checked, with ✅ for confirmed signals
-and ❌ for ruled out, each followed by a one-line finding. The point
-is that the reader can see what work the AI did and what it found.
+and ❌ for ruled out, each followed by a one-line finding; a query that failed
+or timed out is "not checked", with the error. The point is that the reader
+can see what work the AI did and what it found.
 Example:
 - ✅ Tier 1: peak error rate 12.4%, fire was real (not marginal).
 - ✅ Tier 2: payments error rate +8900%, p99 +1180%; downstream
@@ -272,9 +273,6 @@ handles so the user can act immediately:
 - "Open an incident" or "page the owning team" if the cause is
   cross-service.
 
-Do not pad with generic advice ("verify connectivity", "check
-dashboards"); that's noise during an active incident.
-
 **Mirroring as navigation chips.** Mirror up to 3 of these "Suggested
 next steps" as host follow-up intents: the most actionable,
 alert-scoped ones. Keep the rest in the report prose so the user has
@@ -301,6 +299,9 @@ the full picture. The chip surface is capped; the prose is not.
   gates are not optional optimizations.
 - **Anchor every claim to an MCP query result.** No speculation. If
   evidence is missing, lower confidence and say so.
+- **A failed or partial read rules nothing out.** An errored or timed-out query
+  is "not checked". Capped trace or log samples support claims only about their
+  rows; "none", "all", or a total needs a complete aggregate.
 - **Show the supporting query** with each hypothesis so the user can
   reproduce and dig deeper.
 - **Keep it short and evidence-backed.** TL;DR is one or two sentences max; the
@@ -361,8 +362,8 @@ the full picture. The chip surface is capped; the prose is not.
 5. **Tier 3**: traces for `service.name = checkout, has_error = true`
    in the fire window: top operation `POST /checkout/submit`, top
    error message "context deadline exceeded calling payments-api".
-   30 traces, all hitting the same downstream URL. Logs show
-   matching "payments client timeout" lines, 142 occurrences.
+   All 20 sampled error traces hit the same downstream URL; 17 of 20
+   sampled error logs read "payments client timeout".
 6. **Output**:
 
    > **TL;DR**: checkoutservice error rate hit 12.4% (threshold 5%)
@@ -378,13 +379,13 @@ the full picture. The chip surface is capped; the prose is not.
      - ✅ Tier 2: payments error rate +8900%, p99 latency +1180%,
        throughput −42%.
      - ❌ CPU / memory pressure on checkout: flat.
-     - ✅ Tier 3: 30 error traces all hit payments-api with
-       `context deadline exceeded`; 142 matching timeout logs.
+     - ✅ Tier 3: all 20 sampled error traces hit payments-api with
+       `context deadline exceeded`; 17 of 20 sampled logs are timeouts.
    - **Likely causes** (high confidence): payments service errors
      cascading into checkout. Evidence converges across topology
      (checkout → payments edge), temporal precedence (payments
-     errors lead checkout p99), and shared entity (every error
-     trace targets the payments-api URL).
+     errors lead checkout p99), and shared entity (every sampled
+     error trace targets the payments-api URL).
    - **Ruled out**: checkout-side resource pressure (CPU/memory
      flat); upstream traffic spike (throughput dropped, didn't
      spike).
@@ -449,9 +450,9 @@ the full picture. The chip surface is capped; the prose is not.
    - p99 latency: +30% (mild).
    - CPU: -80% (collapsed). Memory: -60%.
    - Pod restarts (k8s): 4 in fire window.
-5. **Tier 3**: logs for inventory in fire window. Top message: "OOMKilled
-   restarting" (1,200 occurrences). Top trace error: graceful-shutdown
-   exceptions.
+5. **Tier 3**: logs for inventory in fire window. Top message in the
+   20-row sample: "OOMKilled restarting" (14 of 20). Top trace error:
+   graceful-shutdown exceptions.
 6. **Output**:
 
    > **TL;DR**: log volume alert 14 fired at 03:12 UTC for
@@ -468,8 +469,8 @@ the full picture. The chip surface is capped; the prose is not.
      - ✅ Tier 2: request error rate +600%; CPU/memory collapsed
        (−80%/−60%); 4 pod restarts in window.
      - ❌ p99 latency: only +30%, not a latency-driven incident.
-     - ✅ Tier 3: top log message "OOMKilled restarting" (1,200
-       occurrences); top trace error: graceful-shutdown exceptions.
+     - ✅ Tier 3: top sampled log message "OOMKilled restarting" (14 of
+       20); top trace error: graceful-shutdown exceptions.
    - **Likely causes** (high confidence): inventory pods OOM-killed
      and restarted 4 times during the window. Evidence converges
      across topology (single service), temporal precedence (memory

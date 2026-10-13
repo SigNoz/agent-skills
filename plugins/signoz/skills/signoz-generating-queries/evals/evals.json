@@ -157,6 +157,32 @@
         "Agent does not use searchText with the default body scope because the request says all log fields"
       ],
       "files": []
+    },
+    {
+      "id": 13,
+      "eval_name": "service-absence-scoped-claim",
+      "prompt": "Using the attached offline SigNoz responses, did billing-worker send any traces in the last 15 minutes?",
+      "expected_output": "Agent uses the fixture without querying a live tenant. It reports that the successful, complete trace search scoped to billing-worker returned no traces for the last 15 minutes. It does not infer that billing-worker is healthy, never existed, or is not instrumented. It may note that billing-worker was not seen in the 6h service list, scoped to that window, and offer causes only as labeled possibilities.",
+      "expectations": [
+        "Output explicitly reports no billing-worker traces in the requested last 15 minutes, based on the empty search with hasMore=false",
+        "Output does not infer billing-worker's health from the absence of traces",
+        "Output does not state as fact that billing-worker never existed or is not instrumented; any such cause is labeled a possibility",
+        "If the 6h service list is mentioned, the claim is scoped to that window ('not seen in the last 6h'), not 'does not exist'"
+      ],
+      "files": ["evals/files/service-absence-traces.json"]
+    },
+    {
+      "id": 14,
+      "eval_name": "capped-sample-and-failed-count",
+      "prompt": "Using the attached offline SigNoz responses, how many timeout logs did payments emit in the last 6 hours, and are they all from one pod?",
+      "expected_output": "Agent uses the fixture without querying a live tenant. It says the count aggregation timed out, so it cannot give a total. It does not report 100 as the total, since the search filled its limit and reports more pages. It scopes the pod observation to the returned rows ('all 100 returned rows come from payments-7d9f-a') and does not claim every timeout log came from that pod. It offers to retry the count, for example over a narrower window.",
+      "expectations": [
+        "Output does not present 100, or any other number, as the total count of timeout logs",
+        "Output states that the count aggregation timed out and that no total is available",
+        "Any pod claim is scoped to the returned rows and does not say all timeout logs in the window came from one pod",
+        "Output does not report zero timeout logs or 'none' from the failed aggregate"
+      ],
+      "files": ["evals/files/capped-logs-failed-count.json"]
     }
   ]
 }

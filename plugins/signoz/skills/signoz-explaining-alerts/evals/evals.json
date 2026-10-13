@@ -61,6 +61,20 @@
         "If series activity is mentioned, it distinguishes fingerprint or label-group transitions from rule-wide incidents"
       ],
       "files": ["evals/files/grouped-alert-history.json"]
+    },
+    {
+      "id": 6,
+      "eval_name": "empty-history-scoped-claim",
+      "prompt": "Using the attached offline SigNoz responses, explain the Checkout failures alert and tell me whether it fired in the last 7 days.",
+      "expected_output": "Agent uses the fixture without querying a live tenant. It explains the rule and reports that no firing events were returned for the last 7d. It does not convert empty history into 'has not fired', 'never fired', a healthy service, or a too-loose threshold. It notes history may be missing because of retention, a recreated rule, or an unfetched page. It reports the rule's current inactive state, its enabled configuration, and routing to pagerduty-oncall as separate facts, without claiming any notification was or was not delivered.",
+      "expectations": [
+        "Output says no firing events were returned for the last 7d, or equivalent wording scoped to the returned history",
+        "Output does not state that the alert has not fired or never fired in the window as fact",
+        "Output gives at least one reason retained history can be empty (retention, rule recreated under a new ID, unfetched page)",
+        "Output does not infer that the service is healthy or that the threshold is too loose from the empty history",
+        "Current state, configuration, and firing history are reported as separate facts, and the output makes no claim about notification delivery"
+      ],
+      "files": ["evals/files/empty-alert-history.json"]
     }
   ]
 }

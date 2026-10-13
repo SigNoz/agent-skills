@@ -239,6 +239,25 @@ not apply to PromQL or ClickHouse SQL envelopes.
 
 ### Step 5: Handle results
 
+**Scope every claim to what the read returned.** Before reporting, classify
+each result:
+
+1. **Failed read**: the tool returned an error or timed out. This is not
+   evidence of absence. Say the read failed, quote the error, and never report
+   zero, "none", or a total from it.
+2. **Partial result**: raw rows from `signoz_search_logs` or
+   `signoz_search_traces` that filled `limit`, groups truncated by `limit`, or
+   any response that reports more pages (`hasMore: true`, a `nextCursor`, or a
+   "more results exist" note). Claims cover only the returned rows ("the 100
+   most recent matching logs all come from pod-a"). Never present a count of
+   returned rows as a total, and never say "none" or "all" from a partial
+   result.
+3. **Complete result**: a successful aggregate over the full requested scope
+   and window, or a raw search that returned fewer rows than `limit` with no
+   further pages (including zero rows). Only this supports "none", "all", or a
+   total. For a total larger than one page, use `signoz_aggregate_logs` or
+   `signoz_aggregate_traces` with `aggregation: count`.
+
 **Data returned:**
 - Present findings as neutral observations with timestamps and values.
 - Include the time range in your response.
@@ -246,13 +265,25 @@ not apply to PromQL or ClickHouse SQL envelopes.
   group count if truncated by `limit`.
 - For search results, summarize patterns rather than listing every entry.
 
-**No data returned. Apply the three-way distinction:**
-1. **Healthy zero**: The query ran successfully but the count is zero. Say so:
-   "No errors found for checkout-service in the last hour; error count is zero."
-2. **No data in range**: The field/metric exists but no data points fall in the
-   time window. Suggest expanding: "No data in the last hour. Try a wider range?"
-3. **Missing instrumentation**: The metric, field, or service doesn't exist in
-   discovery results. Say what's missing and suggest how to instrument.
+**No data returned.** Report what was empty and its scope, and claim nothing
+beyond it:
+
+1. **Zero over the requested scope**: a successful, complete query returned no
+   matches. Say so with the filter and window: "No error spans matched
+   `service.name = 'checkout-service'` in the last hour." Absence of errors or
+   traces does not establish that the service is healthy, that it was never
+   running, or why the data is missing. Offer such explanations only as
+   labeled possibilities.
+2. **No data in range**: the field or metric was seen in discovery, but no
+   data points fall in the requested window. Report the empty window and
+   suggest a wider range. Older data seen in a wider window is outside the
+   requested window, not recent activity.
+3. **Not found in discovery**: the metric, field, or service is absent from
+   discovery results. Discovery is itself windowed (`signoz_list_services`
+   defaults to 6h and `signoz_list_metrics` to 1h), so report "not seen in
+   <window>" rather than "does not exist" or "not instrumented". Missing
+   instrumentation is one possibility to check, alongside a wider window or a
+   different name.
 
 **Drill-down:**
 - If an aggregation reveals an interesting pattern (spike, outlier service),
@@ -272,6 +303,9 @@ not apply to PromQL or ClickHouse SQL envelopes.
 - **Never claim root cause**: Present data patterns and correlations. Write
   "Error rate for checkout increased from 0.2% to 4.1% at 14:05" not "The
   deployment caused the errors."
+- **Never claim absence beyond the evidence**: A failed, timed-out, or partial
+  read shows nothing about absence. "None", "all", and totals need a complete
+  aggregate over the requested scope (Step 5).
 - **One focused query per question**: Do not scatter-shot multiple queries when
   one precise query answers the question. Use parallel discovery calls, but be
   precise for execution.
