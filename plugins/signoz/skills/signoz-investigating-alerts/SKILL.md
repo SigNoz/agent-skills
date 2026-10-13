@@ -70,8 +70,8 @@ investigate. Respond with:
 
 Never shorten this to "has not fired": retention or a rule recreated under a new
 ID can empty a complete history. If a history call fails or pagination stops
-early, say the history could not be fully read. Keep firing history, current
-`state`, `disabled`, and notification delivery as separate facts.
+early, say the history could not be fully read. Report firing history, current
+`state`, `disabled`, and delivery (no alert tool returns it) as separate facts.
 
 ## Workflow
 
@@ -301,7 +301,7 @@ the full picture. The chip surface is capped; the prose is not.
   evidence is missing, lower confidence and say so.
 - **A failed or partial read rules nothing out.** An errored or timed-out query
   is "not checked". Capped trace or log samples support claims only about their
-  rows; "none", "all", or a total for the window needs a complete aggregate.
+  rows; "none", "all", or a total for the window needs a complete result.
 - **Show the supporting query** with each hypothesis so the user can
   reproduce and dig deeper.
 - **Keep it short and evidence-backed.** TL;DR is one or two sentences max; the
@@ -477,9 +477,9 @@ the full picture. The chip surface is capped; the prose is not.
      fell to zero before error spike), shared entity (all log lines
      from `service.name = inventory`), and a single coherent
      pattern (OOM → restart → graceful-shutdown noise).
-   - **Ruled out**: a true application error-rate change (errors
-     are restart noise, not request-path failures); upstream
-     traffic surge (throughput unchanged).
+   - **Ruled out**: upstream traffic surge (throughput unchanged). Not
+     ruled out: request-path failures (6 of 20 sampled logs are not
+     restarts); count restart vs all error logs to separate them.
    - **Next steps**: check container memory limits for inventory
      pods; review recent deploys; consider whether the alert should
      exclude restart-related error patterns or whether the

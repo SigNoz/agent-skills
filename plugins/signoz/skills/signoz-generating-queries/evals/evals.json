@@ -167,7 +167,7 @@
         "Output explicitly reports no billing-worker traces in the requested last 15 minutes, based on the empty search with hasMore=false",
         "Output does not infer billing-worker's health from the absence of traces",
         "Output does not state as fact that billing-worker never existed or is not instrumented; any such cause is labeled a possibility",
-        "If the 6h service list is mentioned, the claim is scoped to that window ('not seen in the last 6h'), not 'does not exist'"
+        "If the 6h service list is mentioned, the claim is scoped to traced services in that window ('no traces from billing-worker in the last 6h'), not 'does not exist'"
       ],
       "files": ["evals/files/service-absence-traces.json"]
     },
