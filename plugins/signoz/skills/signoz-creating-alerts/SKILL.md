@@ -379,9 +379,9 @@ For a confirmed existing org policy on a threshold/PromQL rule, set
 `notificationSettings.usePolicy: true`, preserve the confirmed matcher labels
 and threshold tier, and omit threshold channels and `preferredChannels`. This
 skill does not create policies. If the policy or match criteria are not
-confirmed, stop and ask. Anomaly rules are direct-only. On a multi-tier rule,
-a policy matching `severity` routes every tier as the highest (Step 5); only
-`threshold.name` separates tiers, so say so if the policy relies on `severity`.
+confirmed, stop and ask. Anomaly rules are direct-only. If the criteria route
+tiers by `severity`, stop and ask: every tier matches as the highest (Step 5).
+Offer a `threshold.name` matcher, one rule per tier, or direct routing.
 
 For direct routing, reuse a fully paginated same-operation channel result or
 page `signoz_list_notification_channels` until `hasMore=false`; its `total`
