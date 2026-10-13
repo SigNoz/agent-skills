@@ -225,28 +225,29 @@ Use `above` for anomaly rules: their absolute score covers spikes and drops.
 - `matchType: "at_least_once"` for error counts / error rates:
   catches any breach.
 
-**Severity defaults.** Resolve severity with these rules, in order:
+**Severity defaults.** Resolve each threshold tier's severity in this order:
 
 1. Take the default from the first matching row below, or `warning` if no
    row matches. A `critical` row applies even when the user gives no cue.
-2. A user cue overrides the default. Use a named severity or per-tier
-   severities ("critical", "warning at 80%, page me at 90%") as given.
-   "Page me", "wake me up", or "urgent" sets `critical`. "Just FYI",
-   "no paging", or "low priority" lowers the default one tier (`critical` to
-   `warning`, `warning` to `info`).
-3. The Step 8 preview states the chosen severity and why: the table row, or
-   the user cue that overrode it.
+2. A user cue overrides the default. A named severity ("critical", "warning
+   at 80%") wins over an urgency cue. "Page me", "wake me up", or "urgent"
+   sets `critical`. "Just FYI", "no paging", or "low priority" lowers the
+   default one tier (`critical` to `warning`, `warning` to `info`, `info`
+   stays `info`). A cue tied to one threshold ("page me at 90%") applies
+   only to that tier. Ask when urgency cues conflict on the same tier.
+3. The Step 8 preview states each tier's severity and why: the table row,
+   or the user cue that overrode it.
 
 | Alert intent | Default severity |
 |---|---|
-| Pod crash / OOMKilled / CrashLoopBackOff / panic / FATAL log signals | critical |
+| Any single crash event: OOMKilled / CrashLoopBackOff / panic / FATAL log line | critical |
 | Service down / no-data on a production service | critical |
+| SLO burn rate | fast (14.4×): critical; slow (6×): warning; ticket-level (1×): info |
 | Error rate with a threshold above 1% | critical |
-| Error logs / exception spikes | warning |
+| Error log or exception volume above a count threshold | warning |
 | Latency degradation (p95/p99 above target) | warning |
 | CPU / memory / disk pressure | warning |
 | Request-rate / traffic anomaly | warning |
-| SLO burn rate | fast (14.4×): critical; slow (6×): warning; ticket-level (1×): info |
 
 Example: "alert me when checkout error rate goes above 2%" is `critical`
 (error-rate row); the same request with "just FYI" is `warning`.

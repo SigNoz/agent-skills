@@ -33,8 +33,8 @@ log-volume groupBy, and anomaly detection.
 
 **Agent:**
 1. Intent parsed: traces, error-rate formula, scope
-   `service.name = payments`, threshold 5%. No severity cue, so the
-   error-rate row of *Severity defaults* sets `critical`.
+   `service.name = payments`, threshold 5%. The user gives no severity cue,
+   so the error-rate row of *Severity defaults* sets `critical`.
 2. `signoz_get_field_keys fieldContext=resource signal=traces` confirms
    `service.name`. `signoz_get_field_values` confirms `payments` exists.
 3. No existing payments error-rate alert.
@@ -58,7 +58,9 @@ log-volume groupBy, and anomaly detection.
 
 **Agent:**
 1. Intent parsed: logs, volume threshold, scope = all services (groupBy
-   `service.name`), threshold 1000/min, severity warning.
+   `service.name`), threshold 1000/min. Severity is `warning` from the
+   error-log volume row: the alert counts ERROR and FATAL lines and does
+   not fire on a single crash event.
 2. `signoz_get_field_keys signal=logs fieldContext=resource` confirms
    `service.name` exists; **no service filter required** since the user
    said "any service" → groupBy provides the scoping.

@@ -171,8 +171,8 @@
     {
       "id": 12,
       "eval_name": "error-rate-severity-lowered-by-fyi-cue",
-      "prompt": "just FYI: let me know when paymentservice error rate goes above 2%. send to #staging-alerts on slack.",
-      "expected_output": "Same error-rate alert as the no-cue case, but the user's \"just FYI\" cue lowers the table default of critical by one tier to warning. The preview states severity warning and gives the user's cue as the reason.",
+      "prompt": "just FYI: let me know when cartservice error rate goes above 2%. send to #staging-alerts on slack.",
+      "expected_output": "TRACES_BASED_ALERT error-rate formula on service.name='cartservice' with threshold target 2 and targetUnit percent. The error-rate row of the Severity defaults table gives critical, and the user's \"just FYI\" cue lowers it one tier to warning. The preview states severity warning and gives the user's cue as the reason.",
       "expectations": [
         "The preview shown before signoz_create_alert states the severity as warning",
         "The preview gives the user's \"just FYI\" cue as the reason the severity is below the critical default",
