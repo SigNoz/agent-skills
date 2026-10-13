@@ -227,16 +227,16 @@ Use `above` for anomaly rules: their absolute score covers spikes and drops.
 
 **Severity defaults.** Resolve each threshold tier's severity in this order:
 
-1. Take the default from the first matching row below, or `warning` if no
-   row matches. A `critical` row applies even when the user gives no cue.
+1. Take the first matching row below (no cue needed), or `warning` if none.
 2. A user cue overrides the default. A named severity ("critical", "warning
    at 80%") wins over an urgency cue. "Page me", "wake me up", or "urgent"
    sets `critical`. "Just FYI", "no paging", or "low priority" lowers the
    default one tier (`critical` to `warning`, `warning` to `info`, `info`
    stays `info`). A cue tied to one threshold ("page me at 90%") applies
    only to that tier. Ask when urgency cues conflict on the same tier.
-3. The Step 8 preview states each tier's severity and why: the table row,
-   or the user cue that overrode it.
+3. Name each threshold tier by its severity and set `labels.severity` to the
+   highest tier; anomaly rules have no tiers, so set only the label. The
+   Step 8 preview states each tier's severity and why: table row or user cue.
 
 | Alert intent | Default severity |
 |---|---|

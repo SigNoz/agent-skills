@@ -18,8 +18,9 @@ log-volume groupBy, and anomaly detection.
    `slack-infra` and `pagerduty-oncall`. If none fits, it offers
    `signoz_create_notification_channel` with user-provided provider config.
 5. Builds JSON: `METRIC_BASED_ALERT`, `threshold_rule`,
-   `signal=metrics`, two thresholds (`op="above"`,
-   `matchType="on_average"`, `targetUnit="percent"`), filter
+   `signal=metrics`, two thresholds named `warning` and `critical`
+   (`op="above"`, `matchType="on_average"`, `targetUnit="percent"`),
+   `labels.severity: critical` (the highest tier), filter
    `service.name = 'checkout'`.
 6. Dry-run via `signoz_execute_builder_query` over last 1h: returns data,
    would have fired 0 times (clean baseline).
@@ -41,8 +42,9 @@ log-volume groupBy, and anomaly detection.
 4. Builds formula alert: query A counts spans with `has_error = true` for
    `service.name = 'payments'`, query B counts all spans for the same
    service, formula F1 = `A * 100 / B`, `selectedQueryName: "F1"`,
-   threshold target 5, `targetUnit: "percent"`,
-   `op: "above"`, `matchType: "at_least_once"` (catch any breach).
+   one threshold tier named `critical` with target 5,
+   `targetUnit: "percent"`, `op: "above"`, `matchType: "at_least_once"`
+   (catch any breach), and `labels.severity: critical`.
 5. No channel was named, so it reuses a fully paginated same-operation
    `signoz_list_notification_channels` result, or calls it through
    `pagination.hasMore=false`; the user picks `slack-payments`. If none fits,
