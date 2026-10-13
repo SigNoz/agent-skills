@@ -154,6 +154,32 @@
         "The secret URL is not echoed in preview or final output"
       ],
       "files": []
+    },
+    {
+      "id": 11,
+      "eval_name": "error-rate-severity-from-defaults-table",
+      "prompt": "alert me when paymentservice error rate goes above 2%. send to #staging-alerts on slack.",
+      "expected_output": "TRACES_BASED_ALERT error-rate formula F1 = A*100/B on service.name='paymentservice' with threshold target 2 and targetUnit percent. The request has no severity or urgency cue, so the Severity defaults table decides: an error rate threshold above 1% is critical. The preview states severity critical and gives the error-rate row as the reason. The agent does not fall back to warning because the user did not say \"page\", \"wake up\", or \"critical\".",
+      "expectations": [
+        "The preview shown before signoz_create_alert states the severity as critical",
+        "The preview gives the error-rate default (threshold above 1%) as the reason for critical, not a user cue",
+        "The agent does not choose warning on the grounds that the user did not say page, wake up, or critical",
+        "If creation proceeds, the signoz_create_alert payload sets labels.severity=critical and names its threshold tier critical, with the returned Slack displayName in that tier's channels"
+      ],
+      "files": []
+    },
+    {
+      "id": 12,
+      "eval_name": "error-rate-severity-lowered-by-fyi-cue",
+      "prompt": "just FYI: let me know when paymentservice error rate goes above 2%. send to #staging-alerts on slack.",
+      "expected_output": "Same error-rate alert as the no-cue case, but the user's \"just FYI\" cue lowers the table default of critical by one tier to warning. The preview states severity warning and gives the user's cue as the reason.",
+      "expectations": [
+        "The preview shown before signoz_create_alert states the severity as warning",
+        "The preview gives the user's \"just FYI\" cue as the reason the severity is below the critical default",
+        "The agent neither keeps critical nor lowers the severity two tiers to info",
+        "If creation proceeds, the signoz_create_alert payload sets labels.severity=warning and names its threshold tier warning"
+      ],
+      "files": []
     }
   ]
 }

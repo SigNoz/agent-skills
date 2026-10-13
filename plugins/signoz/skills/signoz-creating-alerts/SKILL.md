@@ -49,7 +49,7 @@ guesses create noisy alerts on the wrong service:
 | Alert intent (NL goal) | yes | `$ARGUMENTS` or recent user turn |
 | Resource attribute filter (e.g. `service.name`, `k8s.namespace.name`, `host.name`) | yes | discover via `signoz_get_field_keys` + `signoz_get_field_values` |
 | Threshold value(s) | threshold / PromQL rules | derive a sensible default and surface in the preview; never substitute one for an absent-only request |
-| Severity | inferred from intent | default `warning`; promote to `critical` only if user said "page", "wake up", "critical" |
+| Severity | inferred from intent | resolve with *Severity defaults* in Step 5 |
 | Notification routing | yes | direct: verified channel display name(s); policy: confirmation that an existing org policy matches this rule |
 
 If a required input is missing and undiscoverable, **stop before any write**
@@ -76,8 +76,8 @@ Extract from the user's request:
    and the specific condition (CPU, error rate, p99 latency, log count, ...).
 2. **Resource scope**: which service, host, namespace, or environment.
 3. **Threshold**: numeric value and comparison ("above 80%", "below 100/s").
-4. **Severity**: implicit from urgency words ("page" → critical, default
-   warning otherwise).
+4. **Severity**: note any severity the user names and any urgency cue
+   ("page me", "just FYI"). Step 5 resolves the final value.
 5. **Routing**: direct channel name(s), or an explicit request to use a
    confirmed existing org notification policy.
 
@@ -225,23 +225,31 @@ Use `above` for anomaly rules: their absolute score covers spikes and drops.
 - `matchType: "at_least_once"` for error counts / error rates:
   catches any breach.
 
-**Severity defaults: derive intrinsic urgency, not just wording.** An explicit
-cue overrides this table ("just FYI" → demote; "page me" → promote).
+**Severity defaults.** Resolve severity with these rules, in order:
+
+1. Take the default from the first matching row below, or `warning` if no
+   row matches. A `critical` row applies even when the user gives no cue.
+2. A user cue overrides the default. Use a named severity or per-tier
+   severities ("critical", "warning at 80%, page me at 90%") as given.
+   "Page me", "wake me up", or "urgent" sets `critical`. "Just FYI",
+   "no paging", or "low priority" lowers the default one tier (`critical` to
+   `warning`, `warning` to `info`).
+3. The Step 8 preview states the chosen severity and why: the table row, or
+   the user cue that overrode it.
 
 | Alert intent | Default severity |
 |---|---|
 | Pod crash / OOMKilled / CrashLoopBackOff / panic / FATAL log signals | critical |
 | Service down / no-data on a production service | critical |
-| Error rate above any non-trivial threshold (>1%) | critical |
+| Error rate with a threshold above 1% | critical |
 | Error logs / exception spikes | warning |
 | Latency degradation (p95/p99 above target) | warning |
 | CPU / memory / disk pressure | warning |
 | Request-rate / traffic anomaly | warning |
-| SLO budget burn (info-level burn rate) | info / warning |
+| SLO burn rate | fast (14.4×): critical; slow (6×): warning; ticket-level (1×): info |
 
-When the user's intent is ambiguous on severity (no urgency cue, no
-clearly-critical condition), default to `warning` and surface the choice
-in the preview so they can adjust.
+Example: "alert me when checkout error rate goes above 2%" is `critical`
+(error-rate row); the same request with "just FYI" is `warning`.
 
 **Attribute names**: use exact keys returned by `signoz_get_field_keys`; when
 available they are usually OTel names such as `service.name`, not `service`.
@@ -437,7 +445,8 @@ through the JSON does not catch query-shape errors (Step 6's dry-run
 does).
 
 > **Summary**: This alert fires when [condition] for [resource scope],
-> evaluated every [frequency] over the last [window]. Thresholds:
+> evaluated every [frequency] over the last [window]. Severity: [tier],
+> because [table row or user cue]. Thresholds:
 > warning at X, critical at Y. Notifications route through [direct channels / confirmed org policy]. Dry-run on
 > the last hour: would have fired N times.
 
@@ -451,7 +460,7 @@ does).
    this skill).
 3. On success, report:
    - The alert ID and name.
-   - What it watches and at what threshold.
+   - What it watches, at what threshold, and at what severity.
    - How notifications route (direct channels or the confirmed org policy).
    - The dry-run summary ("would have fired N times in last 1h").
 

@@ -33,7 +33,8 @@ log-volume groupBy, and anomaly detection.
 
 **Agent:**
 1. Intent parsed: traces, error-rate formula, scope
-   `service.name = payments`, threshold 5%, severity default warning.
+   `service.name = payments`, threshold 5%. No severity cue, so the
+   error-rate row of *Severity defaults* sets `critical`.
 2. `signoz_get_field_keys fieldContext=resource signal=traces` confirms
    `service.name`. `signoz_get_field_values` confirms `payments` exists.
 3. No existing payments error-rate alert.
@@ -48,7 +49,8 @@ log-volume groupBy, and anomaly detection.
    it offers `signoz_create_notification_channel` with user-provided config.
 6. Dry-run on last 1h: payments error rate hovered around 0.3%, would have
    fired 0 times. Clean, not too tight.
-7. Preview, save, report.
+7. Preview states severity `critical` with the error-rate row as the reason.
+   Save, report.
 
 ## Log-volume threshold with groupBy
 
