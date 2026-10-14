@@ -1,0 +1,72 @@
+{
+  "mode": "offline_mcp_fixture",
+  "instructions": "Use these responses to explain the rule and summarize its fire history offline. Do not query a live tenant. History was requested with timeRange=7d, state=firing, order=desc.",
+  "responses": [
+    {
+      "tool": "signoz_get_alert",
+      "request": {
+        "id": "019f0000-0000-7000-8000-000000000201"
+      },
+      "response": {
+        "data": {
+          "id": "019f0000-0000-7000-8000-000000000201",
+          "alert": "Checkout failures",
+          "alertType": "TRACES_BASED_ALERT",
+          "ruleType": "threshold_rule",
+          "state": "inactive",
+          "disabled": false,
+          "condition": {
+            "compositeQuery": {
+              "queryType": "builder",
+              "queries": []
+            },
+            "thresholds": {
+              "kind": "basic",
+              "spec": [
+                {
+                  "name": "critical",
+                  "target": 25,
+                  "op": "above",
+                  "matchType": "at_least_once",
+                  "channels": [
+                    "pagerduty-oncall"
+                  ]
+                }
+              ]
+            }
+          },
+          "evaluation": {
+            "kind": "rolling",
+            "spec": {
+              "evalWindow": "5m",
+              "frequency": "1m"
+            }
+          },
+          "notificationSettings": {
+            "usePolicy": false
+          },
+          "labels": {
+            "severity": "critical"
+          }
+        }
+      }
+    },
+    {
+      "tool": "signoz_get_alert_history",
+      "request": {
+        "id": "019f0000-0000-7000-8000-000000000201",
+        "timeRange": "7d",
+        "state": "firing",
+        "order": "desc",
+        "limit": 100
+      },
+      "response": {
+        "data": {
+          "items": [],
+          "total": 0
+        },
+        "note": "note: returned 0 rows (limit 100); all matching results returned (hasMore=false)."
+      }
+    }
+  ]
+}

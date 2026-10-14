@@ -35,9 +35,15 @@
     },
     {
       "id": 3,
-      "eval_name": "never-fired-stop",
+      "eval_name": "no-firing-events-stop",
       "prompt": "RCA for the [eval-3-ws-anomaly] frontend service request rate anomaly alert please. Rule ID 019de287-6752-7629-83e4-375919d56dd8.",
-      "expected_output": "Agent fetches alert + paginated 7d firing history in descending order. Detects that the alert is disabled and has no firing transition in the queried lookback. Stops per skill guardrail with the message 'Alert has not fired in the last 7d, so there is no fire window to investigate.' Suggests using signoz-explaining-alerts to explain the rule, or to enable the alert. Does NOT claim the rule has never fired or proceed to Tier-1/2/3 against synthetic data.",
+      "expected_output": "Agent fetches alert + paginated 7d history in descending order. Detects that the alert is disabled and that the complete history returned no firing transition in the queried lookback. Stops per skill guardrail with the message 'No firing events were returned for alert ... in the last 7d, so there is no fire window to investigate.' Suggests using signoz-explaining-alerts to explain the rule, or to enable the alert. Does NOT claim the rule has not fired or never fired, and does NOT proceed to Tier-1/2/3 against synthetic data.",
+      "expectations": [
+        "The stop message says no firing events were returned for the last 7d; it does not state 'has not fired' or 'never fired' as fact",
+        "If the user is told why history could be empty, the reasons are retention or a rule recreated under a new ID, presented as possibilities; the agent does not suggest pages may be missing after fetching every page",
+        "The disabled setting is reported separately from firing history and is not used as proof that the rule did not fire in the window",
+        "The agent does not run Tier-1, Tier-2, or Tier-3 queries"
+      ],
       "files": []
     },
     {
