@@ -200,11 +200,10 @@ For most user intents, the config is one of a small number of patterns:
 | ClickHouse SQL alert: author SQL using the schema in `signoz://alert/examples` | non-trivial joins, custom aggregations the builder cannot express |
 | PromQL alert: delegate to `signoz-generating-queries` for the query, then return here | when user already has PromQL |
 
-**Threshold `op` and `matchType` values.** Prefer readable words; symbols and
-legacy numeric codes are accepted but discouraged. Valid `op` words are
-`above`, `below`, `equal`, `not_equal`,
-`above_or_equal`, `below_or_equal`, and `outside_bounds`; `equals` is invalid.
-Use `above` for anomaly rules: their absolute score covers spikes and drops.
+**Threshold `op` and `matchType` values.** Use these `op` words: `above`,
+`below`, `equal`, `not_equal`, `above_or_equal`, `below_or_equal`, and
+`outside_bounds`; `equals` is invalid. Use `above` for anomaly rules: their
+absolute score covers spikes and drops.
 
 | Comparison | `op` | Evaluation behavior | `matchType` |
 |---|---|---|---|
@@ -232,7 +231,7 @@ Use `above` for anomaly rules: their absolute score covers spikes and drops.
    stays `info`). A cue tied to one threshold ("page me at 90%") applies
    only to that tier. Ask when urgency cues conflict on the same tier.
 3. Name each threshold tier by its severity and set `labels.severity` to the
-   highest tier (the MCP server defaults a missing label to `warning`). Every
+   highest tier, which SigNoz's alert-rule list sorts and filters by. Every
    firing carries that label, so on a multi-tier rule only `threshold.name`
    shows which tier fired. Anomaly rules have no tiers: SigNoz uses the label
    as the tier name. The Step 8 preview states each tier's severity and why.
@@ -475,9 +474,8 @@ does).
   duplicates and produces noise.
 - **Dry-run is mandatory** Complete Steps 4 and 6 before
   `signoz_create_alert`; a never-firing alert creates false confidence.
-- **Threshold operators use canonical words** Prefer valid words, never
-  `equals`. Numeric codes (`"1"`–`"7"`) are accepted but discouraged: same
-  goes for `matchType` (`"on_average"` / `"at_least_once"`, not `"3"` / `"1"`).
+- **Threshold operators use canonical words** Use the `op` and `matchType`
+  words from Step 5, never `equals`.
 - **Signal must match alertType** `signal: "logs"` requires
   `LOGS_BASED_ALERT`. Mismatches fail validation.
 - **Anomaly rules are metrics-only** `anomaly_rule` + non-metric alertType
