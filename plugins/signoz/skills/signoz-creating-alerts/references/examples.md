@@ -1,5 +1,12 @@
 # Examples: `signoz-creating-alerts`
 
+## Contents
+
+- Metric threshold with multi-severity routing
+- Error-rate formula alert
+- Log-volume threshold with groupBy
+- Anomaly detection (z-score)
+
 Four canonical alert flows: simple metric threshold, error-rate formula,
 log-volume groupBy, and anomaly detection.
 
@@ -18,8 +25,10 @@ log-volume groupBy, and anomaly detection.
    `slack-infra` and `pagerduty-oncall`. If none fits, it offers
    `signoz_create_notification_channel` with user-provided provider config.
 5. Builds JSON: `METRIC_BASED_ALERT`, `threshold_rule`,
-   `signal=metrics`, two thresholds (`op="above"`,
-   `matchType="on_average"`, `targetUnit="percent"`), filter
+   `signal=metrics`, two thresholds named `warning` and `critical`
+   (`op="above"`, `matchType="on_average"`, `targetUnit="percent"`),
+   `labels.severity: critical` (the highest tier; direct routing still sends
+   each tier to its own channels by `threshold.name`), filter
    `service.name = 'checkout'`.
 6. Dry-run via `signoz_execute_builder_query` over last 1h: returns data,
    would have fired 0 times (clean baseline).
@@ -33,22 +42,25 @@ log-volume groupBy, and anomaly detection.
 
 **Agent:**
 1. Intent parsed: traces, error-rate formula, scope
-   `service.name = payments`, threshold 5%, severity default warning.
+   `service.name = payments`, threshold 5%. The user gives no severity cue,
+   so the error-rate row of *Severity defaults* sets `critical`.
 2. `signoz_get_field_keys fieldContext=resource signal=traces` confirms
    `service.name`. `signoz_get_field_values` confirms `payments` exists.
 3. No existing payments error-rate alert.
 4. Builds formula alert: query A counts spans with `has_error = true` for
    `service.name = 'payments'`, query B counts all spans for the same
    service, formula F1 = `A * 100 / B`, `selectedQueryName: "F1"`,
-   threshold target 5, `targetUnit: "percent"`,
-   `op: "above"`, `matchType: "at_least_once"` (catch any breach).
+   one threshold tier named `critical` with target 5,
+   `targetUnit: "percent"`, `op: "above"`, `matchType: "at_least_once"`
+   (catch any breach), and `labels.severity: critical`.
 5. No channel was named, so it reuses a fully paginated same-operation
    `signoz_list_notification_channels` result, or calls it through
    `pagination.hasMore=false`; the user picks `slack-payments`. If none fits,
    it offers `signoz_create_notification_channel` with user-provided config.
 6. Dry-run on last 1h: payments error rate hovered around 0.3%, would have
    fired 0 times. Clean, not too tight.
-7. Preview, save, report.
+7. Preview states severity `critical` with the error-rate row as the reason.
+   Save, report.
 
 ## Log-volume threshold with groupBy
 
@@ -56,7 +68,9 @@ log-volume groupBy, and anomaly detection.
 
 **Agent:**
 1. Intent parsed: logs, volume threshold, scope = all services (groupBy
-   `service.name`), threshold 1000/min, severity warning.
+   `service.name`), threshold 1000/min. Severity is `warning` from the
+   error-log volume row: the alert counts ERROR and FATAL lines and does
+   not fire on a single crash event.
 2. `signoz_get_field_keys signal=logs fieldContext=resource` confirms
    `service.name` exists; **no service filter required** since the user
    said "any service" → groupBy provides the scoping.

@@ -5,7 +5,7 @@
       "id": 0,
       "eval_name": "metric-cpu-multi-severity",
       "prompt": "set up an alert for cartservice CPU usage. warning at 80%, page on-call at 90%. send warnings to #staging-alerts slack and criticals to 'test pager send resolved' pagerduty.",
-      "expected_output": "Multi-severity METRIC_BASED_ALERT with two thresholds (warning 80, critical 90), per-severity channels (slack on warning, pagerduty on critical), service.name='cartservice' filter on a CPU metric (e.g. system.cpu.utilization or k8s.pod.cpu.utilization), targetUnit percent, op='above', matchType='on_average' (canonical word form preferred over numeric codes). Runs a concrete-metric data probe, then the mandatory full-query dry-run before emitting a plain-language summary and saving.",
+      "expected_output": "Multi-severity METRIC_BASED_ALERT with two thresholds (warning 80, critical 90), per-severity channels (slack on warning, pagerduty on critical), service.name='cartservice' filter on a CPU metric (e.g. system.cpu.utilization or k8s.pod.cpu.utilization), targetUnit percent, op='above', matchType='on_average' (canonical word form). Runs a concrete-metric data probe, then the mandatory full-query dry-run before emitting a plain-language summary and saving.",
       "expectations": [
         "Before direct-routing creation, the agent reuses a fully paginated signoz_list_notification_channels result only from the same still-current prepared operation or calls it until pagination.hasMore=false; if a requested name is unavailable, it presents exact returned choices and asks the user instead of guessing",
         "Every metric builder_query in the dry-run and create payload has limit=100 plus Query Builder v5 order by __result desc",
@@ -34,7 +34,7 @@
       "id": 2,
       "eval_name": "logs-pod-crash-keywords",
       "prompt": "create a log-based alert for pod crashes: fire if we see OOMKilled, CrashLoopBackOff, panic, or FATAL anywhere in log bodies. group by service so I know which one. notify #staging-alerts.",
-      "expected_output": "LOGS_BASED_ALERT, signal=logs, count() aggregation, body filter using LIKE/CONTAINS for the four keywords (OR'd), groupBy service.name with fieldContext=resource and fieldDataType=string. Threshold > 0, matchType='at_least_once' (canonical word form preferred over numeric codes). Runs the mandatory data probe and full-query dry-run. CRITICAL: crash-pattern alerts (OOMKilled / CrashLoopBackOff / panic / FATAL) intentionally have zero matches in a healthy system: agent must surface the zero-match result, ask the user to confirm before saving an alert that returns nothing now, and skip the would-have-fired breach-count computation per the skill's healthy-zero exception. Must NOT treat zero matches as a failure or nudge the user to loosen the filter.",
+      "expected_output": "LOGS_BASED_ALERT, signal=logs, count() aggregation, body filter using LIKE/CONTAINS for the four keywords (OR'd), groupBy service.name with fieldContext=resource and fieldDataType=string. Threshold > 0, matchType='at_least_once' (canonical word form). Runs the mandatory data probe and full-query dry-run. CRITICAL: crash-pattern alerts (OOMKilled / CrashLoopBackOff / panic / FATAL) intentionally have zero matches in a healthy system: agent must surface the zero-match result, ask the user to confirm before saving an alert that returns nothing now, and skip the would-have-fired breach-count computation per the skill's healthy-zero exception. Must NOT treat zero matches as a failure or nudge the user to loosen the filter.",
       "expectations": [
         "Every log builder_query in the dry-run and create payload has limit=100 plus Query Builder v5 order by count() desc (not dashboard orderBy)",
         "The full dry-run uses signoz_execute_builder_query with signal=logs in the builder_query spec",
@@ -152,6 +152,32 @@
         "No notification-channel tool call contains top-level type, slack_api_url, send_resolved, or flat provider fields",
         "Canonical payload uses name/displayName plus config.kind='slack' and config.spec.apiUrl/sendResolved",
         "The secret URL is not echoed in preview or final output"
+      ],
+      "files": []
+    },
+    {
+      "id": 11,
+      "eval_name": "error-rate-severity-from-defaults-table",
+      "prompt": "alert me when paymentservice error rate goes above 2%. send to #staging-alerts on slack.",
+      "expected_output": "TRACES_BASED_ALERT error-rate formula F1 = A*100/B on service.name='paymentservice' with threshold target 2 and targetUnit percent. The request has no severity or urgency cue, so the Severity defaults table decides: an error rate threshold above 1% is critical. The preview states severity critical and gives the error-rate row as the reason. The agent does not fall back to warning because the user did not say \"page\", \"wake up\", or \"critical\".",
+      "expectations": [
+        "The preview shown before signoz_create_alert states the severity as critical",
+        "The preview gives the error-rate default (threshold above 1%) as the reason for critical, not a user cue",
+        "The agent does not choose warning on the grounds that the user did not say page, wake up, or critical",
+        "If creation proceeds, the signoz_create_alert payload sets labels.severity=critical and names its threshold tier critical, with the returned Slack displayName in that tier's channels"
+      ],
+      "files": []
+    },
+    {
+      "id": 12,
+      "eval_name": "error-rate-severity-lowered-by-fyi-cue",
+      "prompt": "just FYI: let me know when cartservice error rate goes above 2%. send to #staging-alerts on slack.",
+      "expected_output": "TRACES_BASED_ALERT error-rate formula on service.name='cartservice' with threshold target 2 and targetUnit percent. The error-rate row of the Severity defaults table gives critical, and the user's \"just FYI\" cue lowers it one tier to warning. The preview states severity warning and gives the user's cue as the reason.",
+      "expectations": [
+        "The preview shown before signoz_create_alert states the severity as warning",
+        "The preview gives the user's \"just FYI\" cue as the reason the severity is below the critical default",
+        "The agent neither keeps critical nor lowers the severity two tiers to info",
+        "If creation proceeds, the signoz_create_alert payload sets labels.severity=warning and names its threshold tier warning"
       ],
       "files": []
     }

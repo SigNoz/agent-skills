@@ -49,7 +49,7 @@ guesses create noisy alerts on the wrong service:
 | Alert intent (NL goal) | yes | `$ARGUMENTS` or recent user turn |
 | Resource attribute filter (e.g. `service.name`, `k8s.namespace.name`, `host.name`) | yes | discover via `signoz_get_field_keys` + `signoz_get_field_values` |
 | Threshold value(s) | threshold / PromQL rules | derive a sensible default and surface in the preview; never substitute one for an absent-only request |
-| Severity | inferred from intent | default `warning`; promote to `critical` only if user said "page", "wake up", "critical" |
+| Severity | inferred from intent | resolve with *Severity defaults* in Step 5 |
 | Notification routing | yes | direct: verified channel display name(s); policy: confirmation that an existing org policy matches this rule |
 
 If a required input is missing and undiscoverable, **stop before any write**
@@ -76,8 +76,8 @@ Extract from the user's request:
    and the specific condition (CPU, error rate, p99 latency, log count, ...).
 2. **Resource scope**: which service, host, namespace, or environment.
 3. **Threshold**: numeric value and comparison ("above 80%", "below 100/s").
-4. **Severity**: implicit from urgency words ("page" → critical, default
-   warning otherwise).
+4. **Severity**: note any severity the user names and any urgency cue
+   ("page me", "just FYI"). Step 5 resolves the final value.
 5. **Routing**: direct channel name(s), or an explicit request to use a
    confirmed existing org notification policy.
 
@@ -174,9 +174,6 @@ result and ask the user to confirm before save. Treat this exception
 narrowly: it applies to "alert me when bad thing happens" log queries,
 not to alerts that depend on continuous data flow.
 
-This cheap probe catches no-data before the user reviews an alert that cannot
-fire.
-
 ### Step 5: Build the alert config
 
 The MCP server is the source of truth for the alert JSON schema, threshold
@@ -203,11 +200,10 @@ For most user intents, the config is one of a small number of patterns:
 | ClickHouse SQL alert: author SQL using the schema in `signoz://alert/examples` | non-trivial joins, custom aggregations the builder cannot express |
 | PromQL alert: delegate to `signoz-generating-queries` for the query, then return here | when user already has PromQL |
 
-**Threshold `op` and `matchType` values.** Prefer readable words; symbols and
-legacy numeric codes are accepted but discouraged. Valid `op` words are
-`above`, `below`, `equal`, `not_equal`,
-`above_or_equal`, `below_or_equal`, and `outside_bounds`; `equals` is invalid.
-Use `above` for anomaly rules: their absolute score covers spikes and drops.
+**Threshold `op` and `matchType` values.** Use these `op` words: `above`,
+`below`, `equal`, `not_equal`, `above_or_equal`, `below_or_equal`, and
+`outside_bounds`; `equals` is invalid. Use `above` for anomaly rules: their
+absolute score covers spikes and drops.
 
 | Comparison | `op` | Evaluation behavior | `matchType` |
 |---|---|---|---|
@@ -225,23 +221,34 @@ Use `above` for anomaly rules: their absolute score covers spikes and drops.
 - `matchType: "at_least_once"` for error counts / error rates:
   catches any breach.
 
-**Severity defaults: derive intrinsic urgency, not just wording.** An explicit
-cue overrides this table ("just FYI" → demote; "page me" → promote).
+**Severity defaults.** Resolve each threshold tier's severity in this order:
+
+1. Take the first matching row below (no cue needed), or `warning` if none.
+2. A user cue overrides the default. A named severity ("critical", "warning
+   at 80%") wins over an urgency cue. "Page me", "wake me up", or "urgent"
+   sets `critical`. "Just FYI", "no paging", or "low priority" lowers the
+   default one tier (`critical` to `warning`, `warning` to `info`, `info`
+   stays `info`). A cue tied to one threshold ("page me at 90%") applies
+   only to that tier. Ask when urgency cues conflict on the same tier.
+3. Name each threshold tier by its severity and set `labels.severity` to the
+   highest tier, which SigNoz's alert-rule list sorts and filters by. Every
+   firing carries that label, so on a multi-tier rule only `threshold.name`
+   shows which tier fired. Anomaly rules have no tiers: SigNoz uses the label
+   as the tier name. The Step 8 preview states each tier's severity and why.
 
 | Alert intent | Default severity |
 |---|---|
-| Pod crash / OOMKilled / CrashLoopBackOff / panic / FATAL log signals | critical |
+| Any single crash event: OOMKilled / CrashLoopBackOff / panic / FATAL log line | critical |
 | Service down / no-data on a production service | critical |
-| Error rate above any non-trivial threshold (>1%) | critical |
-| Error logs / exception spikes | warning |
+| SLO burn rate | 14.4× or more: critical; 6× to under 14.4×: warning; under 6× (e.g. ticket-level 1×): info |
+| Error rate with a threshold above 1% | critical |
+| Error log or exception volume above a count threshold | warning |
 | Latency degradation (p95/p99 above target) | warning |
 | CPU / memory / disk pressure | warning |
 | Request-rate / traffic anomaly | warning |
-| SLO budget burn (info-level burn rate) | info / warning |
 
-When the user's intent is ambiguous on severity (no urgency cue, no
-clearly-critical condition), default to `warning` and surface the choice
-in the preview so they can adjust.
+Example: "alert me when checkout error rate goes above 2%" is `critical`
+(error-rate row); the same request with "just FYI" is `warning`.
 
 **Attribute names**: use exact keys returned by `signoz_get_field_keys`; when
 available they are usually OTel names such as `service.name`, not `service`.
@@ -371,7 +378,9 @@ For a confirmed existing org policy on a threshold/PromQL rule, set
 `notificationSettings.usePolicy: true`, preserve the confirmed matcher labels
 and threshold tier, and omit threshold channels and `preferredChannels`. This
 skill does not create policies. If the policy or match criteria are not
-confirmed, stop and ask. Anomaly rules are direct-only.
+confirmed, stop and ask. Anomaly rules are direct-only. If the criteria route
+tiers by `severity`, stop and ask: every tier matches as the highest (Step 5).
+Offer a `threshold.name` matcher, one rule per tier, or direct routing.
 
 For direct routing, reuse a fully paginated same-operation channel result or
 page `signoz_list_notification_channels` until `hasMore=false`; its `total`
@@ -437,7 +446,8 @@ through the JSON does not catch query-shape errors (Step 6's dry-run
 does).
 
 > **Summary**: This alert fires when [condition] for [resource scope],
-> evaluated every [frequency] over the last [window]. Thresholds:
+> evaluated every [frequency] over the last [window]. Severity: [tier],
+> because [table row or user cue]. Thresholds:
 > warning at X, critical at Y. Notifications route through [direct channels / confirmed org policy]. Dry-run on
 > the last hour: would have fired N times.
 
@@ -451,7 +461,7 @@ does).
    this skill).
 3. On success, report:
    - The alert ID and name.
-   - What it watches and at what threshold.
+   - What it watches, at what threshold, and at what severity.
    - How notifications route (direct channels or the confirmed org policy).
    - The dry-run summary ("would have fired N times in last 1h").
 
@@ -464,10 +474,8 @@ does).
   duplicates and produces noise.
 - **Dry-run is mandatory** Complete Steps 4 and 6 before
   `signoz_create_alert`; a never-firing alert creates false confidence.
-- **Threshold operators use canonical words** Prefer valid words, never
-  `equals`. Numeric codes (`"1"`–`"7"`)
-  are accepted but discouraged: same goes for `matchType`
-  (`"on_average"` / `"at_least_once"`, not `"3"` / `"1"`).
+- **Threshold operators use canonical words** Use the `op` and `matchType`
+  words from Step 5, never `equals`.
 - **Signal must match alertType** `signal: "logs"` requires
   `LOGS_BASED_ALERT`. Mismatches fail validation.
 - **Anomaly rules are metrics-only** `anomaly_rule` + non-metric alertType
