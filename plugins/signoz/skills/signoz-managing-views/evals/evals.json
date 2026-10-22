@@ -310,7 +310,7 @@
         },
         {
           "text": "signal in every builder_query matches the view's source",
-          "description": "SigNoz saves a signal/source mismatch but the Explorer never renders it; the skill is the only guard"
+          "description": "A signal/source mismatch saves but never renders in the Explorer"
         }
       ]
     },
@@ -343,7 +343,7 @@
         },
         {
           "text": "Every builder_query spec has signal='metrics' AND source='meter'",
-          "description": "A meter view is queried on the metrics signal against the meter store; omitting source='meter' silently queries the default store, and nothing rejects the omission"
+          "description": "A meter view is queried on the metrics signal against the meter store; omitting source='meter' silently queries the default store"
         },
         {
           "text": "Every copied Cost Meter builder_query retains limit=100 plus Query Builder v5 order by __result desc and contains no dashboard orderBy",

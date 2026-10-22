@@ -124,14 +124,13 @@ threshold tickle or flap) and quantifies the magnitude.
    - Use `signoz_execute_builder_query` for the alert's stored builder,
      formula, PromQL, or ClickHouse query envelope.
    - Reproduce the stored query as stored. If the rule carries `limit` and
-     `order` on a grouped query, keep them for this run: SigNoz evaluates
-     only the top-N series they select (ranked over the whole window), so the
-     reproduction must see the same subset the evaluator saw. Record the cap
-     as a finding: a breaching group outside the top N was never evaluated,
-     and a `below` rule ordered descending can exclude every breaching
-     series. Rules created through older SigNoz MCP server releases carry an
-     injected `limit: 100` and `order`; the remediation is to update the
-     rule without them unless top-N alerting was the intent.
+     `order` on a grouped query, keep them for this run: only the top-N
+     series they select (ranked over the whole window) were evaluated, so
+     the reproduction must see the same subset. Record the cap as a
+     finding: a breaching group outside the top N was never evaluated, and
+     a `below` rule ordered descending can exclude every breaching series.
+     The remediation is to update the rule without `limit`/`order` unless
+     top-N alerting was the intent.
    - If the stored queries carry no bounds, the alert evaluated every
      series, but `signoz_execute_builder_query` still applies its own display
      `limit`. To check a specific fingerprint from Step 1, add its labels to

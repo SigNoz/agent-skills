@@ -9,7 +9,7 @@
       "expectations": [
         "Before direct-routing creation, the agent reuses a fully paginated signoz_list_notification_channels result only from the same still-current prepared operation or calls it until pagination.hasMore=false; if a requested name is unavailable, it presents exact returned choices and asks the user instead of guessing",
         "No query in the signoz_create_alert payload carries limit or order; any limit/order used in the signoz_execute_builder_query dry-run stays in the dry-run envelope",
-        "The signoz_create_alert payload sets schemaVersion=v2alpha1, an explicit evaluation block (rolling, evalWindow, frequency), notificationSettings, labels.severity, and condition.compositeQuery.panelType=graph rather than relying on injected defaults",
+        "The signoz_create_alert payload sets schemaVersion=v2alpha1, an explicit evaluation block (rolling, evalWindow, frequency), notificationSettings, labels.severity, and condition.compositeQuery.panelType=graph",
         "Every signoz_execute_builder_query dry-run carries start and end as JSON integer Unix-millisecond values in the outer query",
         "The data probe calls signoz_query_metrics with a concrete metricName and the cartservice filter; it never sends count() or count_distinct(service.name) as a metrics aggregation expression",
         "The signoz_create_alert payload puts Slack in the warning threshold channels and PagerDuty in the critical threshold channels",
