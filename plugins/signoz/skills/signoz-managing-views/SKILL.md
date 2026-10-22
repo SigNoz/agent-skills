@@ -9,7 +9,7 @@ description: >
   Explorer saved views, even if they don't say "view" explicitly. Also use
   when someone wants to share a recurring Explorer query with their team and
   asks how to "save" or "bookmark" it.
-argument-hint: <view name, source (traces/logs/metrics/meter), and filter intent>
+argument-hint: <view name, source (for example traces/logs/metrics/meter), and filter intent>
 ---
 
 # Managing Saved Views
@@ -27,8 +27,14 @@ parameter was renamed to `source`.
 This skill covers the full CRUD surface in one place because the operations
 share the same schema, the same identity model (UUID per view), and the same
 prerequisite resources. The only operation with real blast radius is delete,
-and update has a sharp edge (full-body replace); both get explicit guards
-below.
+and update has two sharp edges (full-body replace, and a `source` change
+moves the view to another Explorer); both get explicit guards below.
+
+SigNoz is the only validator. The MCP server forwards view payloads as sent
+and surfaces SigNoz's own error when it rejects one. It does not reject a
+`source` value, a `signal`/`source` mismatch, a Cost Meter placement, or a
+`source` change on update. The rules below are the skill's guards, not the
+server's, and each one states what happens when it is broken.
 
 ## Prerequisites
 
@@ -78,12 +84,16 @@ Read both MCP resources by URI using your client's resource-read mechanism:
 
 ### Create a view
 
-1. **Resolve `source`**: must be exactly one of `traces`, `logs`,
-   `metrics`, `meter`. If the user's intent is ambiguous ("save this query"),
-   ask which Explorer they mean. It cannot be inferred from filter strings
-   alone. Use `meter` for **Cost Meter** (usage / billing) views; it is a
-   distinct Explorer page from `metrics`, even though the query runs on the
-   metrics signal (see Step 4).
+1. **Resolve `source`**: the Explorer the view belongs to. The Explorers
+   with a saved-views page today are `traces`, `logs`, `metrics`, and
+   `meter`. SigNoz validates the value and accepts newer sources the UI does
+   not surface yet (for example `ai_observability`); use one of those only
+   when the user names it, and say that no Explorer page lists it. If the
+   user's intent is ambiguous ("save this query"), ask which Explorer they
+   mean. It cannot be inferred from filter strings alone. Use `meter` for
+   **Cost Meter** (usage / billing) views; it is a distinct Explorer page
+   from `metrics`, even though the query runs on the metrics signal (see
+   Step 4).
 2. **Read the schema resources.** Read both `signoz://view/instructions`
    and `signoz://view/examples` using your client's resource-read mechanism
    before composing any payload. Do not skip this step even if you think
@@ -132,13 +142,19 @@ Read both MCP resources by URI using your client's resource-read mechanism:
    including disabled flags and PromQL or SQL envelopes. On create, a PromQL
    or SQL envelope must come verbatim from the user or an existing view;
    `signoz-generating-queries` does not author it, so validate it in Step 5.
-4. **Enforce the signal rule** in every `builder_query` spec.
+4. **Enforce the signal rule** in every `builder_query` spec. Nothing
+   rejects a violation: SigNoz saves the view and the Explorer renders only
+   views whose queries match its signal, so a mismatched view is saved but
+   unusable. This step is the only guard.
    - For `traces` / `logs` / `metrics`: `signal == source`. A
-     `source:"traces"` view with `signal:"logs"` is a server-side error.
+     `source:"traces"` view with `signal:"logs"` saves successfully and never
+     renders in the Traces Explorer.
    - For `meter` (Cost Meter): `signal:"metrics"` **and** `source:"meter"`:
      a Cost Meter view is queried on the metrics signal against the meter
      store. Omitting `source:"meter"` silently queries the default metrics
-     store; setting `source:"meter"` on a non-`meter` source view is rejected.
+     store; setting `source:"meter"` inside a view whose top-level `source`
+     is `metrics` files it under the Metrics Explorer, where the Cost Meter
+     page never lists it.
 5. **Mandatory pre-save sample fetch.** Probe with the **exact** filter
    from `spec.queries[0].spec` against the destination
    signal:
@@ -182,18 +198,20 @@ preserving an authored `search()` filter.
 
 ### List or find views
 
-`signoz_list_views` requires a `source`. If the user did not
-specify one and is searching by name, call it once per source (traces,
-logs, metrics, meter) and merge; do not guess. Use the `name`
-parameter for server-side partial-match filtering when the user gives a
-substring; do not fetch everything and grep client-side. There is no
+`source` is optional on `signoz_list_views`. Pass it when the user names
+an Explorer. When the user did not specify one and is searching by name,
+call it once with `source` omitted: that single call lists every Explorer's
+views, so do not guess a source and do not fan out one call per source. Use
+the `name` parameter for server-side partial-match filtering when the user
+gives a substring; do not fetch everything and grep client-side. There is no
 `category` filter; it was removed with the v2 API.
 
 The response paginates. **Always check `pagination.hasMore`** before
 concluding a view does not exist. Default page size is 50; pass `offset =
 pagination.nextOffset` to continue. A view is only confirmed missing for a
-given `source` once you have walked pages until `hasMore = false`. As
-long as `hasMore = true`, keep paginating; there is no page-count cap.
+given listing (one `source`, or all Explorers when `source` is omitted)
+once you have walked pages until `hasMore = false`. As long as `hasMore =
+true`, keep paginating; there is no page-count cap.
 
 ### Get a single view
 
@@ -229,7 +247,13 @@ renaming a view means changing `spec.displayName`. The flow:
    envelope fields. For pure metadata tweaks (display-label rename), skip
    this step and do not touch `spec.queries`.
 4. Modify only the field(s) the user asked to change. Keep `source`
-   unchanged; a cross-source move is rejected.
+   unchanged unless the user asked to move the view: changing `source` on
+   update is accepted and moves the view to that Explorer's list. Treat a
+   move as a deliberate change with two consequences to state in the
+   preview: the view disappears from the old Explorer, and its queries must
+   satisfy the Step 4 signal rule for the new `source` or the moved view
+   never renders. For a `meter` or `metrics` move, also flip the
+   per-query `source:"meter"` field to match.
 5. **Mandatory pre-save sample fetch, when `spec.queries` changed.**
    Run the 1-row probe from the Create flow's Step 5 against the new
    filter. Empty → save anyway / revise / abort. Skip only for pure
@@ -256,8 +280,8 @@ affordance, not a substitute for getting the delete right. Treat this like
 dropping a row from a shared table:
 
 1. **List to locate.** Call `signoz_list_views` to find the view
-   by name. If `source` is unknown, search all four sources (traces,
-   logs, metrics, meter).
+   by name. If `source` is unknown, omit it so one call covers every
+   Explorer.
 2. **Get to confirm, mandatory.** Call `signoz_get_view` with the
    UUID from step 1. Do NOT skip this step even when you got the UUID from
    a list result that looks correct. List results are paginated and a name
@@ -316,9 +340,9 @@ call.
 | Operation | Tools called | Key guard |
 |-----------|-------------|-----------|
 | Create | read `signoz://view/instructions` + `signoz://view/examples` → `signoz-generating-queries` → **sample fetch on exact filter** → preview → `signoz_create_view` | Mandatory pre-save sample fetch; preview before write; no v1 fields |
-| List | `signoz_list_views` (× 4 if no source given: traces/logs/metrics/meter) | Check `pagination.hasMore` |
+| List | `signoz_list_views` (omit `source` to list every Explorer in one call) | Check `pagination.hasMore` |
 | Get | `signoz_get_view(id)` | Returns canonical body for update |
-| Update | `signoz_get_view` → modify → **sample fetch if `spec.queries` changed** → diff preview → `signoz_update_view` | Full replacement; name immutable (rename = `spec.displayName`); diff preview required |
+| Update | `signoz_get_view` → modify → **sample fetch if `spec.queries` changed** → diff preview → `signoz_update_view` | Full replacement; name immutable (rename = `spec.displayName`); a `source` change moves the view; diff preview required |
 | Delete | `signoz_list_views` → `signoz_get_view` → confirm → `signoz_delete_view` | Get-before-delete mandatory; fresh confirmation |
 
 ## Common mistakes
@@ -332,8 +356,10 @@ call.
 | Skipping the pre-save sample fetch because `signoz-generating-queries` already validated the query | The sub-skill validates the query *it* authored; the filter you persist may have been edited or lifted since then. The Step 5 sample fetch is mandatory regardless |
 | Skipping `signoz_get_view` before delete (relying on list UUID alone) | Always call `signoz_get_view` to confirm name+source before `signoz_delete_view` |
 | Trying to rename the machine `name` on update | `name` is immutable server-side; change `spec.displayName` for the visible label |
-| `signal` ≠ `source` in builder query | For traces/logs/metrics, every `builder_query.signal` must equal the view's `source`. For a `meter` view, use `signal:"metrics"` + `source:"meter"` (not `signal:"meter"`) |
-| Filing a Cost Meter view under `source:"metrics"` (with `source:"meter"`) | Cost Meter views go under `source:"meter"`; otherwise they're invisible in the Meter Explorer and mis-filed under Metrics. The server rejects `source:"meter"` on a non-`meter` source |
+| `signal` ≠ `source` in builder query | For traces/logs/metrics, every `builder_query.signal` must equal the view's `source`. For a `meter` view, use `signal:"metrics"` + `source:"meter"` (not `signal:"meter"`). SigNoz saves the mismatch; the Explorer never renders it |
+| Filing a Cost Meter view under `source:"metrics"` (with `source:"meter"`) | Cost Meter views go under `source:"meter"`; otherwise they're invisible in the Meter Explorer and mis-filed under Metrics. Nothing rejects the mis-filing, so check it before the write |
+| Changing `source` on update without the user asking | A `source` change is accepted and moves the view to another Explorer; keep the fetched `source` unless a move is the intent, and preview the move explicitly |
+| Calling `signoz_list_views` once per source when no source was given | Omit `source`; one unscoped call lists every Explorer's views |
 | Partial update body (omitting unchanged fields) | GET full body first → modify only changed fields → replace with `source` + full `spec` |
 | Declaring "no such view" after only page 1 | Check `pagination.hasMore`; continue with `offset = pagination.nextOffset` |
 | Normalizing away PromQL, SQL, disabled flags, selected fields, or unknown authored content | Preserve every field allowed by the current typed resource across read-modify-write; strip only known server-populated fields |

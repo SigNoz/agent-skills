@@ -82,16 +82,16 @@
       "id": 1,
       "name": "list-views-no-source",
       "prompt": "Show me all my saved views.",
-      "expected_output": "Agent recognizes no source was given, calls signoz_list_views four times (once for each of traces, logs, metrics, meter), merges results, and presents them organized by source. Checks pagination.hasMore for each page before concluding.",
+      "expected_output": "Agent recognizes no source was given and calls signoz_list_views once with source omitted, which lists every Explorer's views in one call. It does not fan out one call per source or guess a source. It walks pagination.hasMore to the end and presents the results organized by source.",
       "files": [],
       "assertions": [
         {
-          "text": "Agent calls signoz_list_views for all four sources: traces, logs, metrics, and meter",
-          "description": "Without a source the agent must query all four Explorer pages, including meter (Cost Meter)"
+          "text": "Agent calls signoz_list_views with source omitted instead of once per source",
+          "description": "source is optional; an unscoped call lists every Explorer, including meter (Cost Meter)"
         },
         {
-          "text": "Agent calls signoz_list_views for traces, logs, metrics, and meter",
-          "description": "All Explorer sources"
+          "text": "Agent does not guess a single source and does not call signoz_list_views separately for traces, logs, metrics, and meter",
+          "description": "One unscoped call replaces the per-source fan-out"
         },
         {
           "text": "Agent checks pagination.hasMore before concluding the list is complete",
@@ -115,7 +115,7 @@
       "id": 2,
       "name": "rename-existing-view",
       "prompt": "Rename the 'slow-checkout' view to 'slow-checkout-p99'.",
-      "expected_output": "Because the source is unknown, the agent searches all four sources with full pagination, then calls signoz_get_view. It previews a rename-only diff and calls signoz_update_view with the full fetched view body, changing only spec.displayName (the machine name is immutable server-side). Reports UUID, old label, and new label.",
+      "expected_output": "Because the source is unknown, the agent calls signoz_list_views with source omitted and walks pagination to the end, then calls signoz_get_view. It previews a rename-only diff and calls signoz_update_view with the full fetched view body, changing only spec.displayName (the machine name is immutable server-side) and keeping the fetched source. Reports UUID, old label, and new label.",
       "files": [],
       "assertions": [
         {
@@ -139,12 +139,12 @@
           "description": "V2 identity contract"
         },
         {
-          "text": "Agent searches all four sources with full pagination because source was not supplied",
-          "description": "Name is not globally resolved from one source"
+          "text": "Agent lists views with source omitted and full pagination because source was not supplied",
+          "description": "An unscoped list covers every Explorer; guessing one source can miss the view"
         },
         {
-          "text": "Agent searches traces, logs, metrics, and meter with pagination because the source was not supplied",
-          "description": "A saved-view name is not globally searchable through one source"
+          "text": "Agent does not guess a single source when the source was not supplied",
+          "description": "A saved-view name is not resolvable from one guessed source"
         },
         {
           "text": "Agent shows a diff-style preview before calling update",
@@ -176,7 +176,7 @@
       "id": 3,
       "name": "delete-view-by-name",
       "prompt": "Delete the 'checkout-errors' view.",
-      "expected_output": "Because the source is unknown, the agent searches all four sources with full pagination, then calls signoz_get_view to confirm the UUID maps to checkout-errors. It shows the resolved name and source, asks for confirmation, and only then calls signoz_delete_view.",
+      "expected_output": "Because the source is unknown, the agent calls signoz_list_views with source omitted and walks pagination to the end, then calls signoz_get_view to confirm the UUID maps to checkout-errors. It shows the resolved name and source, asks for confirmation, and only then calls signoz_delete_view.",
       "files": [],
       "assertions": [
         {
@@ -196,11 +196,11 @@
           "description": "Identity verification"
         },
         {
-          "text": "Agent searches traces, logs, metrics, and meter when source is unknown",
+          "text": "Agent lists views with source omitted when source is unknown",
           "description": "Complete resolution"
         },
         {
-          "text": "Agent searches traces, logs, metrics, and meter with pagination because the source was not supplied",
+          "text": "Agent walks pagination.hasMore on the unscoped listing because the source was not supplied",
           "description": "Deletion must not assume which Explorer owns the named view"
         },
         {
@@ -233,7 +233,7 @@
       "id": 4,
       "name": "update-view-filter",
       "prompt": "Update the 'checkout-errors' view to show only error spans slower than one second.",
-      "expected_output": "Because the source is unknown, the agent searches all four sources with full pagination, then gets the full view. It uses signoz-generating-queries to build has_error=true AND duration_nano>1000000000, sample-fetches the exact filter, previews the diff, confirms, and calls signoz_update_view with the full fetched view body containing the validated queries.",
+      "expected_output": "Because the source is unknown, the agent calls signoz_list_views with source omitted and walks pagination to the end, then gets the full view. It uses signoz-generating-queries to build has_error=true AND duration_nano>1000000000, sample-fetches the exact filter, previews the diff, confirms, and calls signoz_update_view with the full fetched view body containing the validated queries and the fetched source unchanged.",
       "files": [],
       "assertions": [
         {
@@ -265,11 +265,11 @@
           "description": "Step 5 of the update flow: spec.queries changed, so the 1-row probe against the new filter is required (skip only for pure metadata tweaks)"
         },
         {
-          "text": "Agent searches all four sources with full pagination because source is unknown",
+          "text": "Agent lists views with source omitted and full pagination because source is unknown",
           "description": "Resolve before mutation"
         },
         {
-          "text": "Agent searches traces, logs, metrics, and meter with pagination because the source was not supplied",
+          "text": "Agent does not guess a single source when the source was not supplied",
           "description": "Update must locate the view across every Explorer before GET-then-replace"
         },
         {
@@ -310,7 +310,7 @@
         },
         {
           "text": "signal in every builder_query matches the view's source",
-          "description": "signal != source is a server-side error"
+          "description": "SigNoz saves a signal/source mismatch but the Explorer never renders it; the skill is the only guard"
         }
       ]
     },
@@ -343,7 +343,7 @@
         },
         {
           "text": "Every builder_query spec has signal='metrics' AND source='meter'",
-          "description": "A meter view is queried on the metrics signal against the meter store; omitting source='meter' silently queries the default store, and the server rejects a meter view without it"
+          "description": "A meter view is queried on the metrics signal against the meter store; omitting source='meter' silently queries the default store, and nothing rejects the omission"
         },
         {
           "text": "Every copied Cost Meter builder_query retains limit=100 plus Query Builder v5 order by __result desc and contains no dashboard orderBy",

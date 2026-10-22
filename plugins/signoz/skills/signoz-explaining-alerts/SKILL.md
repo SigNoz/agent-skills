@@ -281,6 +281,12 @@ actually in the config:
   `alertOnAbsent: true` if it isn't set.
 - **GroupBy cardinality**: high-cardinality groupBy fields can produce
   many independent alert series; flag potential notification storms.
+- **`limit`/`order` on a grouped query**: SigNoz evaluates only the top-N
+  series they select, ranked over the whole window, so series beyond N are
+  never evaluated and a `below` rule ordered descending can miss every
+  breaching series. Unless top-N alerting is the intent, recommend removing
+  both; rules created through older SigNoz MCP server releases carry an
+  injected `limit: 100` and `order`.
 - **Filter completeness**: for `IN` / `NOT IN` filters with explicit
   value lists, flag values that look out of place or missing values
   that seem expected.

@@ -123,10 +123,22 @@ threshold tickle or flap) and quantifies the magnitude.
    start: `[fire_start - 30m, fire_start + 30m]`.
    - Use `signoz_execute_builder_query` for the alert's stored builder,
      formula, PromQL, or ClickHouse query envelope.
-   - Preserve positive bounds/order so Tier 1 reproduces the stored alert. If a formula input is below 10000, record truncation risk and compare at 10000 before ruling groups out.
-     For omissions, use 10000 on formula-input `builder_query` leaves and 100 on standalone/formula results. Find leaves from every formula expression, including `disabled: true` formulas, following references through the dependency graph.
-     This walk sets comparison bounds only; it does not prove deterministic formula-to-formula order. Use v5 `order`: `__result desc` for metrics/formulas or primary aggregation desc for logs/traces, never dashboard `orderBy`.
-     Time-series top-N ranks over the whole window and may omit a short-lived local spike.
+   - Reproduce the stored query as stored. If the rule carries `limit` and
+     `order` on a grouped query, keep them for this run: SigNoz evaluates
+     only the top-N series they select (ranked over the whole window), so the
+     reproduction must see the same subset the evaluator saw. Record the cap
+     as a finding: a breaching group outside the top N was never evaluated,
+     and a `below` rule ordered descending can exclude every breaching
+     series. Rules created through older SigNoz MCP server releases carry an
+     injected `limit: 100` and `order`; the remediation is to update the
+     rule without them unless top-N alerting was the intent.
+   - If the stored queries carry no bounds, the alert evaluated every
+     series, but `signoz_execute_builder_query` still applies its own display
+     `limit`. To check a specific fingerprint from Step 1, add its labels to
+     the filter instead of raising the limit; to rank groups, use v5 `order`
+     (`__result desc` for metrics/formulas, primary aggregation desc for
+     logs/traces), never dashboard `orderBy`, and say when exactly `limit`
+     groups came back.
 2. Compute:
    - **Peak value** during the fire window.
    - **Threshold breach magnitude**: `(peak - threshold) / threshold *

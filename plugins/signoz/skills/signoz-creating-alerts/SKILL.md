@@ -90,6 +90,13 @@ Map signal phrasing to alert type:
 | trace, span, latency p99, slow requests | TRACES_BASED_ALERT | traces |
 | exception, stack trace, crash | EXCEPTIONS_BASED_ALERT | (clickhouse_sql) |
 
+SigNoz validates `alertType`; the MCP server does not. The table lists the
+types the SigNoz alert UI can edit today. SigNoz also accepts newer types the
+UI does not surface yet, such as `AI_TRACES_BASED_ALERT` for LLM and AI-agent
+span telemetry. Use one of those only when the user names it or the intent
+cannot be expressed with a listed type, say that the UI has no editor for it,
+and let SigNoz accept or reject the value rather than refusing it yourself.
+
 If resource scope is missing, run discovery (Step 2). If still missing after
 discovery, stop and ask the user (see *Required inputs* above).
 
@@ -176,16 +183,37 @@ not to alerts that depend on continuous data flow.
 
 ### Step 5: Build the alert config
 
-The MCP server is the source of truth for the alert JSON schema, threshold
-codes, and validation rules. Read the `signoz://alert/instructions` and
-`signoz://alert/examples` MCP resources for the canonical, version-current
-shape.
+SigNoz is the only validator of alert payloads. The MCP server teaches the
+shape through its tool input schemas and the `signoz://alert/instructions`
+and `signoz://alert/examples` resources, forwards `signoz_create_alert` and
+`signoz_update_alert` payloads to SigNoz as sent, and surfaces SigNoz's own
+coded error when a payload is rejected. Read both resources for the
+canonical, version-current shape.
+
+Nothing fills in defaults for you. Compose the full payload and set these
+fields explicitly on every threshold or PromQL rule:
+
+- `schemaVersion: "v2alpha1"`. An omitted `schemaVersion` makes SigNoz read
+  the rule with v1 semantics and reject it for missing v1 condition fields.
+- `evaluation`: `{ "kind": "rolling", "spec": { "evalWindow": "5m0s",
+  "frequency": "1m0s" } }` unless the intent implies another cadence. SigNoz
+  rejects a v2alpha1 rule without it.
+- `notificationSettings`: SigNoz requires the block on v2alpha1 rules; set
+  `usePolicy` per Step 7 and `groupBy` on high-cardinality queries.
+- `labels.severity`: the highest tier's severity from *Severity defaults*
+  below. Without it the rule has no severity in the alert list.
+- `condition.compositeQuery.panelType: "graph"`. SigNoz stores an empty
+  value when it is omitted.
+
+Anomaly rules use the v1 shape instead: top-level `evalWindow` and
+`frequency`, `condition.op` / `matchType` / `target` / `algorithm` /
+`seasonality`, no `schemaVersion`, no `thresholds`, no `evaluation`, and no
+`notificationSettings`.
 
 Threshold/PromQL `condition.thresholds` requires `kind` (use `"basic"`) and
 non-empty `spec[]`. Current v2 cannot represent `alertOnAbsent` as the sole
 trigger. For an exact absent-only request, stop before any write and offer a
-combined threshold + absence rule only with explicit approval. Anomaly rules
-omit thresholds.
+combined threshold + absence rule only with explicit approval.
 
 For most user intents, the config is one of a small number of patterns:
 
@@ -213,7 +241,9 @@ absolute score covers spikes and drops.
 | not equal / != | `"not_equal"` | sum breaches | `"in_total"` |
 |  |  | last value breaches | `"last"` |
 
-**Defaults the skill applies (and surfaces in the preview):**
+**Choices the skill writes into the payload (and surfaces in the preview).**
+These are this skill's conventions, not server defaults; the payload must
+carry them explicitly:
 - `evalWindow: 5m0s`, `frequency: 1m0s`: change only if the intent implies
   a slower or faster cadence.
 - `matchType: "on_average"` for CPU / memory / latency: smooths
@@ -332,15 +362,23 @@ Run the full primary query (or formula) over the last hour:
   PromQL is not supported here; use `signoz_execute_builder_query`
   for that.
 
-Every persisted alert and dry-run builder query or formula needs a positive
-`limit` and non-empty Query Builder v5 `order`. Standalone queries and formula
-results use 100; every formula input uses 10000 because its limit applies before
-evaluation. Find inputs from every formula expression, including disabled
-formulas, and follow references to all builder-query leaves. This walk sets
-bounds, not formula evaluation order, so dry-run the complete composite. Use
-`__result desc` for metrics/formulas and the primary aggregation descending for
-logs/traces. Preserve the same specs; narrow filters/grouping if input
-cardinality can exceed 10000.
+**Omit `limit` and `order` from every query in the persisted rule**, builder
+queries, formula inputs, and formula results alike. On a grouped alert query
+SigNoz treats `limit` plus `order` as a top-N series cap: it evaluates only
+the top-N groups ranked over the whole evaluation window, so series beyond N
+are never evaluated, a group with a short-lived spike can be ranked out, and a
+`below` alert ordered descending can exclude every breaching series. Set them
+only when top-N alerting is the explicit intent ("alert on the five busiest
+hosts"), using Query Builder v5 wire `order`, never dashboard `orderBy`.
+
+The dry-run is different: `signoz_execute_builder_query` is a display
+context with a response budget, so the bounds `signoz-generating-queries`
+teaches for it (a positive `limit` and v5 `order` on each query) are fine
+there. They stay in the dry-run envelope only; never copy them into the
+`signoz_create_alert` payload. Because the dry-run returns at most `limit`
+groups, a breach count computed from it covers the returned groups only;
+when the groupBy can exceed that bound, say so in the preview rather than
+reporting the count as complete.
 
 Compute how many evaluation points breached the proposed threshold.
 Surface in the preview as **"would have fired N times in the last 1h"**.
@@ -397,7 +435,12 @@ secret store. If routing remains unresolved, stop and ask.
 
 Put exact returned display names in each threshold's `channels`; anomaly rules
 use top-level `preferredChannels`. Never substitute one routing field for the
-other.
+other. SigNoz enforces this, not the MCP server: it rejects a threshold tier
+with no channels and a channel displayName that does not exist unless
+`notificationSettings.usePolicy` is `true`, and it stores top-level
+`preferredChannels` on a v2alpha1 rule unused rather than rejecting it, so a
+threshold rule routed only through `preferredChannels` saves and then notifies
+nobody.
 
 #### Updating or handling secret-bearing channel config
 
@@ -476,10 +519,15 @@ does).
   `signoz_create_alert`; a never-firing alert creates false confidence.
 - **Threshold operators use canonical words** Use the `op` and `matchType`
   words from Step 5, never `equals`.
+- **Compose the full payload** Set `schemaVersion`, `evaluation`,
+  `notificationSettings`, `labels.severity`, and `panelType` yourself (Step
+  5); nothing injects them, and SigNoz is the only validator.
+- **No `limit` or `order` on persisted alert queries** They cap a grouped
+  alert to its top-N series (Step 6). Keep them in the dry-run envelope only.
 - **Signal must match alertType** `signal: "logs"` requires
-  `LOGS_BASED_ALERT`. Mismatches fail validation.
-- **Anomaly rules are metrics-only** `anomaly_rule` + non-metric alertType
-  is rejected.
+  `LOGS_BASED_ALERT`. SigNoz rejects mismatches.
+- **Anomaly rules are metrics-only** SigNoz rejects `anomaly_rule` with a
+  non-metric alertType.
 - **Routing must be confirmed.** Direct routes use exact returned
   `displayName` values from the fully paginated
   `signoz_list_notification_channels`; put them in per-threshold
@@ -503,8 +551,8 @@ formula, log-volume groupBy, and anomaly detection) live in
 ## Additional resources
 
 - `signoz://alert/instructions` and `signoz://alert/examples` MCP resources:
-  full alert config JSON schema, threshold codes, filter expression
-  syntax, and version-current pattern examples. Always preferred over any
-  transcribed copy.
+  the alert payload shape, the fields SigNoz requires you to set explicitly,
+  threshold codes, filter expression syntax, and version-current pattern
+  examples. Always preferred over any transcribed copy.
 - `signoz-generating-queries` skill: for authoring PromQL or testing queries
   before wrapping them in an alert.
