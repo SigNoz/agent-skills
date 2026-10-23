@@ -106,9 +106,28 @@ If the user asks about a particular service/host/group instead, partition by
 a rule-wide fire. A grouped rule can have many series transitions while the
 overall rule remains continuously firing.
 
-If the alert never fired in the window, say so explicitly:
-"Has not fired in the last 7d." If the alert is disabled, mention that
-separately; disabled rules can still have earlier fires in the lookback.
+If the complete history has no firing transitions, report what the tool
+returned: "No firing events were returned for the last 7d." Do not shorten
+this to "has not fired" or "never fired". Complete history can still miss
+fires because of retention or because the rule was recreated under a new ID.
+Add that caveat when the user relies on the answer, for example when they
+expected the alert to fire. If a history call fails or pagination
+stops before `nextCursor` is absent, say the history is incomplete and report
+any count as "at least N"; never report zero from a failed or partial read.
+
+Report these as separate facts, each from its own source:
+
+- **Firing history**: transitions returned by `signoz_get_alert_history`.
+- **Current state**: the rule's `state` from `signoz_get_alert`, or current
+  instances from `signoz_list_alerts`.
+- **Configuration**: `disabled`, thresholds, and routing from
+  `signoz_get_alert`.
+- **Notification delivery**: no SigNoz alert tool returns it. A firing
+  transition, a configured channel, or a passed channel test does not show
+  that a notification was sent or received.
+
+Do not derive one from another. A disabled rule can still have earlier fires
+in the lookback, and an empty history does not show the rule is inactive now.
 
 This single line grounds the explanation. Do **not** drill into specific
 fires here; that's `signoz-investigating-alerts`.
@@ -263,14 +282,20 @@ actually in the config:
   `alertOnAbsent: true` if it isn't set.
 - **GroupBy cardinality**: high-cardinality groupBy fields can produce
   many independent alert series; flag potential notification storms.
+- **`limit`/`order` on a grouped query**: only the top-N series they
+  select, ranked over the whole window, are evaluated, so series beyond N
+  are never evaluated and a `below` rule ordered descending can miss every
+  breaching series. Unless top-N alerting is the intent, recommend removing
+  both.
 - **Filter completeness**: for `IN` / `NOT IN` filters with explicit
   value lists, flag values that look out of place or missing values
   that seem expected.
 - **Fire frequency vs threshold**: if Step 3 shows the alert fires
   many times a day (>10/day in the 7d window), the threshold is likely
-  too tight; if it never fires and the user is asking because they
-  expected it to, the threshold may be too loose or the query may be
-  wrong.
+  too tight; if no firing events were returned and the user expected the
+  alert to fire, the threshold may be too loose or the query may be
+  wrong. Present these as possibilities to check, alongside missing
+  retained history.
 
 ### Step 6: Offer next steps
 
@@ -291,6 +316,9 @@ follow-ups is better than offering wrong ones.
 - **Always pull fire history.** The one-line frequency summary grounds the
   explanation, including for disabled alerts: disabled rules can still have
   earlier fires in the lookback.
+- **Scope history claims to the returned data.** Empty history supports "No
+  firing events were returned for the last 7d", not "has not fired". Do not
+  infer health, correct thresholds, or notification delivery from it.
 - **Decode, don't dump.** Translate `op`, `matchType`, filter
   expressions, and query JSON into operational language. Show raw JSON
   only if the user asks.
@@ -354,7 +382,8 @@ follow-ups is better than offering wrong ones.
    two thresholds (warning 80%, critical 90%), `matchType=3` on_average,
    filter `deployment.environment.name = 'production'`, groupBy
    `host.name`.
-2. `signoz_get_alert_history id=17` → has not fired in last 7d.
+2. `signoz_get_alert_history id=17` → complete pages, no firing events
+   returned for the last 7d.
 3. The user asked "is it well configured?"; the TL;DR leads with the
    **verdict**, not a generic description. Then explanation + full
    audit:
@@ -363,8 +392,10 @@ follow-ups is better than offering wrong ones.
    > is the right call for CPU), but two gaps to fix: (1) no
    > `alertOnAbsent` (a crashed agent silently stops reporting and
    > this rule won't catch it); (2) annotations are default (a
-   > runbook URL would help on-call). Has not fired in the last 7d
-   > (could mean production is healthy or thresholds too loose).
+   > runbook URL would help on-call). No firing events were returned
+   > for the last 7d. That alone does not show production is healthy
+   > or the thresholds are too loose, and history may not be retained
+   > for the full window.
    >
    > **What it watches**: `system.cpu.utilization` on
    > `deployment.environment.name = 'production'`, grouped by

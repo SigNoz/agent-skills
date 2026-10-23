@@ -239,20 +239,62 @@ not apply to PromQL or ClickHouse SQL envelopes.
 
 ### Step 5: Handle results
 
+**Scope every claim to what the read returned.** Before reporting, classify
+each result:
+
+1. **Failed read**: the tool returned an error or timed out. This is not
+   evidence of absence. Say the read failed, quote the error, and never report
+   zero, "none", or a total from it.
+2. **Partial result**: a raw search whose note reports `hasMore=true`, any
+   response with a `nextCursor` or a note saying more results exist or may
+   exist, or a `groupBy` aggregate that returned exactly `limit` groups
+   (aggregate tools do not flag this, so treat it as truncated). Claims cover
+   only the returned rows ("the 100 most recent matching logs all come from
+   pod-a"). Never present a count of returned rows as a total, and never
+   claim "none" or "all" for the full scope or window from a partial result.
+3. **Complete result**: a successful aggregate over the full requested scope
+   and window, or a raw search whose note reports `hasMore=false` (fewer rows
+   than `limit`, including zero). Only this supports "none", "all", or a
+   total over the full scope. For a total larger than one page, use
+   `signoz_aggregate_logs` or `signoz_aggregate_traces` with
+   `aggregation: count`.
+
 **Data returned:**
 - Present findings as neutral observations with timestamps and values.
 - Include the time range in your response.
-- For aggregations with `groupBy`, highlight the top entries and mention total
-  group count if truncated by `limit`.
+- For aggregations with `groupBy`, highlight the top entries. If exactly
+  `limit` groups came back, say more groups may exist; the total group count
+  is not reported.
 - For search results, summarize patterns rather than listing every entry.
 
-**No data returned. Apply the three-way distinction:**
-1. **Healthy zero**: The query ran successfully but the count is zero. Say so:
-   "No errors found for checkout-service in the last hour; error count is zero."
-2. **No data in range**: The field/metric exists but no data points fall in the
-   time window. Suggest expanding: "No data in the last hour. Try a wider range?"
-3. **Missing instrumentation**: The metric, field, or service doesn't exist in
-   discovery results. Say what's missing and suggest how to instrument.
+**No data returned.** Report what was empty and its scope, and claim nothing
+beyond it:
+
+1. **Zero over the requested scope**: a successful, complete query returned no
+   matches. Say so with the filter and window: "No error spans matched
+   `service.name = 'checkout-service'` in the last hour." Absence of errors or
+   traces does not establish that the service is healthy, that it was never
+   running, or why the data is missing. Offer such explanations only as
+   labeled possibilities.
+2. **No data in range**: the field or metric was seen in discovery, but no
+   data points fall in the requested window. Report the empty window and
+   suggest a wider range. Older data seen in a wider window is outside the
+   requested window, not recent activity.
+3. **Not found in discovery**: the metric, field, or service is absent from
+   discovery results. Discovery is scoped and capped, and a miss in a
+   truncated list shows nothing:
+   - `signoz_list_services` lists only services with traces (6h by default).
+     Follow `pagination.nextOffset` until `hasMore=false`. A service missing
+     here may still send logs or metrics.
+   - `signoz_list_metrics` lists metrics active in the window (1h by default)
+     and has no paging. If its note reports `hasMore=true`, narrow with
+     `searchText`.
+   - `signoz_get_field_keys` and `signoz_get_field_values` set
+     `data.complete=false` when they truncate. Narrow with `searchText`.
+
+   From a complete list, report "not seen in <signal> for <window>" rather
+   than "does not exist" or "not instrumented". Missing instrumentation is
+   one possibility to check, alongside a wider window or a different name.
 
 **Drill-down:**
 - If an aggregation reveals an interesting pattern (spike, outlier service),
@@ -272,6 +314,9 @@ not apply to PromQL or ClickHouse SQL envelopes.
 - **Never claim root cause**: Present data patterns and correlations. Write
   "Error rate for checkout increased from 0.2% to 4.1% at 14:05" not "The
   deployment caused the errors."
+- **Never claim absence beyond the evidence**: A failed, timed-out, or partial
+  read shows nothing about absence. "None", "all", and totals need a complete
+  result over the requested scope (Step 5).
 - **One focused query per question**: Do not scatter-shot multiple queries when
   one precise query answers the question. Use parallel discovery calls, but be
   precise for execution.

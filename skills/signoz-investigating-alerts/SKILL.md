@@ -30,9 +30,7 @@ This skill calls SigNoz MCP server tools heavily (`signoz_get_alert`,
 `signoz_get_trace_details`, etc.). Before running the workflow,
 confirm the `signoz_*` tools are available. If they are not, the
 SigNoz MCP server is not installed or configured; run `signoz-mcp-setup` first
-to initialize or repair the MCP connection. The investigation depends on
-correlating multiple MCP queries; without the server there is no way to ground
-the analysis.
+to initialize or repair the MCP connection.
 
 ## When to use
 
@@ -64,11 +62,17 @@ If the alert name is fuzzy, this skill is **best-effort** (read-only):
    fire, tell me."
 3. Proceed.
 
-If no firing transition exists in the queried lookback window, **stop**: there is
-nothing to investigate. Respond with:
-> "Alert '[name]' has not fired in the last 7d, so there is no fire
-> window to investigate. Use `signoz-explaining-alerts` to walk through
-> the rule, or check whether the alert is enabled."
+If the complete history (every page fetched, no failed call) has no firing
+transition in the queried lookback window, **stop**: there is no fire window to
+investigate. Respond with:
+> "No firing events were returned for alert '[name]' in the last 7d, so
+> there is no fire window to investigate. Use `signoz-explaining-alerts` to
+> walk through the rule, or check whether the alert is enabled."
+
+Never shorten this to "has not fired": retention or a rule recreated under a new
+ID can empty a complete history. If a history call fails or pagination stops
+early, say the history could not be fully read. Report firing history, current
+`state`, `disabled`, and delivery (no alert tool returns it) as separate facts.
 
 ## Workflow
 
@@ -120,10 +124,21 @@ threshold tickle or flap) and quantifies the magnitude.
    start: `[fire_start - 30m, fire_start + 30m]`.
    - Use `signoz_execute_builder_query` for the alert's stored builder,
      formula, PromQL, or ClickHouse query envelope.
-   - Preserve positive bounds/order so Tier 1 reproduces the stored alert. If a formula input is below 10000, record truncation risk and compare at 10000 before ruling groups out.
-     For omissions, use 10000 on formula-input `builder_query` leaves and 100 on standalone/formula results. Find leaves from every formula expression, including `disabled: true` formulas, following references through the dependency graph.
-     This walk sets comparison bounds only; it does not prove deterministic formula-to-formula order. Use v5 `order`: `__result desc` for metrics/formulas or primary aggregation desc for logs/traces, never dashboard `orderBy`.
-     Time-series top-N ranks over the whole window and may omit a short-lived local spike.
+   - Reproduce the stored query as stored. If the rule carries `limit` and
+     `order` on a grouped query, keep them for this run: only the top-N
+     series they select (ranked over the whole window) were evaluated, so
+     the reproduction must see the same subset. Record the cap as a
+     finding: a breaching group outside the top N was never evaluated, and
+     a `below` rule ordered descending can exclude every breaching series.
+     The remediation is to update the rule without `limit`/`order` unless
+     top-N alerting was the intent.
+   - If the stored queries carry no bounds, the alert evaluated every
+     series, but `signoz_execute_builder_query` still applies its own display
+     `limit`. To check a specific fingerprint from Step 1, add its labels to
+     the filter instead of raising the limit; to rank groups, use v5 `order`
+     (`__result desc` for metrics/formulas, primary aggregation desc for
+     logs/traces), never dashboard `orderBy`, and say when exactly `limit`
+     groups came back.
 2. Compute:
    - **Peak value** during the fire window.
    - **Threshold breach magnitude**: `(peak - threshold) / threshold *
@@ -191,7 +206,7 @@ specific failing operations.
      `<scope_filter>` AND `severity_text IN ('ERROR', 'FATAL')`. Cap
      at top 20 most recent.
    - Group by `body` pattern (or `exception.type` if present). Surface
-     the top 3 distinct messages with counts.
+     the top 3 distinct messages with their counts in the sample.
 
 3. Cross-reference: do the traces and logs point at the same
    downstream service, dependency, or code path? If so, that becomes
@@ -214,10 +229,6 @@ action. Example:
 > 14:32 UTC; most likely cause is payments-api timing out
 > (high confidence). Open trace `7af3a09b…` to see the failing call."
 
-If no hypothesis reaches medium confidence, the leading line is
-"No clear root cause found." rather than a low-confidence guess
-dressed up as the answer.
-
 **2. What fired**
 The alert (id, name), the fire window (absolute UTC + relative),
 peak magnitude ("error rate hit 12.4% vs. 5% threshold, 148% over"),
@@ -226,8 +237,9 @@ fire duration, and the fire pattern (`one-off` / `sustained` /
 
 **3. Investigation trail**
 A scannable list of what was checked, with ✅ for confirmed signals
-and ❌ for ruled out, each followed by a one-line finding. The point
-is that the reader can see what work the AI did and what it found.
+and ❌ for ruled out, each followed by a one-line finding; a query that failed
+or timed out is "not checked", with the error. The point is that the reader
+can see what work the AI did and what it found.
 Example:
 - ✅ Tier 1: peak error rate 12.4%, fire was real (not marginal).
 - ✅ Tier 2: payments error rate +8900%, p99 +1180%; downstream
@@ -273,9 +285,6 @@ handles so the user can act immediately:
 - "Open an incident" or "page the owning team" if the cause is
   cross-service.
 
-Do not pad with generic advice ("verify connectivity", "check
-dashboards"); that's noise during an active incident.
-
 **Mirroring as navigation chips.** Mirror up to 3 of these "Suggested
 next steps" as host follow-up intents: the most actionable,
 alert-scoped ones. Keep the rest in the report prose so the user has
@@ -302,6 +311,9 @@ the full picture. The chip surface is capped; the prose is not.
   gates are not optional optimizations.
 - **Anchor every claim to an MCP query result.** No speculation. If
   evidence is missing, lower confidence and say so.
+- **A failed or partial read rules nothing out.** An errored or timed-out query
+  is "not checked". Capped trace or log samples support claims only about their
+  rows; "none", "all", or a total for the window needs a complete result.
 - **Show the supporting query** with each hypothesis so the user can
   reproduce and dig deeper.
 - **Keep it short and evidence-backed.** TL;DR is one or two sentences max; the
@@ -362,8 +374,8 @@ the full picture. The chip surface is capped; the prose is not.
 5. **Tier 3**: traces for `service.name = checkout, has_error = true`
    in the fire window: top operation `POST /checkout/submit`, top
    error message "context deadline exceeded calling payments-api".
-   30 traces, all hitting the same downstream URL. Logs show
-   matching "payments client timeout" lines, 142 occurrences.
+   All 20 sampled error traces hit the same downstream URL; 17 of 20
+   sampled error logs read "payments client timeout".
 6. **Output**:
 
    > **TL;DR**: checkoutservice error rate hit 12.4% (threshold 5%)
@@ -379,13 +391,13 @@ the full picture. The chip surface is capped; the prose is not.
      - ✅ Tier 2: payments error rate +8900%, p99 latency +1180%,
        throughput −42%.
      - ❌ CPU / memory pressure on checkout: flat.
-     - ✅ Tier 3: 30 error traces all hit payments-api with
-       `context deadline exceeded`; 142 matching timeout logs.
+     - ✅ Tier 3: all 20 sampled error traces hit payments-api with
+       `context deadline exceeded`; 17 of 20 sampled logs are timeouts.
    - **Likely causes** (high confidence): payments service errors
      cascading into checkout. Evidence converges across topology
      (checkout → payments edge), temporal precedence (payments
-     errors lead checkout p99), and shared entity (every error
-     trace targets the payments-api URL).
+     errors lead checkout p99), and shared entity (every sampled
+     error trace targets the payments-api URL).
    - **Ruled out**: checkout-side resource pressure (CPU/memory
      flat); upstream traffic spike (throughput dropped, didn't
      spike).
@@ -450,9 +462,9 @@ the full picture. The chip surface is capped; the prose is not.
    - p99 latency: +30% (mild).
    - CPU: -80% (collapsed). Memory: -60%.
    - Pod restarts (k8s): 4 in fire window.
-5. **Tier 3**: logs for inventory in fire window. Top message: "OOMKilled
-   restarting" (1,200 occurrences). Top trace error: graceful-shutdown
-   exceptions.
+5. **Tier 3**: logs for inventory in fire window. Top message in the
+   20-row sample: "OOMKilled restarting" (14 of 20). Top trace error:
+   graceful-shutdown exceptions.
 6. **Output**:
 
    > **TL;DR**: log volume alert 14 fired at 03:12 UTC for
@@ -469,17 +481,17 @@ the full picture. The chip surface is capped; the prose is not.
      - ✅ Tier 2: request error rate +600%; CPU/memory collapsed
        (−80%/−60%); 4 pod restarts in window.
      - ❌ p99 latency: only +30%, not a latency-driven incident.
-     - ✅ Tier 3: top log message "OOMKilled restarting" (1,200
-       occurrences); top trace error: graceful-shutdown exceptions.
+     - ✅ Tier 3: top sampled log message "OOMKilled restarting" (14 of
+       20); top trace error: graceful-shutdown exceptions.
    - **Likely causes** (high confidence): inventory pods OOM-killed
      and restarted 4 times during the window. Evidence converges
      across topology (single service), temporal precedence (memory
      fell to zero before error spike), shared entity (all log lines
      from `service.name = inventory`), and a single coherent
      pattern (OOM → restart → graceful-shutdown noise).
-   - **Ruled out**: a true application error-rate change (errors
-     are restart noise, not request-path failures); upstream
-     traffic surge (throughput unchanged).
+   - **Ruled out**: upstream traffic surge (throughput unchanged). Not
+     ruled out: request-path failures (6 of 20 sampled logs are not
+     restarts); count restart vs all error logs to separate them.
    - **Next steps**: check container memory limits for inventory
      pods; review recent deploys; consider whether the alert should
      exclude restart-related error patterns or whether the
