@@ -8,7 +8,8 @@
       "expected_output": "Multi-severity METRIC_BASED_ALERT with two thresholds (warning 80, critical 90), per-severity channels (slack on warning, pagerduty on critical), service.name='cartservice' filter on a CPU metric (e.g. system.cpu.utilization or k8s.pod.cpu.utilization), targetUnit percent, op='above', matchType='on_average' (canonical word form). Runs a concrete-metric data probe, then the mandatory full-query dry-run before emitting a plain-language summary and saving.",
       "expectations": [
         "Before direct-routing creation, the agent reuses a fully paginated signoz_list_notification_channels result only from the same still-current prepared operation or calls it until pagination.hasMore=false; if a requested name is unavailable, it presents exact returned choices and asks the user instead of guessing",
-        "Every metric builder_query in the dry-run and create payload has limit=100 plus Query Builder v5 order by __result desc",
+        "No query in the signoz_create_alert payload carries limit or order; any limit/order used in the signoz_execute_builder_query dry-run stays in the dry-run envelope",
+        "The signoz_create_alert payload sets schemaVersion=v2alpha1, an explicit evaluation block (rolling, evalWindow, frequency), notificationSettings, labels.severity, and condition.compositeQuery.panelType=graph",
         "Every signoz_execute_builder_query dry-run carries start and end as JSON integer Unix-millisecond values in the outer query",
         "The data probe calls signoz_query_metrics with a concrete metricName and the cartservice filter; it never sends count() or count_distinct(service.name) as a metrics aggregation expression",
         "The signoz_create_alert payload puts Slack in the warning threshold channels and PagerDuty in the critical threshold channels",
@@ -25,7 +26,8 @@
       "expectations": [
         "If creation proceeds after duplicate resolution, the direct channel is in condition.thresholds.spec[].channels",
         "If creation proceeds after duplicate resolution, the exact returned channel displayName is in condition.thresholds.spec[].channels",
-        "If creation proceeds, trace builder_query inputs A and B use limit=10000 plus v5 order by count() desc in both the dry-run and persisted alert, while builder_formula F1 uses limit=100 plus v5 order by __result desc",
+        "If creation proceeds, the persisted builder_query inputs A and B and builder_formula F1 carry no limit or order; the dry-run may carry display bounds that are not copied into the persisted alert",
+        "If creation proceeds, the signoz_create_alert payload sets schemaVersion=v2alpha1 with explicit evaluation and notificationSettings blocks",
         "The trace data probe calls signoz_aggregate_traces with aggregation=count, never aggregation=count()"
       ],
       "files": []
@@ -36,7 +38,8 @@
       "prompt": "create a log-based alert for pod crashes: fire if we see OOMKilled, CrashLoopBackOff, panic, or FATAL anywhere in log bodies. group by service so I know which one. notify #staging-alerts.",
       "expected_output": "LOGS_BASED_ALERT, signal=logs, count() aggregation, body filter using LIKE/CONTAINS for the four keywords (OR'd), groupBy service.name with fieldContext=resource and fieldDataType=string. Threshold > 0, matchType='at_least_once' (canonical word form). Runs the mandatory data probe and full-query dry-run. CRITICAL: crash-pattern alerts (OOMKilled / CrashLoopBackOff / panic / FATAL) intentionally have zero matches in a healthy system: agent must surface the zero-match result, ask the user to confirm before saving an alert that returns nothing now, and skip the would-have-fired breach-count computation per the skill's healthy-zero exception. Must NOT treat zero matches as a failure or nudge the user to loosen the filter.",
       "expectations": [
-        "Every log builder_query in the dry-run and create payload has limit=100 plus Query Builder v5 order by count() desc (not dashboard orderBy)",
+        "The persisted log builder_query grouped by service.name carries no limit or order, so every service is evaluated rather than a top-N subset; any dry-run bounds stay in the dry-run envelope",
+        "The signoz_create_alert payload sets schemaVersion=v2alpha1 with explicit evaluation and notificationSettings blocks and panelType=graph",
         "The full dry-run uses signoz_execute_builder_query with signal=logs in the builder_query spec",
         "The log data probe calls signoz_aggregate_logs with aggregation=count, never aggregation=count()",
         "The signoz_create_alert payload puts the chosen Slack channel in condition.thresholds.spec[].channels",
@@ -52,7 +55,7 @@
       "expectations": [
         "The anomaly create payload omits condition.thresholds, evaluation, notificationSettings, and schemaVersion",
         "The metric data probe calls signoz_query_metrics with a concrete metricName and service.name='frontend'; it never uses an expression-only count() metrics aggregation",
-        "The persisted base metric builder_query and its signoz_execute_builder_query dry-run each have limit=100 plus Query Builder v5 order by __result desc and no dashboard orderBy",
+        "The persisted base metric builder_query carries no limit, order, or dashboard orderBy; the anomaly payload sets top-level evalWindow and frequency and condition.op/matchType/target/algorithm/seasonality explicitly",
         "The signoz_create_alert payload has top-level preferredChannels containing the selected Slack channel",
         "The signoz_create_alert payload has top-level preferredChannels containing the selected Slack displayName, not its machine name",
         "The signoz_execute_builder_query dry-run validates the base metric query without claiming to validate the anomaly functions transform or anomaly score"
@@ -69,7 +72,7 @@
         "The full dry-run preserves having.expression=count() > 50 in the Query Builder spec",
         "The signoz_create_alert payload places both Slack and PagerDuty names in the critical threshold channels array",
         "The signoz_create_alert payload places both returned Slack and PagerDuty displayNames in the critical threshold channels array",
-        "The trace builder_query persisted and dry-run has limit=100 plus Query Builder v5 order by p99(duration_nano) desc",
+        "The persisted trace builder_query carries no limit or order; the signoz_create_alert payload sets schemaVersion=v2alpha1 with explicit evaluation and notificationSettings blocks",
         "The trace data probe calls signoz_aggregate_traces with aggregation=count, never aggregation=count()"
       ],
       "files": []
