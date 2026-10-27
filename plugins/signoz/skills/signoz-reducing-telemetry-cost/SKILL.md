@@ -159,7 +159,7 @@ step are candidates only. Complete the alert check in Step 3c before recommendin
 reduction, including a source log-level change.
 
 **Path A, service mode (≥ 10%).** Get the severity mix with `signoz_aggregate_logs`,
-`aggregation: count`, `groupBy: "service.name,severity_text"`. Classify severities: REDUCIBLE =
+`aggregations: "count()"`, `groupBy: "service.name,severity_text"`. Classify severities: REDUCIBLE =
 INFO, INFORMATION, DEBUG, TRACE, VERBOSE; HIGH-SIGNAL = ERROR, FATAL, CRITICAL, WARN, WARNING.
 For each top service by GB:
 - Reducible-dominant + own service code → candidate: set `LOG_LEVEL=WARN` (stops generation at
@@ -220,7 +220,7 @@ Run when the Cost Meter shows span data, ordered by its cost contribution, or wh
 explicitly asks about span cost.
 
 **4a. Global operation-name view, read this first.** `signoz_aggregate_traces`,
-`aggregation: count`, `groupBy: "name"`, `orderBy: "count() desc"`, limit 20, **no service
+`aggregations: "count()"`, `groupBy: "name"`, `orderBy: "count() desc"`, limit 20, **no service
 filter**. This surfaces auto-instrumentation noise (health checks, SQL, cache, sidecars) across
 all services at once.
 

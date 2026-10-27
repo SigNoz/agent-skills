@@ -30,14 +30,14 @@
       "id": 2,
       "eval_name": "traces-p99-latency-by-operation",
       "prompt": "What's the p99 latency for cart-service broken down by operation in the last 30 minutes?",
-      "expected_output": "Agent uses signoz_aggregate_traces with aggregation=p99, aggregateOn=duration_nano, service=cart-service, groupBy=name, requestType=scalar, timeRange=30m. Reports top operations by p99.",
+      "expected_output": "Agent uses signoz_aggregate_traces with aggregations=p99(duration_nano), service=cart-service, groupBy=name, requestType=scalar, timeRange=30m. Reports top operations by p99.",
       "files": []
     },
     {
       "id": 3,
       "eval_name": "traces-time-series-error-spike",
       "prompt": "When did errors spike for the frontend service today?",
-      "expected_output": "Agent uses signoz_aggregate_traces with error=true, service=frontend, requestType=time_series (NOT scalar: temporal question), aggregation=count, time window covers today. Identifies the spike timestamp.",
+      "expected_output": "Agent uses signoz_aggregate_traces with error=true, service=frontend, requestType=time_series (NOT scalar: temporal question), aggregations=count(), time window covers today. Identifies the spike timestamp.",
       "files": []
     },
     {
@@ -69,9 +69,9 @@
       "id": 6,
       "eval_name": "traces-simple-grouped-count-prefers-aggregate",
       "prompt": "Rank the top 10 services by error span count over the last hour.",
-      "expected_output": "Agent discovers the trace grouping key, then uses signoz_aggregate_traces with bare aggregation=count, error=true, the discovered service key in groupBy, scalar request type, and a one-hour range. It relies on default aggregation-descending order or valid tool-schema ordering and does not hand-build a Query Builder envelope for this plain grouped count.",
+      "expected_output": "Agent discovers the trace grouping key, then uses signoz_aggregate_traces with aggregations=count(), error=true, the discovered service key in groupBy, scalar request type, and a one-hour range. It relies on default aggregation-descending order or valid tool-schema ordering and does not hand-build a Query Builder envelope for this plain grouped count.",
       "expectations": [
-        "Agent calls signoz_aggregate_traces with aggregation=count, requestType=scalar, timeRange=1h, and the discovered groupBy key",
+        "Agent calls signoz_aggregate_traces with aggregations=count(), requestType=scalar, timeRange=1h, and the discovered groupBy key",
         "Agent calls signoz_get_field_keys with signal=traces before grouping and uses the returned service attribute name verbatim",
         "Agent does not call signoz_execute_builder_query for the simple grouped count",
         "The aggregation token is count, never count() or count(service.name)"

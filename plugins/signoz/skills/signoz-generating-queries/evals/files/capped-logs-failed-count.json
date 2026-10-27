@@ -623,7 +623,7 @@
       "request": {
         "service": "payments",
         "filter": "body CONTAINS 'timeout'",
-        "aggregation": "count",
+        "aggregations": "count()",
         "groupBy": "k8s.pod.name",
         "timeRange": "6h"
       },
