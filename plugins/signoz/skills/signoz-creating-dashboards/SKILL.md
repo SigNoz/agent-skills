@@ -308,7 +308,9 @@ resources before authoring panel JSON.
   rules.
 - `signoz://dashboard/widgets-examples`: complete panel configs with
   all required fields (the most important resource; every panel must
-  include `kind`, `spec.display`, `spec.plugin`, and exactly one query).
+  include `kind`, `spec.display`, `spec.plugin`, and `spec.queries`).
+  Query panels require exactly one outer query wrapper in `spec.queries`;
+  `signoz/TextPanel` requires a non-null empty `queries: []`.
 - `signoz://dashboard/examples`: whole create payloads with panels,
   layouts, and variables assembled.
 - `signoz://dashboard/query-builder-example`: query builder reference.
@@ -404,8 +406,10 @@ if formula-input cardinality can exceed 10000.
 Two rules `widgets-examples` does not call out, but
 `signoz_create_dashboard` enforces: **no `JSON.stringify` on
 arrays/objects** (`spec`, `panels`, `layouts`, `tags`, and `variables`
-are native JSON) and **one query per panel**, so a panel plotting two
-series carries a single `signoz/CompositeQuery` envelope holding both.
+are native JSON) and **exactly one outer query wrapper per query panel**
+in `spec.queries`. A nested `signoz/CompositeQuery` can hold multiple
+queries and formulas where the panel supports them. `signoz/TextPanel`
+instead requires a non-null empty `queries: []`.
 
 ##### Step 3b-ii.6: Dry-run before save (mandatory)
 
