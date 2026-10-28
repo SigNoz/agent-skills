@@ -285,7 +285,7 @@
           "description": "Source/signal invariant"
         },
         {
-          "text": "Every copied builder_query/builder_formula retains its positive limit and Query Builder v5 order losslessly; formula inputs remain at 10000 and formula results at 100, with no dashboard orderBy introduced",
+          "text": "Every copied builder_query/builder_formula retains its positive limit and Query Builder v5 order losslessly; formula inputs keep no limit and formula results stay at 100, with no dashboard orderBy introduced",
           "description": "Changing a saved-view query must not drop its bounded result contract during GET-then-replace"
         },
         {

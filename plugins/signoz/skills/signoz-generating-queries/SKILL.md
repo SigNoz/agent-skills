@@ -171,20 +171,19 @@ default aggregation-expression descending order; explicit ordering should use a
 `signoz_execute_builder_query`.
 
 For every `signoz_execute_builder_query` payload, put a positive `limit` and
-non-empty Query Builder v5 `order` on each `builder_query` and
-`builder_formula` spec. Raw requests and trace-signal `requestType: trace`
+non-empty Query Builder v5 `order` on each `builder_formula` spec and on each
+`builder_query` spec no formula references. Raw requests and trace-signal `requestType: trace`
 default to 100 rows: traces order by timestamp desc, while raw logs order by
 timestamp desc then id desc. Scalar/time-series requests default to 100 groups
 ordered by `__result` desc for metrics/formulas or the primary aggregation desc
-for logs/traces. Formula results stay at 100, but every `builder_query`
-referenced by a formula uses 10000 because each component limit is applied
-before formula evaluation; independently top-100 inputs can drop a high-ratio
-group. When calculating those input bounds, inspect every formula expression,
+for logs/traces. Formula results stay at 100, but leave `limit` and `order` unset on every
+`builder_query` referenced by a formula: each component limit is applied before
+formula evaluation and cuts each input to its own top N, which can drop a
+high-ratio group. To find those inputs, inspect every formula expression,
 including formulas with `disabled: true`, and follow formula references until
 all `builder_query` leaves are found. This dependency walk sets bounds only; it
 does not prove deterministic formula-to-formula evaluation order, so validate
-the complete composite payload. Narrow filters/grouping if input cardinality
-can exceed 10000. This wire field is `order`, not dashboard editor `orderBy`.
+the complete composite payload. This wire field is `order`, not dashboard editor `orderBy`.
 Time-series top-N ranks groups over the whole window, so a short-lived local
 spike may fall outside the returned set.
 

@@ -98,7 +98,7 @@ Dashboards use the **Perses schema (`schemaVersion: "v6"`)**: panels are a map, 
 | Aggregation columns named with `alias`, not `as '...'` inside the expression | 14, 16 |
 | Metrics `order` key is the composed `spaceAggregation(timeAggregation(metricName))` | 6 |
 | Filters are one `filter.expression` string | 14, 24 |
-| Result bounds preserved: 100 standalone, 10000 formula inputs, 100 `__result` formula output | 9, 10, 16, 22 |
+| Result bounds preserved: 100 standalone, no limit on formula inputs, 100 `__result` formula output | 9, 10, 16, 22 |
 | One query per panel — multi-series via `signoz/CompositeQuery` (backend-enforced, not schema-enforced) | 9, 16 |
 | Text panels use `signoz/TextPanel`, non-null `queries: []`, and no query dry-run | 26 |
 | Known system dashboard ids can be fetched, but non-user sources cannot be modified | 27 |
@@ -129,7 +129,7 @@ Dashboards use the **Perses schema (`schemaVersion: "v6"`)**: panels are a map, 
 | 19 | `custom-build-variable-application-selected-panels` | Follow-up selects two panels and keeps the global panel unfiltered | traces | TimeSeries | targeted `$service_name` wiring, representative-value dry-runs, spec reused verbatim |
 | 20 | `custom-build-having-array-validation-gap` | Logs table with a per-group count threshold | logs | Table | `having.expression` not a clause array, dry-run validates the saved panel |
 | 21 | `unsupported-builder-function-blocks-lossy-validation` | Current execution schema cannot represent a requested Builder function | metrics | TimeSeries | surface unsupported field; never claim a stripped dry-run passed |
-| 22 | `formula-order-limit-bounded-execution` | Top-5 formula bound applied after, not before, the formula | traces | Table | formula `limit`/`order`, 10000 on inputs, no `orderBy` anywhere |
+| 22 | `formula-order-limit-bounded-execution` | Top-5 formula bound applied after, not before, the formula | traces | Table | formula `limit`/`order`, no limit on inputs, no `orderBy` anywhere |
 | 23 | `trace-operator-sibling-envelope-contract` | Trace operator as a composite member | traces | TimeSeries | `builder_trace_operator` sibling, no coercion to `builder_query` |
 | 24 | `saved-not-in-to-execution-not-in` | Logs table excluding checkout and frontend services | logs | Table | discover the log-side service field; one `filter.expression` with `NOT IN`; non-empty groupBy `name`; short absolute Unix-ms dry-run window |
 | 25 | `custom-build-raw-log-stable-order` | 20 newest ERROR logs with stable ordering | logs | List | `raw` query kind, `limit` + two-key `order`, `selectFields` |
