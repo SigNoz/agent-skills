@@ -120,8 +120,7 @@ Read both MCP resources by URI using your client's resource-read mechanism:
    `panelType` and `requestType` from the saved-view intent rather than
    inventing them from the execution envelope. Metrics and Cost Meter views
    are always `panelType: "graph"` with `requestType: "time_series"`: those
-   Explorers render only a time series, so any other pair saves but does not
-   open as saved.
+   Explorers run and draw only a time series, whatever the view stores.
    Set the top-level `name` (a DNS-1123 label: lowercase letters, digits,
    hyphens) or pass `generateName: true` to derive it from
    `spec.displayName`. `schemaVersion` is always `"v2"`; the server fills it

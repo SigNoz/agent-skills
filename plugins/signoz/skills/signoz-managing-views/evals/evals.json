@@ -359,7 +359,7 @@
         },
         {
           "text": "The actual signoz_create_view payload uses spec={displayName, panelType:'graph', requestType:'time_series', queries:[...]} with queries copied from the validated execution query and no execution-only envelope fields",
-          "description": "Cost Meter views use the same explicit execution-to-saved-spec translation as every other source, and the Cost Meter Explorer renders only a time series"
+          "description": "Cost Meter views use the same explicit execution-to-saved-spec translation as every other source, saved as the time series the Cost Meter Explorer runs"
         },
         {
           "text": "The create uses explicit name or generateName plus spec.displayName according to v2 identity rules",
