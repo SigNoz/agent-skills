@@ -131,8 +131,8 @@ and values also require a non-empty discovered `name`.
 | Cost Meter total or grouped total attribution | `signoz_execute_builder_query` | Use the discovered meter metric with raw `timeAggregation: "sum"`; sum complete hourly buckets. Do not use `signoz_query_metrics` for totals. |
 | Log search (find matching entries) | `signoz_search_logs` | Finding specific log lines. Use `searchText` for literal text (`searchScope` chooses where it matches; the default is the log body), `filter` for field filters, `severity` for level filtering. |
 | Trace search (find matching spans) | `signoz_search_traces` | Finding specific traces/spans. Use `service`, `operation`, `error`, `minDuration`/`maxDuration` shortcuts plus `filter` for field filters. |
-| Log aggregation (count, avg, percentiles) | `signoz_aggregate_logs` | Plain totals, grouped counts, and top-N by one aggregation. |
-| Trace aggregation (count, avg, percentiles) | `signoz_aggregate_traces` | Plain totals, grouped counts, and top-N by one aggregation. |
+| Log aggregation (count, avg, percentiles) | `signoz_aggregate_logs` | Plain totals, grouped counts, and top-N by one or more aggregations. |
+| Trace aggregation (count, avg, percentiles) | `signoz_aggregate_traces` | Plain totals, grouped counts, and top-N by one or more aggregations. |
 | Complex log/trace formula or shaping | `signoz_execute_builder_query` | Use when ratios, shaping, ordering, or cardinality control exceed the convenience tools; never hand-build a plain grouped count. |
 
 **Canonical log search contract:**
@@ -162,13 +162,18 @@ and values also require a non-empty discovered `name`.
   second. Leave a caller-authored raw `filter` untouched; do not escape it
   again.
 
-For `signoz_aggregate_logs` / `signoz_aggregate_traces`, `aggregation` is one
-bare token: `count`, `count_distinct`, `avg`, `sum`, `min`, `max`, `p50`, `p75`,
-`p90`, `p95`, `p99`, or `rate`. Never include parentheses or a column; put the
-column in `aggregateOn` (`count` and `rate` need none). Omit `orderBy` for the
-default aggregation-expression descending order; explicit ordering should use a
-`groupBy` key or the aggregation expression. Custom aliases or formulas require
-`signoz_execute_builder_query`.
+For `signoz_aggregate_logs` / `signoz_aggregate_traces`, `aggregations` takes
+Query Builder expressions: `count()`, `count_distinct(name)`, `avg(duration_nano)`,
+`sum(x)`, `min(x)`, `max(x)`, `p50(duration_nano)` to `p99(duration_nano)`,
+`rate()`, or a conditional such as `countIf(has_error = true)`. Pass one
+expression, or an array to compute several in one call (for example
+`["p50(duration_nano)", "p99(duration_nano)"]`); results come back as
+`__result_0`, `__result_1`, and so on, in that order. The tools reject the
+former `aggregation` and `aggregateOn` inputs. Omit `orderBy` for the default
+first-expression descending order; explicit ordering should use a `groupBy` key
+or an aggregation expression. Use `having` to keep only groups whose aggregate
+passes a condition (for example `count() > 100`). Custom aliases or formulas
+require `signoz_execute_builder_query`.
 
 For every `signoz_execute_builder_query` payload, put a positive `limit` and
 non-empty Query Builder v5 `order` on each `builder_query` and
@@ -257,7 +262,7 @@ each result:
    than `limit`, including zero). Only this supports "none", "all", or a
    total over the full scope. For a total larger than one page, use
    `signoz_aggregate_logs` or `signoz_aggregate_traces` with
-   `aggregation: count`.
+   `aggregations: "count()"`.
 
 **Data returned:**
 - Present findings as neutral observations with timestamps and values.
@@ -307,7 +312,7 @@ beyond it:
 - **Discovery first**: Never guess metric, field, or service names. A field is
   confirmed only by live output for the same signal in this conversation.
 - **Supply required parameters**: Never invoke tools hoping they auto-discover.
-  `signoz_aggregate_*` requires `aggregation`; `signoz_query_metrics` requires a
+  `signoz_aggregate_*` requires `aggregations`; `signoz_query_metrics` requires a
   `metricName` from `signoz_list_metrics`; `signoz_get_trace_details` requires a
   `traceId`; `signoz_get_service_top_operations` requires a `service` from
   `signoz_list_services`. Discover first, then call.
@@ -416,9 +421,8 @@ beyond it:
 **User:** "What's the p99 latency for the cart service?"
 
 **Agent:**
-1. Calls `signoz_aggregate_traces(aggregation: "p99",
-   aggregateOn: "duration_nano", service: "cart-service",
-   requestType: "scalar", timeRange: "1h")`.
+1. Calls `signoz_aggregate_traces(aggregations: "p99(duration_nano)",
+   service: "cart-service", requestType: "scalar", timeRange: "1h")`.
 2. Presents: "p99 latency for cart-service: 1.2s over the last hour."
 3. Offers: "Want me to break this down by operation or show the trend over time?"
 
@@ -427,7 +431,7 @@ beyond it:
 **User:** "When did errors spike for the frontend?"
 
 **Agent:**
-1. Calls `signoz_aggregate_traces(aggregation: "count", error: "true",
+1. Calls `signoz_aggregate_traces(aggregations: "count()", error: "true",
    service: "frontend", requestType: "time_series", timeRange: "6h")`.
 2. Presents: "Error count for frontend over the last 6 hours. Spike at 11:30 UTC:
    error count jumped from ~5/min to ~45/min, returning to baseline by 12:15."

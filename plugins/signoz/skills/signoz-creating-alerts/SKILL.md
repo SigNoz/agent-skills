@@ -150,11 +150,10 @@ will use, but with the simplest aggregation that confirms data exists:
   tool is necessary, use a metrics aggregation object containing
   `metricName`, `timeAggregation`, and `spaceAggregation`. Metrics do **not**
   accept expression aggregations such as `count()` or filter-only probes.
-- **Logs**: call `signoz_aggregate_logs` with `aggregation: "count"` and the
-  alert filter. `count()` is a Query Builder expression, not a helper-tool
-  argument.
-- **Traces**: call `signoz_aggregate_traces` with `aggregation: "count"` and
-  the alert filter. Do not pass `aggregation: "count()"`.
+- **Logs**: call `signoz_aggregate_logs` with `aggregations: "count()"` and
+  the alert filter.
+- **Traces**: call `signoz_aggregate_traces` with `aggregations: "count()"` and
+  the alert filter.
 
 Inspect the result:
 
