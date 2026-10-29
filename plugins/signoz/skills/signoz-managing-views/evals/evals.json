@@ -318,7 +318,7 @@
       "id": 5,
       "name": "create-cost-meter-view",
       "prompt": "Save a view that tracks our log ingestion volume from the Cost Meter so I can find it later.",
-      "expected_output": "Agent recognizes this is a Cost Meter view and resolves source=meter (not metrics). Reads the schema resources, then builds the query via signoz-generating-queries told it is a Cost Meter query (source=meter) so discovery hits the meter store and finds a meter metric (e.g. signoz.meter.log.size). The resulting builder_query has signal=metrics and source=meter, spec.panelType=graph. Runs the mandatory pre-save sample fetch via signoz_query_metrics with source=meter, the metricName, timeRange=24h, requestType=scalar. Shows a preview (name, source=meter, metric/filter, sample-fetch result), confirms, and calls signoz_create_view. Reports name, UUID, and source=meter.",
+      "expected_output": "Agent recognizes this is a Cost Meter view and resolves source=meter (not metrics). Reads the schema resources, then builds the query via signoz-generating-queries told it is a Cost Meter query (source=meter) so discovery hits the meter store and finds a meter metric (e.g. signoz.meter.log.size). The resulting builder_query has signal=metrics and source=meter, spec.panelType=graph, spec.requestType=time_series. Runs the mandatory pre-save sample fetch via signoz_query_metrics with source=meter, the metricName, timeRange=24h, requestType=time_series. Shows a preview (name, source=meter, metric/filter, sample-fetch result), confirms, and calls signoz_create_view. Reports name, UUID, and source=meter.",
       "files": [],
       "assertions": [
         {
@@ -330,8 +330,8 @@
           "description": "Handoff"
         },
         {
-          "text": "Agent runs the pre-save sample fetch via signoz_query_metrics with source=meter before signoz_create_view",
-          "description": "Step 5 of the create flow, adapted for meter: the 1-row/scalar probe must carry source=meter so it hits the meter store"
+          "text": "Agent runs the pre-save sample fetch via signoz_query_metrics with source=meter and requestType=time_series before signoz_create_view",
+          "description": "Step 5 of the create flow, adapted for meter: the probe must carry source=meter so it hits the meter store, and runs the time-series request the Cost Meter Explorer runs"
         },
         {
           "text": "Agent shows a preview and calls signoz_create_view, reporting the UUID and source=meter",
@@ -358,8 +358,8 @@
           "description": "Create-flow Step 3 mandates signoz-generating-queries; for a meter view the agent must pass the source=meter context so the meter-unaware default discovery path doesn't miss signoz.meter.* metrics"
         },
         {
-          "text": "The actual signoz_create_view payload uses spec={displayName, panelType:'graph', requestType, queries:[...]} with queries copied from the validated execution query and no execution-only envelope fields",
-          "description": "Cost Meter views use the same explicit execution-to-saved-spec translation as every other source"
+          "text": "The actual signoz_create_view payload uses spec={displayName, panelType:'graph', requestType:'time_series', queries:[...]} with queries copied from the validated execution query and no execution-only envelope fields",
+          "description": "Cost Meter views use the same explicit execution-to-saved-spec translation as every other source, and the Cost Meter Explorer renders only a time series"
         },
         {
           "text": "The create uses explicit name or generateName plus spec.displayName according to v2 identity rules",
