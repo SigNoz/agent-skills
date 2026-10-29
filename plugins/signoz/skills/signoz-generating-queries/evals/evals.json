@@ -74,7 +74,7 @@
         "Agent calls signoz_aggregate_traces with aggregations=count(), requestType=scalar, timeRange=1h, and the discovered groupBy key",
         "Agent calls signoz_get_field_keys with signal=traces before grouping and uses the returned service attribute name verbatim",
         "Agent does not call signoz_execute_builder_query for the simple grouped count",
-        "The aggregation token is count, never count() or count(service.name)"
+        "The aggregations expression is count(), never count(service.name) or the retired aggregation or aggregateOn inputs"
       ],
       "files": []
     },
