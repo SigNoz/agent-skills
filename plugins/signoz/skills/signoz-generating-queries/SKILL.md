@@ -116,7 +116,9 @@ Run discovery calls in parallel where possible:
   `signoz_get_field_keys(signal: "traces")`.
 - **For logs**: Before any attribute filter or grouping, call
   `signoz_get_field_keys(signal: "logs")`; use `signoz_get_field_values` only
-  after discovery to validate values.
+  after discovery to validate values. Filter on a body field (`body.<path>`)
+  freely, but group or select it only when `signoz_get_field_keys(signal:
+  "logs", fieldContext: "body")` lists it; SigNoz rejects the others.
 
 Field keys are signal-specific: `service.name` may be absent on logs, while
 `body` is logs-only. Never carry a key across signals. Skip key discovery only
@@ -127,16 +129,20 @@ guesses such as `traceID` or `hostname`. Never assume tenant keys (`org.id`,
 `signoz_get_field_keys` before `signoz_get_field_values`; both require `signal`,
 and values also require a non-empty discovered `name`.
 
+An unknown filter key usually returns no rows plus a `key ... not found in
+metadata` warning instead of an error. That means the key is absent: rerun
+discovery and retry with a returned key; never report "nothing matched".
+
 ### Step 3: Choose the right tool
 
 **Use the simplest tool that answers the question:**
 
 | Question type | Tool | When to use |
 |---|---|---|
-| Metric time series, scalar, ratio, or formula | `signoz_query_metrics` | Ordinary metrics queries, Cost Meter trends/rates, and metric ratios via `formula` + `formulaQueries`. |
+| Metric time series, scalar, ratio, or formula | `signoz_query_metrics` | Ordinary metrics queries, Cost Meter trends/rates, and metric ratios via `formula` + `formulaQueries`. `limit`, `orderBy` (`__result` or a `groupBy` label), and `having` (for example `__result > 0.5`) shape grouped results. |
 | Cost Meter total or grouped total attribution | `signoz_execute_builder_query` | Use the discovered meter metric with raw `timeAggregation: "sum"`; sum complete hourly buckets. Do not use `signoz_query_metrics` for totals. |
-| Log search (find matching entries) | `signoz_search_logs` | Finding specific log lines. Use `searchText` for literal text (`searchScope` chooses where it matches; the default is the log body), `filter` for field filters, `severity` for level filtering. |
-| Trace search (find matching spans) | `signoz_search_traces` | Finding specific traces/spans. Use `service`, `operation`, `error`, `minDuration`/`maxDuration` shortcuts plus `filter` for field filters. |
+| Log search (find matching entries) | `signoz_search_logs` | Finding specific log lines. Use `searchText` for literal text (`searchScope` chooses where it matches; the default is the log body), `filter` for field filters, `severity` for level filtering. Rows carry a default set of columns (timestamp, id, body, severity_text, trace_id, span_id); add others with `selectFields`, and set `orderBy` (for example `timestamp asc`) to change the newest-first order. |
+| Trace search (find matching spans) | `signoz_search_traces` | Finding specific traces/spans. Use `service`, `operation`, `error`, `minDuration`/`maxDuration` shortcuts plus `filter` for field filters. Give durations with a unit (`'500ms'`, `'2s'`); a bare number is nanoseconds. |
 | Log aggregation (count, avg, percentiles) | `signoz_aggregate_logs` | Plain totals, grouped counts, and top-N by one or more aggregations. |
 | Trace aggregation (count, avg, percentiles) | `signoz_aggregate_traces` | Plain totals, grouped counts, and top-N by one or more aggregations. |
 | Complex log/trace formula or shaping | `signoz_execute_builder_query` | Use when ratios, shaping, ordering, or cardinality control exceed the convenience tools; never hand-build a plain grouped count. |
@@ -153,8 +159,8 @@ Observability shows no data.
   rejected.
 - `searchText` is literal text to find, escaped automatically.
   `searchScope` chooses where it matches; the default is the log body. It
-  combines with `filter` using AND. `searchScope` without `searchText` is a
-  validation error.
+  combines with `filter` using AND. `searchScope` without `searchText` is
+  ignored, and the result carries a note saying so.
 - `searchScope` values: `body` (default) for message text; `attribute` or
   `resource` for their keys and values; `all` for every field. Scopes other
   than `body` are slower, and SigNoz may reject them over wide time ranges.
@@ -209,6 +215,11 @@ spike may fall outside the returned set.
 - `scalar` (default): "How many?", "What is the p99?", "Which service has the most?"
 - `time_series`: "When did errors spike?", "How did latency change?", "Show trend"
 - If the question has ANY temporal component (spike, trend, change), use `time_series`
+
+`signoz_query_metrics` defaults to `time_series`, and a scalar metrics request
+must set `reduceTo` on query A and every `formulaQueries` item: `last` for the
+current value, `max` for the peak, `avg` for a typical value, or `sum` with
+`timeAggregation: "increase"` for a total count over the window.
 
 Aggregate tools accept only `scalar` or `time_series`. For builder-query
 envelopes passed to `signoz_execute_builder_query`, use only:
@@ -398,6 +409,7 @@ attribute mappings as `references/ai-queries.md` describes.
      "filter": "service.name = 'checkout-service' AND status_code = 'STATUS_CODE_ERROR'",
      "timeRange": "1h",
      "requestType": "scalar",
+     "reduceTo": "sum",
      "formula": "A / B * 100",
      "formulaQueries": [{
        "name": "B",
@@ -407,6 +419,7 @@ attribute mappings as `references/ai-queries.md` describes.
        "temporality": "cumulative",
        "timeAggregation": "increase",
        "spaceAggregation": "sum",
+       "reduceTo": "sum",
        "filter": "service.name = 'checkout-service'"
      }]
    }

@@ -15,7 +15,8 @@
         "The actual signoz_query_metrics call sets formula to A / B * 100, so every referenced query name is defined",
         "The actual signoz_query_metrics call uses the exact metricName, metricType, temporality, and isMonotonic values returned by discovery",
         "The actual signoz_query_metrics formulaQueries is an array containing a query named B with a concrete metricName and the same discovered metric metadata as A",
-        "The actual signoz_query_metrics primary filter for query A contains the discovered service key = 'checkout-service' and the discovered error condition"
+        "The actual signoz_query_metrics primary filter for query A contains the discovered service key = 'checkout-service' and the discovered error condition",
+        "If the signoz_query_metrics call uses requestType=scalar, query A and every formulaQueries item set reduceTo (sum with timeAggregation=increase for counts over the window)"
       ],
       "files": []
     },
@@ -196,6 +197,20 @@
         "Describes cost as an estimate in USD",
         "Does not present a null or 0 cost as a free or zero-spend run"
       ]
+    },
+    {
+      "id": 16,
+      "eval_name": "metrics-scalar-error-rate-sets-reduce-to",
+      "prompt": "Give me one number: checkout-service's error rate over the last hour as a percentage.",
+      "expected_output": "Agent discovers a request-count metric and its service and error labels, then calls signoz_query_metrics with requestType=scalar, an A / B * 100 formula, and reduceTo on query A and on query B in formulaQueries. For a monotonic count, both queries use timeAggregation=increase with reduceTo=sum. Reports a single percentage with the window, or correctly handles no data / missing instrumentation.",
+      "expectations": [
+        "The actual signoz_query_metrics call sets requestType=scalar",
+        "The actual signoz_query_metrics call sets reduceTo on query A and on every formulaQueries item",
+        "For a monotonic count metric, query A and query B use timeAggregation=increase with reduceTo=sum",
+        "The actual signoz_query_metrics call sets formula to A / B * 100, with query B defined in formulaQueries",
+        "Agent reports one percentage for the hour rather than a series of points"
+      ],
+      "files": []
     }
   ]
 }
