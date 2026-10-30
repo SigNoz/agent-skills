@@ -191,10 +191,10 @@ For **anomaly rules** (`ruleType: anomaly_rule`), explicitly state that
 the threshold is in **standard deviations from the learned pattern, not
 the raw value**; this is the most common point of confusion. Include
 `algorithm` (`standard`, which is z-score based), `seasonality` (hourly /
-daily / weekly), and how
-lower/higher targets shift sensitivity (lower → more noise, higher →
-only extreme deviations). The score is signed, (value - predicted) /
-standard deviation: `above` with target 3 fires only on rises, `below`
+daily / weekly), and how the target's magnitude shifts sensitivity (closer
+to 0, such as 2 or -2 → more noise; further from 0, such as 4 or -4 → only
+extreme deviations). The score is signed, (value - predicted) / standard
+deviation: `above` with target 3 fires only on rises, `below`
 with target -3 only on drops, and `outside_bounds` with target 3 on
 either. Say which directions the rule catches. New anomaly rules are
 schemaVersion `v2alpha1` with threshold tiers; older ones can still read
