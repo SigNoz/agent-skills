@@ -190,12 +190,12 @@ them; keep the total small:
   `start`/`end` (unix-ms strings) when you need an exact window instead
   of the server default.
 - **Trace-based templates** (APM-style): call
-  `signoz_aggregate_traces` with `aggregation=count`,
+  `signoz_aggregate_traces` with `aggregations="count()"`,
   `timeRange=1h`. No filter is needed for the "is anything flowing"
   probe; adding `filter="service.name EXISTS"` is fragile and
   unnecessary. Zero count → no traces flowing.
 - **Log-based templates**: call `signoz_aggregate_logs` with
-  `aggregation=count`, `timeRange=1h`, no filter. Zero count → no logs.
+  `aggregations="count()"`, `timeRange=1h`, no filter. Zero count → no logs.
 - **Variable values** (when the template clearly relies on a resource
   attribute, e.g. `service.name`, `k8s.cluster.name`): call
   `signoz_get_field_values` to confirm there are values to pick

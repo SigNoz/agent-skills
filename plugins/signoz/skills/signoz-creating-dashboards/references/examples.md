@@ -39,7 +39,7 @@ the user to choose between "create anyway" and "stop".
 3. `signoz_list_dashboard_templates` → reads the full catalog
    in-context, filters to APM entries (APM RED, APM Errors, etc.).
 4. Presents the list and asks which to import. User picks "APM RED".
-5. No-data probe: `signoz_aggregate_traces aggregation=count
+5. No-data probe: `signoz_aggregate_traces aggregations="count()"
    timeRange=1h` → returns rows. Data flowing.
 6. Imports, reports panels and variables. Offers to wire latency
    alerts via `signoz-creating-alerts`.

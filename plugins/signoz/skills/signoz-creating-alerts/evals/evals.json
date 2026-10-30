@@ -28,7 +28,7 @@
         "If creation proceeds after duplicate resolution, the exact returned channel displayName is in condition.thresholds.spec[].channels",
         "If creation proceeds, the persisted builder_query inputs A and B and builder_formula F1 carry no limit or order; the dry-run may carry display bounds that are not copied into the persisted alert",
         "If creation proceeds, the signoz_create_alert payload sets schemaVersion=v2alpha1 with explicit evaluation and notificationSettings blocks",
-        "The trace data probe calls signoz_aggregate_traces with aggregation=count, never aggregation=count()"
+        "The trace data probe calls signoz_aggregate_traces with aggregations=count(), never the retired aggregation or aggregateOn inputs"
       ],
       "files": []
     },
@@ -41,7 +41,7 @@
         "The persisted log builder_query grouped by service.name carries no limit or order, so every service is evaluated rather than a top-N subset; any dry-run bounds stay in the dry-run envelope",
         "The signoz_create_alert payload sets schemaVersion=v2alpha1 with explicit evaluation and notificationSettings blocks and panelType=graph",
         "The full dry-run uses signoz_execute_builder_query with signal=logs in the builder_query spec",
-        "The log data probe calls signoz_aggregate_logs with aggregation=count, never aggregation=count()",
+        "The log data probe calls signoz_aggregate_logs with aggregations=count(), never the retired aggregation or aggregateOn inputs",
         "The signoz_create_alert payload puts the chosen Slack channel in condition.thresholds.spec[].channels",
         "The signoz_create_alert payload puts the chosen Slack displayName returned by the paginated channel list in condition.thresholds.spec[].channels"
       ],
@@ -73,7 +73,7 @@
         "The signoz_create_alert payload places both Slack and PagerDuty names in the critical threshold channels array",
         "The signoz_create_alert payload places both returned Slack and PagerDuty displayNames in the critical threshold channels array",
         "The persisted trace builder_query carries no limit or order; the signoz_create_alert payload sets schemaVersion=v2alpha1 with explicit evaluation and notificationSettings blocks",
-        "The trace data probe calls signoz_aggregate_traces with aggregation=count, never aggregation=count()"
+        "The trace data probe calls signoz_aggregate_traces with aggregations=count(), never the retired aggregation or aggregateOn inputs"
       ],
       "files": []
     },
