@@ -183,6 +183,19 @@
         "Output does not report zero timeout logs or 'none' from the failed aggregate"
       ],
       "files": ["evals/files/capped-logs-failed-count.json"]
+    },
+    {
+      "id": 15,
+      "eval_name": "ai-agent-cost-routing",
+      "prompt": "Which of our AI agent runs cost the most in the last 24 hours?",
+      "expected_output": "Agent treats this as an AI trace question, not SigNoz ingestion cost. It reads signoz://ai/query-builder-guide and calls signoz_search_traces with queryType builder_ai_query, requestType trace, and orderBy trace.estimated_total_cost desc over 24h. It presents the top runs with their estimated cost, says cost is a USD estimate, and treats a null cost as an unpriced model rather than zero spend.",
+      "expectations": [
+        "Calls signoz_search_traces with queryType builder_ai_query and requestType trace",
+        "Orders by trace.estimated_total_cost descending",
+        "Does not query the Cost Meter (source meter) or load signoz-reducing-telemetry-cost",
+        "Describes cost as an estimate in USD",
+        "Does not present a null or 0 cost as a free or zero-spend run"
+      ]
     }
   ]
 }

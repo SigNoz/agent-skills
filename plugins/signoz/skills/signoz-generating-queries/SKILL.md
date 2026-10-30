@@ -7,6 +7,9 @@ description: >
   user asks "show me error rates", "query logs for timeout errors",
   "what's the p99 latency for the cart service", "how many requests hit
   the payment endpoint", "find slow traces", "errors in the last hour",
+  "which agent runs cost the most", "LLM token usage by model",
+  "LLM calls from agent runs with many tool calls", "why does AI
+  Observability show no data",
   or otherwise asks an exploratory question that needs live observability
   data, even if they don't say "query" or "search" explicitly.
 ---
@@ -19,7 +22,9 @@ This skill calls SigNoz MCP server tools heavily (`signoz_execute_builder_query`
 `signoz_query_metrics`, `signoz_search_logs`, `signoz_search_traces`,
 `signoz_aggregate_logs`, `signoz_aggregate_traces`, `signoz_get_field_keys`,
 `signoz_get_field_values`, `signoz_list_metrics`, `signoz_list_services`,
-`signoz_get_service_top_operations`, `signoz_get_trace_details`). Before
+`signoz_get_service_top_operations`, `signoz_get_trace_details`,
+`signoz_get_ai_pricing`, `signoz_list_ai_attribute_mappings`,
+`signoz_test_ai_attribute_mapping`). Before
 running the workflow, confirm the `signoz_*` tools are available. If they
 are not, run `signoz-mcp-setup` first to initialize or repair the MCP connection.
 Do not fall back to raw HTTP calls or fabricate query results without the MCP
@@ -56,6 +61,7 @@ Map the user's intent to the right signal:
 | Find specific traces, slow requests, error spans | **traces** | Per-request detail, span attributes, duration filtering. |
 | Infrastructure metrics (CPU, memory, disk, network) | **metrics** | Always metrics for resource utilization. |
 | Ingestion volume (bytes or count), cost, or billing usage | **metrics** with `source=meter` (Cost Meter) | `signoz.meter.*` ingestion metrics (logs/spans/datapoints by count **and** bytes) live only in the meter store; bytes are unavailable on the raw signals. Dollar **cost is not a metric**; derive it from volume × per-unit price (see Step 2). groupBy/filter work like a normal metric, but only over the limited attribute set the meter retains (not arbitrary log/trace fields). For a *count* sliced by an attribute the meter doesn't carry, aggregate logs/traces directly instead. |
+| LLM or AI-agent cost, tokens, models, or tool calls | **traces** (`gen_ai.*` span attributes) | See `references/ai-queries.md`. LLM token cost is a trace attribute, not SigNoz ingestion cost; never answer it from the Cost Meter. |
 | "How many X per Y" (count/rate grouped by dimension) | **traces** or **logs** (aggregate) | Use `signoz_aggregate_traces` or `signoz_aggregate_logs` for grouped counts. |
 
 Traces have no unqualified full-text search; use `CONTAINS` against a discovered
@@ -134,6 +140,12 @@ and values also require a non-empty discovered `name`.
 | Log aggregation (count, avg, percentiles) | `signoz_aggregate_logs` | Plain totals, grouped counts, and top-N by one or more aggregations. |
 | Trace aggregation (count, avg, percentiles) | `signoz_aggregate_traces` | Plain totals, grouped counts, and top-N by one or more aggregations. |
 | Complex log/trace formula or shaping | `signoz_execute_builder_query` | Use when ratios, shaping, ordering, or cardinality control exceed the convenience tools; never hand-build a plain grouped count. |
+
+**AI agent and LLM questions:** read `references/ai-queries.md` before the
+first query about LLM calls or AI-agent runs. It covers when to set
+`queryType: "builder_ai_query"`, per-call versus per-run queries, the
+aggregation rules SigNoz enforces, and checking attribute mappings when AI
+Observability shows no data.
 
 **Canonical log search contract:**
 
@@ -301,6 +313,10 @@ beyond it:
    than "does not exist" or "not instrumented". Missing instrumentation is
    one possibility to check, alongside a wider window or a different name.
 
+**AI results.** A null or 0 cost means an unpriced model, not zero spend.
+An empty AI result is "no AI traces matched", not "no LLM calls"; check the
+attribute mappings as `references/ai-queries.md` describes.
+
 **Drill-down:**
 - If an aggregation reveals an interesting pattern (spike, outlier service),
   offer to drill into individual traces or logs for that scope.
@@ -436,6 +452,22 @@ beyond it:
 2. Presents: "Error count for frontend over the last 6 hours. Spike at 11:30 UTC:
    error count jumped from ~5/min to ~45/min, returning to baseline by 12:15."
 3. Offers: "Want me to check what error types appeared during the spike?"
+
+---
+
+**User:** "Which agent runs cost the most in the last day?"
+
+**Agent:**
+1. Reads `signoz://ai/query-builder-guide`.
+2. Calls `signoz_search_traces(queryType: "builder_ai_query",
+   requestType: "trace", orderBy: "trace.estimated_total_cost desc",
+   limit: 10, timeRange: "24h")`.
+3. Presents the runs with `estimated_total_cost`, `total_tokens`,
+   `llm_call_count`, and `root_span_name`, and says cost is a USD estimate.
+   If some runs show a null cost, says their models are unpriced rather than
+   free.
+4. Offers: "Want me to open the most expensive run with
+   `signoz_get_trace_details`?"
 
 ---
 
