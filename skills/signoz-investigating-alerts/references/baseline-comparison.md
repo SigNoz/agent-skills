@@ -84,10 +84,10 @@ Keep the same positive limit and Query Builder v5 `order` in the fire and
 baseline requests. For time series, the limit ranks groups over the whole
 window, so a short-lived local spike can be outside the top N. Dashboard
 `orderBy` is not valid in this execution payload. For a formula alert, first
-replay the stored component limits exactly. If any formula input is below
-10000, run a second fire/baseline comparison with that input raised to 10000;
-base limits are applied before formula evaluation, so independent top-N inputs
-can hide the group that should have fired. Find inputs by inspecting every
+replay the stored component limits exactly. If any formula input carries a
+limit, run a second fire/baseline comparison with that input's limit and order
+removed; base limits are applied before formula evaluation, so independent
+top-N inputs can hide the group that should have fired. Find inputs by inspecting every
 formula expression, including formulas with `disabled: true`, and following
 formula references to all `builder_query` leaves. This dependency walk changes
 only the comparison bounds; it does not prove deterministic formula-to-formula
@@ -153,7 +153,7 @@ not "what changed". Run a single fire-window query for each:
   `severity_text IN ('ERROR', 'FATAL')`. Cap at 20 most recent. Group
   by message pattern (or `exception.type`) and surface the top 3.
 - For deep drill on one trace, map the search row's `trace_id` to the details
-  input: `signoz_get_trace_details` with `{ "traceId": "<returned trace_id>",
-  "start": "<fire_start_ms>", "end": "<fire_end_ms>" }`.
+  input: `signoz_get_trace_details` with `{ "traceId": "<returned trace_id>" }`.
+  It takes no time window; SigNoz locates the trace by its ID.
   It extracts span-level attributes (DB statement, peer service, status code)
   when the operation name alone doesn't identify the failing call.

@@ -119,7 +119,9 @@ Read both MCP resources by URI using your client's resource-read mechanism:
    execution envelope's), `formatOptions`, or `variables`; do not put a
    `query` key or a `compositeQuery` object inside the saved spec. Choose
    `panelType` and `requestType` from the saved-view intent rather than
-   inventing them from the execution envelope.
+   inventing them from the execution envelope. Metrics and Cost Meter views
+   are always `panelType: "graph"` with `requestType: "time_series"`: those
+   Explorers run and draw only a time series, whatever the view stores.
    Set the top-level `name` (a DNS-1123 label: lowercase letters, digits,
    hyphens) or pass `generateName: true` to derive it from
    `spec.displayName`. `schemaVersion` is always `"v2"`; the server fills it
@@ -128,10 +130,11 @@ Read both MCP resources by URI using your client's resource-read mechanism:
    `spec.order` entry losslessly. Never translate them to dashboard `orderBy`.
    Raw/list views use 100 rows (logs: timestamp/id desc; traces: timestamp
    desc); standalone aggregate views and formula results use 100 groups.
-   Builder queries referenced by a formula use 10000 because their limits are
-   applied before evaluation. Order by the primary aggregation or `__result`
-   desc as appropriate. Time-series top-N ranks groups over the whole selected
-   window and can omit a short-lived local spike.
+   Builder queries referenced by a formula carry neither `limit` nor `order`,
+   because a limit is applied before the formula runs. Order standalone queries
+   by the primary aggregation desc and formula results by `__result` desc.
+   Time-series top-N ranks groups over the whole selected window and can omit
+   a short-lived local spike.
    Preserve raw query entries exactly where the v2 resource permits them,
    including disabled flags and PromQL or SQL envelopes. On create, a PromQL
    or SQL envelope must come verbatim from the user or an existing view;
@@ -155,13 +158,13 @@ Read both MCP resources by URI using your client's resource-read mechanism:
    - `source=logs` → `signoz_search_logs` with `limit=1`
    - `source=metrics` → `signoz_query_metrics` with the
      `metricName` from `spec.aggregations[0].metricName` plus the same
-     filter, `timeRange=1h`, `requestType=scalar`. Repeat per metric
+     filter, `timeRange=1h`, `requestType=time_series`. Repeat per metric
      query if the view has multiple. The tool requires `metricName`;
      a filter-only probe is not supported.
    - `source=meter` → `signoz_query_metrics` with the `metricName`
      from `spec.aggregations[0].metricName`, **`source=meter`**, the same
      filter, `timeRange=24h` (Cost Meter rolls up hourly, so a 1h window
-     can be a single partial bucket), `requestType=scalar`.
+     can be a single partial bucket), `requestType=time_series`.
    - PromQL or SQL envelope → `signoz_execute_builder_query` with that exact
      envelope over a short recent window. The builder probes above do not
      apply to it.

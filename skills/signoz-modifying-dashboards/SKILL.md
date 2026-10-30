@@ -216,23 +216,23 @@ display range by reflex; apply that section's empty-result and timeout rules
 before widening or retrying. Use representative variable values in the
 dry-run copy and keep `$var` in saved state.
 
-Preserve or add explicit result bounds on every changed builder query/formula:
-the saved spec carries a positive `limit` plus non-empty `order`, and the dry-run
-sends those same values unchanged. List
+Preserve or add explicit result bounds on every changed builder query/formula
+except formula inputs: the saved spec carries a positive `limit` plus non-empty
+`order`, and the dry-run sends those same values unchanged. List
 and trace-request panels default to 100 rows ordered by timestamp desc (raw logs
 also id desc), but preserve a deliberate smaller positive list limit.
 Standalone aggregate queries and formula outputs default to
-100 groups. Every base query referenced by a formula uses 10000 because base
-limits are applied before formula evaluation; raise an existing smaller bound
-unless it was an intentional pre-formula top-N selection. Find the complete
+100 groups. Every base query referenced by a formula carries no `limit` or
+`order`, because base limits are applied before formula evaluation; remove an
+existing input limit unless it was an intentional pre-formula top-N selection. Find the complete
 base-query set by inspecting every formula expression, including formulas with
 `disabled: true`, and following formula references to all `builder_query`
 leaves. This dependency walk chooses bounds only; it does not establish
 deterministic formula-to-formula evaluation order, so dry-run the complete
-composite payload. Base queries order by their primary aggregation and formulas
-by `__result`, in the saved panel and the dry-run alike. For time series, this
+composite payload. Standalone base queries order by their primary aggregation and
+formulas by `__result`, in the saved panel and the dry-run alike. For time series, this
 top-N is chosen over the whole window, so a short-lived local spike can be
-omitted. Narrow filters/grouping if formula-input cardinality can exceed 10000.
+omitted.
 
 If the executor cannot represent a saved field, report the
 panel as unvalidated and continue only after explicit acceptance. Server or

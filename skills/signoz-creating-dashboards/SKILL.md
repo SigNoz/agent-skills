@@ -191,12 +191,12 @@ them; keep the total small:
   `start`/`end` (unix-ms strings) when you need an exact window instead
   of the server default.
 - **Trace-based templates** (APM-style): call
-  `signoz_aggregate_traces` with `aggregation=count`,
+  `signoz_aggregate_traces` with `aggregations="count()"`,
   `timeRange=1h`. No filter is needed for the "is anything flowing"
   probe; adding `filter="service.name EXISTS"` is fragile and
   unnecessary. Zero count → no traces flowing.
 - **Log-based templates**: call `signoz_aggregate_logs` with
-  `aggregation=count`, `timeRange=1h`, no filter. Zero count → no logs.
+  `aggregations="count()"`, `timeRange=1h`, no filter. Zero count → no logs.
 - **Variable values** (when the template clearly relies on a resource
   attribute, e.g. `service.name`, `k8s.cluster.name`): call
   `signoz_get_field_values` to confirm there are values to pick
@@ -390,17 +390,16 @@ required fields, panel-type-specific shapes, plugin `kind` names, and
 common write-shape errors. Re-skim it before serialising any custom panel
 JSON.
 
-Every builder query and formula entry must carry a positive `limit` and non-empty
-`order`. Raw list and trace-request panels default to 100 with timestamp-desc ordering
+Every builder query and formula entry, except a formula's base queries, must carry a
+positive `limit` and non-empty `order`. Raw list and trace-request panels default to 100 with timestamp-desc ordering
 (raw logs add id); a deliberately smaller list page may lower `limit`. Aggregate panels use 100 with
-the primary aggregation desc. Formula outputs use 100 with `__result desc`; every referenced base query uses 10000
-because base limits apply before formula evaluation. Find those inputs from every formula expression, including
+the primary aggregation desc. Formula outputs use 100 with `__result desc`; every referenced base query carries no
+`limit` or `order`, because base limits apply before formula evaluation. Find those inputs from every formula expression, including
 formulas with `disabled: true`, following references until every base `builder_query` leaf is reached. This dependency
 walk chooses bounds only; it does not establish deterministic formula-to-formula evaluation order, so dry-run the
 complete composite payload. A metrics `order` key is the composed `spaceAggregation(timeAggregation(metricName))`
 expression; the bare metric name is rejected, while `__result` and groupBy keys are accepted.
-Time-series top-N ranks groups over the whole window and can omit a short-lived local spike. Narrow filters/grouping
-if formula-input cardinality can exceed 10000.
+Time-series top-N ranks groups over the whole window and can omit a short-lived local spike.
 
 Two rules `widgets-examples` does not call out, but
 `signoz_create_dashboard` enforces: **no `JSON.stringify` on
