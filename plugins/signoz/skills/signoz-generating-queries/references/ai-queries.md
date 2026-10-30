@@ -7,21 +7,24 @@ rules SigNoz enforces on them, and arguments to copy.
 
 ## Choosing the query
 
-- Set `queryType: "builder_ai_query"` for AI trace rows and whenever
-  `aggregations`, `filter`, or `orderBy` uses a per-trace AI key, such as
-  `trace.estimated_total_cost` or `trace.tool_call_count`. Otherwise keep
-  the default.
-- Per call (one LLM or tool call): filter or group on `gen_ai.*` span
-  attributes, for example `sum(signoz.gen_ai.usage.tokens.cost)` grouped by
-  `gen_ai.request.model`. To keep only the calls in some runs, use
-  `signoz_search_traces` with `requestType: "raw"` and filter on a per-trace
-  AI key, such as `trace.tool_call_count > 10`; span rows then hold only the
-  LLM, tool, and agent spans.
-- Per trace (one agent run, its total cost, tokens, or call counts): use
-  `signoz_search_traces` with `requestType: "trace"` for the runs
-  themselves, ordered by a key such as `trace.estimated_total_cost desc`,
-  and `signoz_aggregate_traces` for statistics across runs, such as
-  `avg(trace.estimated_total_cost)`.
+- The keys decide `queryType`:
+  - `gen_ai.*` span attributes only: keep the default `builder_query`.
+  - A per-trace AI key, such as `trace.estimated_total_cost` or
+    `trace.tool_call_count`, in `aggregations`, `filter`, or `orderBy`, or
+    AI trace rows: set `queryType: "builder_ai_query"`.
+- Per call (one LLM or tool call), default `queryType`: use
+  `signoz_search_traces` with `requestType: "raw"` (the default) for the
+  calls themselves, and `signoz_aggregate_traces` for statistics, filtering
+  or grouping on `gen_ai.*` span attributes, such as
+  `sum(signoz.gen_ai.usage.tokens.cost)` grouped by `gen_ai.request.model`.
+  To keep only the calls in some runs, also filter on a per-trace AI key,
+  such as `trace.tool_call_count > 10`, and set `builder_ai_query`; span
+  rows then hold only the LLM, tool, and agent spans.
+- Per trace (one agent run, its total cost, tokens, or call counts),
+  `builder_ai_query`: use `signoz_search_traces` with `requestType: "trace"`
+  for the runs themselves, ordered by a key such as
+  `trace.estimated_total_cost desc`, and `signoz_aggregate_traces` for
+  statistics across runs, such as `avg(trace.estimated_total_cost)`.
 - Discover AI keys with `signoz_get_field_keys(signal: "traces",
   queryType: "builder_ai_query")`; it also lists the per-trace AI keys.
 
@@ -33,9 +36,9 @@ rules SigNoz enforces on them, and arguments to copy.
   separate call from `avg(trace.estimated_total_cost)`.
 - For spend or tokens by model, sum the per-call span attributes
   (`sum(signoz.gen_ai.usage.tokens.cost)` grouped by `gen_ai.request.model`)
-  with the default `queryType`. Grouping a per-trace AI key by a span
-  attribute splits each run across groups, so one run can appear under
-  several models.
+  with the default `queryType`.
+- `groupBy` cannot use a per-trace AI key; group by a span attribute such
+  as `gen_ai.request.model` or `service.name` instead.
 
 ## Results
 
