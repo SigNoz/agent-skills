@@ -25,9 +25,9 @@
       "id": 2,
       "eval_name": "anomaly-threshold-explain",
       "prompt": "Help me understand alert rule 019de287-6752-7629-83e4-375919d56dd8 — I'm confused about how anomaly thresholds work versus regular ones.",
-      "expected_output": "Agent fetches the rule, identifies ruleType=anomaly_rule and algorithm=standard, and explicitly contrasts anomaly vs threshold semantics: target=3 means 3 standard deviations from the learned baseline, NOT 3 raw req/s. Explains daily seasonality and effective routing through top-level preferredChannels. Pulls paginated firing history for 7d in descending order and includes a rule-incident fire-frequency summary.",
+      "expected_output": "Agent fetches the rule, identifies ruleType=anomaly_rule and algorithm=standard, and explicitly contrasts anomaly vs threshold semantics: target=3 means 3 standard deviations from the learned baseline, NOT 3 raw req/s. Explains daily seasonality, which directions the signed score catches for the rule's op, and effective routing for the rule's schemaVersion. Pulls paginated firing history for 7d in descending order and includes a rule-incident fire-frequency summary.",
       "expectations": [
-        "The explanation treats top-level preferredChannels as the anomaly rule's direct notification routing because anomaly rules have no threshold channels",
+        "The explanation derives routing from the fetched rule's schemaVersion: threshold tier channels (or usePolicy) for a v2alpha1 anomaly rule, top-level preferredChannels only for a v1 anomaly rule",
         "The fire-frequency summary counts rule-wide overallStateChanged transitions, not per-fingerprint rows"
       ],
       "files": []

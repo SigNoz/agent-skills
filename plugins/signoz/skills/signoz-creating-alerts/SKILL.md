@@ -184,7 +184,7 @@ Read the `signoz://alert/instructions` and `signoz://alert/examples` MCP
 resources for the canonical, version-current shape.
 
 Compose the full payload; no field is filled in for you. Set these
-explicitly on every threshold or PromQL rule:
+explicitly on every rule, anomaly rules included:
 
 - `schemaVersion: "v2alpha1"`. An omitted `schemaVersion` is read with v1
   semantics and rejected for missing v1 condition fields.
@@ -198,12 +198,13 @@ explicitly on every threshold or PromQL rule:
 - `condition.compositeQuery.panelType: "graph"`. An omitted value is stored
   empty.
 
-Anomaly rules use the v1 shape instead: top-level `evalWindow` and
-`frequency`, `condition.op` / `matchType` / `target` / `algorithm` /
-`seasonality`, no `schemaVersion`, no `thresholds`, no `evaluation`, and no
-`notificationSettings`.
+Anomaly rules use the same v2alpha1 shape and add `condition.algorithm:
+"standard"` and `condition.seasonality`. Their threshold tiers compare a
+signed anomaly score (see *Threshold `op` and `matchType` values*), so leave
+`targetUnit` empty; a unit would rescale the score. An anomaly `evaluation`
+uses a longer window, for example `evalWindow: "24h"`, `frequency: "3h"`.
 
-Threshold/PromQL `condition.thresholds` requires `kind` (use `"basic"`) and
+`condition.thresholds` requires `kind` (use `"basic"`) and
 non-empty `spec[]`. Current v2 cannot represent `alertOnAbsent` as the sole
 trigger. For an exact absent-only request, stop before any write and offer a
 combined threshold + absence rule only with explicit approval.
@@ -223,8 +224,13 @@ For most user intents, the config is one of a small number of patterns:
 
 **Threshold `op` and `matchType` values.** Use these `op` words: `above`,
 `below`, `equal`, `not_equal`, `above_or_equal`, `below_or_equal`, and
-`outside_bounds`; `equals` is invalid. Use `above` for anomaly rules: their
-absolute score covers spikes and drops.
+`outside_bounds`; `equals` is invalid. An anomaly score is signed,
+(value - predicted) / standard deviation, so it is negative on a drop. For
+anomaly rules use `above` with target 3 for spikes, `below` with target -3
+for drops, or `outside_bounds` with target 3 for either; `outside_bounds`
+compares the score's absolute value. Put the same deviation in the anomaly
+function's `z_score_threshold` arg: it only sets the expected-range band,
+and the tier target decides when the rule fires.
 
 | Comparison | `op` | Evaluation behavior | `matchType` |
 |---|---|---|---|
@@ -255,8 +261,7 @@ preview):**
 3. Name each threshold tier by its severity and set `labels.severity` to the
    highest tier, which SigNoz's alert-rule list sorts and filters by. Every
    firing carries that label, so on a multi-tier rule only `threshold.name`
-   shows which tier fired. Anomaly rules have no tiers: SigNoz uses the label
-   as the tier name. The Step 8 preview states each tier's severity and why.
+   shows which tier fired. The Step 8 preview states each tier's severity and why.
 
 | Alert intent | Default severity |
 |---|---|
@@ -404,11 +409,11 @@ alert that will never fire.
 Choose direct or org-policy routing after dry-run and final severity. A missing
 channel does not authorize policy routing.
 
-For a confirmed existing org policy on a threshold/PromQL rule, set
+For a confirmed existing org policy, set
 `notificationSettings.usePolicy: true`, preserve the confirmed matcher labels
 and threshold tier, and omit threshold channels and `preferredChannels`. This
 skill does not create policies. If the policy or match criteria are not
-confirmed, stop and ask. Anomaly rules are direct-only. If the criteria route
+confirmed, stop and ask. If the criteria route
 tiers by `severity`, stop and ask: every tier matches as the highest (Step 5).
 Offer a `threshold.name` matcher, one rule per tier, or direct routing.
 
@@ -425,12 +430,11 @@ user wants a test notification and send `test: true` only if they agree. On
 admin-created channel or a short-lived minimum-role credential from the host's
 secret store. If routing remains unresolved, stop and ask.
 
-Put exact returned display names in each threshold's `channels`; anomaly rules
-use top-level `preferredChannels`. Never substitute one routing field for the
-other. A threshold tier with no channels, or a displayName that does not
+Put exact returned display names in each threshold's `channels`, anomaly
+rules included. A threshold tier with no channels, or a displayName that does not
 exist, fails unless `notificationSettings.usePolicy` is `true`. Top-level
-`preferredChannels` on a v2alpha1 rule is stored unused, so a threshold rule
-routed only through it saves and notifies nobody.
+`preferredChannels` on a v2alpha1 rule is stored unused, so a rule routed
+only through it saves and notifies nobody.
 
 #### Updating or handling secret-bearing channel config
 
@@ -521,8 +525,7 @@ does).
 - **Routing must be confirmed.** Direct routes use exact returned
   `displayName` values from the fully paginated
   `signoz_list_notification_channels`; put them in per-threshold
-  `channels` for threshold/PromQL rules or top-level `preferredChannels` for
-  anomaly rules. Confirmed policy routes set `notificationSettings.usePolicy`
+  `channels` for every rule type. Confirmed policy routes set `notificationSettings.usePolicy`
   and omit direct channel fields.
 - **Never echo channel secrets.** Slack webhook URLs, PagerDuty integration
   keys, and similar webhook tokens are secrets. Pass them to
