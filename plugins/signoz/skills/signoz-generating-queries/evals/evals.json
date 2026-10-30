@@ -15,7 +15,8 @@
         "The actual signoz_query_metrics call sets formula to A / B * 100, so every referenced query name is defined",
         "The actual signoz_query_metrics call uses the exact metricName, metricType, temporality, and isMonotonic values returned by discovery",
         "The actual signoz_query_metrics formulaQueries is an array containing a query named B with a concrete metricName and the same discovered metric metadata as A",
-        "The actual signoz_query_metrics primary filter for query A contains the discovered service key = 'checkout-service' and the discovered error condition"
+        "The actual signoz_query_metrics primary filter for query A contains the discovered service key = 'checkout-service' and the discovered error condition",
+        "If the signoz_query_metrics call uses requestType=scalar, query A and every formulaQueries item set reduceTo (sum with timeAggregation=increase for counts over the window)"
       ],
       "files": []
     },
@@ -30,14 +31,14 @@
       "id": 2,
       "eval_name": "traces-p99-latency-by-operation",
       "prompt": "What's the p99 latency for cart-service broken down by operation in the last 30 minutes?",
-      "expected_output": "Agent uses signoz_aggregate_traces with aggregation=p99, aggregateOn=duration_nano, service=cart-service, groupBy=name, requestType=scalar, timeRange=30m. Reports top operations by p99.",
+      "expected_output": "Agent uses signoz_aggregate_traces with aggregations=p99(duration_nano), service=cart-service, groupBy=name, requestType=scalar, timeRange=30m. Reports top operations by p99.",
       "files": []
     },
     {
       "id": 3,
       "eval_name": "traces-time-series-error-spike",
       "prompt": "When did errors spike for the frontend service today?",
-      "expected_output": "Agent uses signoz_aggregate_traces with error=true, service=frontend, requestType=time_series (NOT scalar: temporal question), aggregation=count, time window covers today. Identifies the spike timestamp.",
+      "expected_output": "Agent uses signoz_aggregate_traces with error=true, service=frontend, requestType=time_series (NOT scalar: temporal question), aggregations=count(), time window covers today. Identifies the spike timestamp.",
       "files": []
     },
     {
@@ -69,12 +70,12 @@
       "id": 6,
       "eval_name": "traces-simple-grouped-count-prefers-aggregate",
       "prompt": "Rank the top 10 services by error span count over the last hour.",
-      "expected_output": "Agent discovers the trace grouping key, then uses signoz_aggregate_traces with bare aggregation=count, error=true, the discovered service key in groupBy, scalar request type, and a one-hour range. It relies on default aggregation-descending order or valid tool-schema ordering and does not hand-build a Query Builder envelope for this plain grouped count.",
+      "expected_output": "Agent discovers the trace grouping key, then uses signoz_aggregate_traces with aggregations=count(), error=true, the discovered service key in groupBy, scalar request type, and a one-hour range. It relies on default aggregation-descending order or valid tool-schema ordering and does not hand-build a Query Builder envelope for this plain grouped count.",
       "expectations": [
-        "Agent calls signoz_aggregate_traces with aggregation=count, requestType=scalar, timeRange=1h, and the discovered groupBy key",
+        "Agent calls signoz_aggregate_traces with aggregations=count(), requestType=scalar, timeRange=1h, and the discovered groupBy key",
         "Agent calls signoz_get_field_keys with signal=traces before grouping and uses the returned service attribute name verbatim",
         "Agent does not call signoz_execute_builder_query for the simple grouped count",
-        "The aggregation token is count, never count() or count(service.name)"
+        "The aggregations expression is count(), never count(service.name) or the retired aggregation or aggregateOn inputs"
       ],
       "files": []
     },
@@ -183,6 +184,33 @@
         "Output does not report zero timeout logs or 'none' from the failed aggregate"
       ],
       "files": ["evals/files/capped-logs-failed-count.json"]
+    },
+    {
+      "id": 15,
+      "eval_name": "ai-agent-cost-routing",
+      "prompt": "Which of our AI agent runs cost the most in the last 24 hours?",
+      "expected_output": "Agent treats this as an AI trace question, not SigNoz ingestion cost. It reads signoz://ai/query-builder-guide and calls signoz_search_traces with queryType builder_ai_query, requestType trace, and orderBy trace.estimated_total_cost desc over 24h. It presents the top runs with their estimated cost, says cost is a USD estimate, and treats a null cost as an unpriced model rather than zero spend.",
+      "expectations": [
+        "Calls signoz_search_traces with queryType builder_ai_query and requestType trace",
+        "Orders by trace.estimated_total_cost descending",
+        "Does not query the Cost Meter (source meter) or load signoz-reducing-telemetry-cost",
+        "Describes cost as an estimate in USD",
+        "Does not present a null or 0 cost as a free or zero-spend run"
+      ]
+    },
+    {
+      "id": 16,
+      "eval_name": "metrics-scalar-error-rate-sets-reduce-to",
+      "prompt": "Give me one number: checkout-service's error rate over the last hour as a percentage.",
+      "expected_output": "Agent discovers a request-count metric and its service and error labels, then calls signoz_query_metrics with requestType=scalar, an A / B * 100 formula, and reduceTo on query A and on query B in formulaQueries. For a monotonic count, both queries use timeAggregation=increase with reduceTo=sum. Reports a single percentage with the window, or correctly handles no data / missing instrumentation.",
+      "expectations": [
+        "The actual signoz_query_metrics call sets requestType=scalar",
+        "The actual signoz_query_metrics call sets reduceTo on query A and on every formulaQueries item",
+        "For a monotonic count metric, query A and query B use timeAggregation=increase with reduceTo=sum",
+        "The actual signoz_query_metrics call sets formula to A / B * 100, with query B defined in formulaQueries",
+        "Agent reports one percentage for the hour rather than a series of points"
+      ],
+      "files": []
     }
   ]
 }

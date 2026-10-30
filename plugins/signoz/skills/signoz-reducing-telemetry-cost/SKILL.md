@@ -10,7 +10,8 @@ description: >
   "reduce telemetry volume", "which metrics cost the most", "cardinality
   health check", or "what can I safely drop", or otherwise asks about
   telemetry spend, ingestion volume, or metric cardinality, even if they
-  don't say "cost" or "optimize" explicitly.
+  don't say "cost" or "optimize" explicitly. Do not use it for LLM or
+  AI-agent token spend; that is a trace query in signoz-generating-queries.
 argument-hint: <investigation focus, such as metrics cost or cardinality health>
 ---
 
@@ -159,7 +160,7 @@ step are candidates only. Complete the alert check in Step 3c before recommendin
 reduction, including a source log-level change.
 
 **Path A, service mode (≥ 10%).** Get the severity mix with `signoz_aggregate_logs`,
-`aggregation: count`, `groupBy: "service.name,severity_text"`. Classify severities: REDUCIBLE =
+`aggregations: "count()"`, `groupBy: "service.name,severity_text"`. Classify severities: REDUCIBLE =
 INFO, INFORMATION, DEBUG, TRACE, VERBOSE; HIGH-SIGNAL = ERROR, FATAL, CRITICAL, WARN, WARNING.
 For each top service by GB:
 - Reducible-dominant + own service code → candidate: set `LOG_LEVEL=WARN` (stops generation at
@@ -184,11 +185,11 @@ For each top service by GB:
 > signal.
 
 **Path B, namespace mode (< 10%).**
-- Top namespaces: `signoz_aggregate_logs`, `count`,
-  `groupBy: "k8s.namespace.name,deployment.environment"`, order by count desc, limit ~10. Use a
+- Top namespaces: `signoz_aggregate_logs`, `aggregations: "count()"`,
+  `groupBy: "k8s.namespace.name,deployment.environment"`, `orderBy: "count() desc"`, limit ~10. Use a
   **24h** window (7-day namespace scans time out on large tenants; count is the proxy, since the Cost
   Meter has no namespace dimension).
-- Severity per namespace: `signoz_aggregate_logs`, `count`,
+- Severity per namespace: `signoz_aggregate_logs`, `aggregations: "count()"`,
   `groupBy: "k8s.namespace.name,severity_text"`.
 - Samples: `signoz_search_logs`, `filter: "k8s.namespace.name = '<ns>'"`, small limit; read
   `body`, `severity_text`, `scope_name`.
@@ -220,7 +221,7 @@ Run when the Cost Meter shows span data, ordered by its cost contribution, or wh
 explicitly asks about span cost.
 
 **4a. Global operation-name view, read this first.** `signoz_aggregate_traces`,
-`aggregation: count`, `groupBy: "name"`, `orderBy: "count() desc"`, limit 20, **no service
+`aggregations: "count()"`, `groupBy: "name"`, `orderBy: "count() desc"`, limit 20, **no service
 filter**. This surfaces auto-instrumentation noise (health checks, SQL, cache, sidecars) across
 all services at once.
 
@@ -236,7 +237,7 @@ service by GB, get its dominant operations with `signoz_get_service_top_operatio
 top-3 for brevity, but the error-rate check (4c) and the APM guard below apply to **every**
 service you consider reducing.
 
-**4c. Error rate per service.** `signoz_aggregate_traces`, `count`, `groupBy: "service.name"`
+**4c. Error rate per service.** `signoz_aggregate_traces`, `aggregations: "count()"`, `groupBy: "service.name"`
 (total), then again with `error: true`. Error rate = errors ÷ total, per service.
 
 **4d. Trace alerts.** `signoz_list_alert_rules`, **paginating through every page** (follow

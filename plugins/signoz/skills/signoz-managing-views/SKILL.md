@@ -118,7 +118,9 @@ Read both MCP resources by URI using your client's resource-read mechanism:
    execution envelope's), `formatOptions`, or `variables`; do not put a
    `query` key or a `compositeQuery` object inside the saved spec. Choose
    `panelType` and `requestType` from the saved-view intent rather than
-   inventing them from the execution envelope.
+   inventing them from the execution envelope. Metrics and Cost Meter views
+   are always `panelType: "graph"` with `requestType: "time_series"`: those
+   Explorers run and draw only a time series, whatever the view stores.
    Set the top-level `name` (a DNS-1123 label: lowercase letters, digits,
    hyphens) or pass `generateName: true` to derive it from
    `spec.displayName`. `schemaVersion` is always `"v2"`; the server fills it
@@ -155,13 +157,13 @@ Read both MCP resources by URI using your client's resource-read mechanism:
    - `source=logs` → `signoz_search_logs` with `limit=1`
    - `source=metrics` → `signoz_query_metrics` with the
      `metricName` from `spec.aggregations[0].metricName` plus the same
-     filter, `timeRange=1h`, `requestType=scalar`. Repeat per metric
+     filter, `timeRange=1h`, `requestType=time_series`. Repeat per metric
      query if the view has multiple. The tool requires `metricName`;
      a filter-only probe is not supported.
    - `source=meter` → `signoz_query_metrics` with the `metricName`
      from `spec.aggregations[0].metricName`, **`source=meter`**, the same
      filter, `timeRange=24h` (Cost Meter rolls up hourly, so a 1h window
-     can be a single partial bucket), `requestType=scalar`.
+     can be a single partial bucket), `requestType=time_series`.
    - PromQL or SQL envelope → `signoz_execute_builder_query` with that exact
      envelope over a short recent window. The builder probes above do not
      apply to it.

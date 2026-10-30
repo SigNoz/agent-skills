@@ -106,15 +106,20 @@ log-volume groupBy, and anomaly detection.
    `METRIC_BASED_ALERT` + `anomaly_rule`.
 2. `signoz_list_metrics searchText=duration` → finds
    `http.server.request.duration`.
-3. Builds the v1 anomaly shape: `anomaly_rule`, `algorithm=standard`
-   (z-score based), `seasonality=daily`, top-level `evalWindow` and
-   `frequency`, `condition.target: 3` (3 standard deviations), `op: "above"`,
-   `matchType: "at_least_once"`; no `schemaVersion`, `thresholds`,
-   `evaluation`, or `notificationSettings`.
+3. Builds a v2alpha1 anomaly rule: `schemaVersion: "v2alpha1"`,
+   `anomaly_rule`, `algorithm=standard` (z-score based), `seasonality=daily`,
+   the anomaly function with `z_score_threshold: 3`, `evaluation` with a
+   rolling `evalWindow: "24h"` and `frequency: "3h"`, and
+   `notificationSettings`. One threshold tier named `warning`: `op:
+   "above"`, `target: 3` (3 standard deviations above the forecast),
+   `matchType: "at_least_once"`, empty `targetUnit`. A request about drops
+   would use `op: "below"` with `target: -3`, and one about either direction
+   `op: "outside_bounds"` with `target: 3`.
 4. No channel was named, so it reuses a fully paginated same-operation
    `signoz_list_notification_channels` result, or calls it through
-   `pagination.hasMore=false`; the user picks `slack-api`. If none fits, it
-   offers `signoz_create_notification_channel` with user-provided config.
+   `pagination.hasMore=false`; the user picks `slack-api`, which goes in the
+   tier's `channels`. If none fits, it offers
+   `signoz_create_notification_channel` with user-provided config.
 5. Dry-run validates query returns data. Skip breach-count for
    anomaly alerts.
 6. Preview emphasizes that the threshold is in standard deviations, not raw

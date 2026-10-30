@@ -197,8 +197,8 @@ specific failing operations.
    - Group by `name` and `status_message`. Surface the sample's top 3 with one
      trace ID each; do not call a 20-row sample count full-window frequency.
    - Optionally call `signoz_get_trace_details` for span attributes. Pass the
-     search row's `trace_id` as `traceId` **plus the same absolute fire-window
-     `start` and `end`**; otherwise the 6h default misses older incidents.
+     search row's `trace_id` as `traceId`; the tool takes no time window,
+     because SigNoz locates the trace by its ID.
 
 2. **Logs** for the fire window:
    - Call `signoz_search_logs` with filter:

@@ -153,7 +153,7 @@ not "what changed". Run a single fire-window query for each:
   `severity_text IN ('ERROR', 'FATAL')`. Cap at 20 most recent. Group
   by message pattern (or `exception.type`) and surface the top 3.
 - For deep drill on one trace, map the search row's `trace_id` to the details
-  input: `signoz_get_trace_details` with `{ "traceId": "<returned trace_id>",
-  "start": "<fire_start_ms>", "end": "<fire_end_ms>" }`.
+  input: `signoz_get_trace_details` with `{ "traceId": "<returned trace_id>" }`.
+  It takes no time window; SigNoz locates the trace by its ID.
   It extracts span-level attributes (DB statement, peer service, status code)
   when the operation name alone doesn't identify the failing call.
