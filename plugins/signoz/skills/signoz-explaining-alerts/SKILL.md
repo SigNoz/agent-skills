@@ -191,9 +191,15 @@ For **anomaly rules** (`ruleType: anomaly_rule`), explicitly state that
 the threshold is in **standard deviations from the learned pattern, not
 the raw value**; this is the most common point of confusion. Include
 `algorithm` (`standard`, which is z-score based), `seasonality` (hourly /
-daily / weekly), and how
-lower/higher targets shift sensitivity (lower → more noise, higher →
-only extreme deviations).
+daily / weekly), and how the target's magnitude shifts sensitivity (closer
+to 0, such as 2 or -2 → more noise; further from 0, such as 4 or -4 → only
+extreme deviations). The score is signed, (value - predicted) / standard
+deviation: `above` with target 3 fires only on rises, `below`
+with target -3 only on drops, and `outside_bounds` with target 3 on
+either. Say which directions the rule catches. New anomaly rules are
+schemaVersion `v2alpha1` with threshold tiers; older ones can still read
+back as v1 with a single top-level `op` / `target`, where SigNoz negates
+the target for `below`.
 
 **2. When it fires**: one paragraph covering threshold + timing.
 Decode the threshold spec into plain English using these mappings:
@@ -217,12 +223,13 @@ breach triggers, while `all_the_times` requires the full window.
 **3. Where it notifies**: decode effective routing, not just fields in
 isolation. If `notificationSettings.usePolicy` is true, say that org policy
 matches the rule/static/dynamic labels and that threshold channels are ignored.
-Otherwise, a v2 `threshold_rule` or `promql_rule` routes only through each
-threshold tier's `channels`. If a tier has no channels, call it unrouted or
-misconfigured; never substitute top-level `preferredChannels` as a per-tier
-fallback. A v1 `anomaly_rule` has no thresholds or notification settings, so
-its direct routing comes from `preferredChannels`. Treat that field as routing
-only when the fetched rule schema defines it, not as a cross-schema fallback.
+Otherwise, a v2alpha1 rule of any type, `anomaly_rule` included, routes only
+through each threshold tier's `channels`. If a tier has no channels, call it
+unrouted or misconfigured; never substitute top-level `preferredChannels` as a
+per-tier fallback. Only a v1 `anomaly_rule`, which has no thresholds or
+notification settings, routes through `preferredChannels`. Treat that field as
+routing only when the fetched rule's `schemaVersion` is v1, not as a
+cross-schema fallback.
 Resolve names from the fully paginated `signoz_list_notification_channels`
 result if needed. Also explain `notificationSettings.groupBy` (bundling) and
 `renotify` (interval + states). Skip this section only when routing is already
@@ -415,7 +422,8 @@ follow-ups is better than offering wrong ones.
 
 **Agent:**
 1. `signoz_get_alert id=88` → `ruleType: anomaly_rule`,
-   `algorithm=standard` (z-score based), `seasonality=daily`, target 3, metric
+   `schemaVersion: v2alpha1`, `algorithm=standard` (z-score based),
+   `seasonality=daily`, one tier with `op: outside_bounds`, target 3, metric
    `http.server.request.duration`, scope `service.name = 'api-gateway'`.
 2. History: fired 1 time in last 7d.
 3. Replies:
@@ -430,8 +438,9 @@ follow-ups is better than offering wrong ones.
    > for each hour of day, so peak-hour latency won't false-trigger if
    > it matches the historical norm for that hour.
    >
-   > **When it fires**: when |Z-score| > 3, i.e. the value is more
-   > than 3 standard deviations away from the expected pattern. Lower
+   > **When it fires**: when |Z-score| >= 3 (`outside_bounds`), i.e. the
+   > value is at least 3 standard deviations above or below the expected
+   > pattern, so both spikes and drops fire. Lower
    > target → more sensitive (more noise); higher → only extreme
    > deviations. The threshold is **not** in seconds or milliseconds.
 

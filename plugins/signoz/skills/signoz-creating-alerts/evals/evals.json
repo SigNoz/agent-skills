@@ -51,13 +51,13 @@
       "id": 3,
       "eval_name": "anomaly-frontend-request-rate",
       "prompt": "set up anomaly detection for frontend service request rate: alert me if traffic suddenly drops or spikes versus normal patterns. slack #staging-alerts is fine.",
-      "expected_output": "METRIC_BASED_ALERT with anomaly_rule, algorithm=standard (z-score based), seasonality=daily or hourly. Uses signoz_calls_total or http.server.request.count metric filtered by service.name='frontend'. Threshold target ~3 standard deviations and op='above' because the anomaly score is absolute. Skips the 'would have fired N times' breach count but dry-runs the underlying metric query and routes to Slack through top-level preferredChannels.",
+      "expected_output": "METRIC_BASED_ALERT with anomaly_rule, algorithm=standard (z-score based), seasonality=daily or hourly. Uses signoz_calls_total or http.server.request.count metric filtered by service.name='frontend'. A schemaVersion v2alpha1 rule with evaluation, notificationSettings, and one threshold tier using op='outside_bounds' with target ~3 standard deviations, because the request covers both drops and spikes and the anomaly score is signed. Skips the 'would have fired N times' breach count but dry-runs the underlying metric query and routes to Slack through the tier's channels.",
       "expectations": [
-        "The anomaly create payload omits condition.thresholds, evaluation, notificationSettings, and schemaVersion",
+        "The anomaly create payload sets schemaVersion v2alpha1, evaluation, notificationSettings, and condition.thresholds",
         "The metric data probe calls signoz_query_metrics with a concrete metricName and service.name='frontend'; it never uses an expression-only count() metrics aggregation",
-        "The persisted base metric builder_query carries no limit, order, or dashboard orderBy; the anomaly payload sets top-level evalWindow and frequency and condition.op/matchType/target/algorithm/seasonality explicitly",
-        "The signoz_create_alert payload has top-level preferredChannels containing the selected Slack channel",
-        "The signoz_create_alert payload has top-level preferredChannels containing the selected Slack displayName, not its machine name",
+        "The persisted base metric builder_query carries no limit, order, or dashboard orderBy; the anomaly payload sets evaluation.spec evalWindow and frequency, condition.algorithm and condition.seasonality, and a threshold tier with op, matchType, and target explicitly",
+        "The threshold tier covers both directions: op outside_bounds with a positive target, not above alone",
+        "The signoz_create_alert threshold tier channels contain the selected Slack displayName, not its machine name, and the payload does not rely on top-level preferredChannels",
         "The signoz_execute_builder_query dry-run validates the base metric query without claiming to validate the anomaly functions transform or anomaly score"
       ],
       "files": []
