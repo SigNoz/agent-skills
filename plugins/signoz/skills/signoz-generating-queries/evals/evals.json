@@ -15,7 +15,8 @@
         "The actual signoz_query_metrics call sets formula to A / B * 100, so every referenced query name is defined",
         "The actual signoz_query_metrics call uses the exact metricName, metricType, temporality, and isMonotonic values returned by discovery",
         "The actual signoz_query_metrics formulaQueries is an array containing a query named B with a concrete metricName and the same discovered metric metadata as A",
-        "The actual signoz_query_metrics primary filter for query A contains the discovered service key = 'checkout-service' and the discovered error condition"
+        "The actual signoz_query_metrics primary filter for query A contains the discovered service key = 'checkout-service' and the discovered error condition",
+        "If the signoz_query_metrics call uses requestType=scalar, query A and every formulaQueries item set reduceTo (sum with timeAggregation=increase for counts over the window)"
       ],
       "files": []
     },
