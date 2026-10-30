@@ -129,10 +129,11 @@ Read both MCP resources by URI using your client's resource-read mechanism:
    `spec.order` entry losslessly. Never translate them to dashboard `orderBy`.
    Raw/list views use 100 rows (logs: timestamp/id desc; traces: timestamp
    desc); standalone aggregate views and formula results use 100 groups.
-   Builder queries referenced by a formula use 10000 because their limits are
-   applied before evaluation. Order by the primary aggregation or `__result`
-   desc as appropriate. Time-series top-N ranks groups over the whole selected
-   window and can omit a short-lived local spike.
+   Builder queries referenced by a formula carry neither `limit` nor `order`,
+   because a limit is applied before the formula runs. Order standalone queries
+   by the primary aggregation desc and formula results by `__result` desc.
+   Time-series top-N ranks groups over the whole selected window and can omit
+   a short-lived local spike.
    Preserve raw query entries exactly where the v2 resource permits them,
    including disabled flags and PromQL or SQL envelopes. On create, a PromQL
    or SQL envelope must come verbatim from the user or an existing view;
