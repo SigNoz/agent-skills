@@ -10,7 +10,8 @@ description: >
   "reduce telemetry volume", "which metrics cost the most", "cardinality
   health check", or "what can I safely drop", or otherwise asks about
   telemetry spend, ingestion volume, or metric cardinality, even if they
-  don't say "cost" or "optimize" explicitly.
+  don't say "cost" or "optimize" explicitly. Do not use it for LLM or
+  AI-agent token spend; that is a trace query in signoz-generating-queries.
 argument-hint: <investigation focus, such as metrics cost or cardinality health>
 ---
 
