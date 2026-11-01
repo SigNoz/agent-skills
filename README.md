@@ -30,15 +30,14 @@ generic HTTP MCP clients.
 ## Installation
 
 The Agent Plugins v1 `mcp.json` is used by Codex and portable clients. Claude
-Code and Cursor use their client-specific MCP registration files. Claude Code
-asks for the MCP endpoint URL during install; Codex and Cursor can use
-`signoz-mcp-setup` to initialize or repair it. The setup skill accepts a SigNoz
-Cloud region such as `us`, `us2`, `eu`, `eu2`, `in`, or `in2`, any hosted MCP
-URL, or a self-hosted HTTP `/mcp` endpoint. Plugin updates can reset the bundled
-Codex and Cursor registration files to the placeholder; if that happens, rerun
-`signoz-mcp-setup`. Claude Code stores its endpoint as a persisted plugin
-option, so changing it through the setup skill or **Customize** survives plugin
-updates.
+Code and Cursor use their client-specific MCP registration files. The portable
+and Claude registrations start at the SigNoz Cloud `us` endpoint; Codex, Claude
+Code, and Cursor can use `signoz-mcp-setup` to initialize or repair it. The
+setup skill accepts a SigNoz Cloud region such as `us`, `us2`, `eu`, `eu2`,
+`in`, or `in2`, any hosted MCP URL, or a self-hosted HTTP `/mcp` endpoint.
+Plugin updates can reset the bundled Claude and Codex registrations to their
+`us` default and the Cursor registration to its placeholder; if that happens,
+rerun `signoz-mcp-setup`.
 
 The Devin CLI plugin ships skills only — Devin's plugin system does not bundle
 MCP servers or prompt for install-time config. Run `signoz-mcp-setup` after
@@ -92,12 +91,29 @@ for testing. The source tree at [`plugins/signoz`](plugins/signoz) intentionally
 also contains native Claude, Codex, Cursor, and Grok files and is not itself a
 portable package.
 
-The portable MCP registration starts at `https://not-setup/mcp`, because Agent
-Plugins v1 does not define portable install-time configuration or credential
-fields. After installing, run `signoz-mcp-setup <region-or-mcp-url>` and complete
-the client's OAuth flow for SigNoz Cloud. Portable non-loopback endpoints must
-use HTTPS; for a self-hosted HTTP endpoint on another host, the skill configures
+The portable MCP registration starts at the valid SigNoz Cloud `us` endpoint,
+`https://mcp.us.signoz.cloud/mcp`. Agent Plugins v1 does not define portable
+install-time configuration or credential fields, so run
+`signoz-mcp-setup <region-or-mcp-url>` after installing when you use another
+region or a self-hosted endpoint. Portable non-loopback endpoints must use
+HTTPS; for a self-hosted HTTP endpoint on another host, the skill configures
 the named client's native MCP surface instead.
+
+### Claude.ai and Claude Desktop
+
+The Anthropic & Partners plugin registers one `mcp` connector with the valid
+SigNoz Cloud `us` endpoint. If it is **Not added**, select **Connect**, replace
+the URL in the connector modal when your workspace uses another region, then
+add it and complete OAuth. Use `https://mcp.<region>.signoz.cloud/mcp`.
+
+Claude cannot edit an added connector in place. To change an already-added
+connector, remove it, then reopen and re-add the plugin's `mcp` connector with
+the new URL. Do not keep a second connector alongside it.
+
+Hosted connectors originate from Anthropic's cloud, so they cannot reach
+`localhost`, VPN-only, or private-network endpoints. Claude Desktop users can
+use a local stdio registration for those deployments; see the setup skill's
+client configuration reference.
 
 ### Claude Code
 
@@ -106,17 +122,23 @@ the named client's native MCP surface instead.
 /plugin install signoz@signoz-skills
 ```
 
-On install, Claude Code prompts for your **SigNoz MCP endpoint**. For SigNoz
-Cloud, keep the default `https://mcp.us.signoz.cloud/mcp` or edit the region
-segment to your region (`us`, `us2`, `eu`, `eu2`, `in`, or `in2`). Find your
-region under **Settings -> Ingestion** in SigNoz, or see the
-[region reference](https://signoz.io/docs/ingestion/signoz-cloud/keys/). For a
-self-hosted SigNoz, enter your own HTTP `/mcp` URL, for example
-`http://localhost:8000/mcp`.
+The plugin starts with `https://mcp.us.signoz.cloud/mcp`. If your SigNoz Cloud
+workspace uses another region, run `/signoz:signoz-mcp-setup <region>`. For a
+self-hosted SigNoz, pass its HTTP `/mcp` URL instead, for example
+`/signoz:signoz-mcp-setup http://localhost:8000/mcp`. Find your Cloud region
+under **Settings -> Ingestion** in SigNoz, or see the
+[region reference](https://signoz.io/docs/ingestion/signoz-cloud/keys/).
 
-Then run `/mcp`, select the `signoz` plugin's `mcp` server, and complete the
-authentication flow if prompted. To change the endpoint later, reconfigure the
-plugin's options or run `signoz-mcp-setup` with the new region or MCP URL.
+Then run `/reload-plugins`, followed by `/mcp`; select the `signoz` plugin's
+`mcp` server and complete the authentication flow if prompted. Plugin updates
+restore the packaged `us` endpoint, so rerun `signoz-mcp-setup` afterward when
+you use another region or a self-hosted endpoint.
+
+If you previously set `SIGNOZ_MCP_URL` through **Customize** or
+`signoz-mcp-setup`, that saved option no longer controls this hosted-compatible
+registration. After updating, run
+`/signoz:signoz-mcp-setup <region-or-mcp-url>` once to restore a non-`us` or
+self-hosted endpoint.
 
 Update:
 
@@ -137,8 +159,8 @@ Then, in a Codex session started from your project:
 
 1. Run `/plugins`, open the `SigNoz` marketplace, and install `signoz`.
 2. Run `signoz-mcp-setup <region>` with your SigNoz Cloud region (`us`, `us2`,
-   `eu`, `eu2`, `in`, `in2`) or a self-hosted HTTP MCP URL. This rewrites the
-   bundled `mcp.json` placeholder when the endpoint is valid for Agent Plugins.
+   `eu`, `eu2`, `in`, `in2`) or a self-hosted HTTP MCP URL. This updates the
+   bundled `mcp.json` default when the endpoint is valid for Agent Plugins.
    Non-loopback plain-HTTP endpoints cannot be stored there; for those, the
    skill leaves `mcp.json` unchanged and configures the same `signoz` server
    through native `codex mcp add` instead.
@@ -162,9 +184,9 @@ Then, in a Codex session started from your project:
    the `signoz` server does not appear.
 
 The bundled `mcp.json` lives inside Codex's versioned plugin cache, so plugin
-updates reinstall that file from this repository and can reset it to the
-placeholder. If you want the endpoint to persist across plugin updates, also
-add a native Codex MCP entry after resolving the endpoint:
+updates reinstall that file from this repository and can reset it to the `us`
+default. If you want another endpoint to persist across plugin updates, also add
+a native Codex MCP entry after resolving the endpoint:
 
 ```sh
 codex mcp add signoz --url http://localhost:8000/mcp
@@ -385,7 +407,7 @@ npx skills add SigNoz/agent-skills --skill signoz-writing-clickhouse-queries    
 │   ├── .claude-plugin/plugin.json          # Claude Code plugin manifest
 │   ├── .cursor-plugin/plugin.json          # Cursor plugin manifest
 │   ├── .grok-plugin/plugin.json            # Grok Build plugin manifest
-│   ├── .signoz_claude_mcp.json             # Claude Code MCP config
+│   ├── .signoz_claude_mcp.json             # Claude MCP config (literal HTTPS URL)
 │   ├── .signoz_cursor_mcp.json             # Cursor MCP config
 │   ├── .signoz_grok_mcp.json               # Grok Build MCP config (env-interpolated)
 │   ├── hooks/                              # Auto-allow hooks
