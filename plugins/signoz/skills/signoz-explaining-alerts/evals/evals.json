@@ -43,10 +43,11 @@
       "id": 4,
       "eval_name": "multi-severity-audit-kafka",
       "prompt": "Audit alert 019dad90-1c73-715e-b040-79901928deb2 (kafka consumer lag) — anything I should change?",
-      "expected_output": "Agent fetches the rule, decodes the multi-severity threshold spec (warning at lag >= 50, critical at >= 200), explains the tiered routing. Performs Step 5 audit: flags missing labels.severity (rule has no severity label even though thresholds have severity tiers), considers groupBy cardinality, evaluates threshold calibration, suggests adding severity label, runbook annotations, alertOnAbsent if relevant. Pulls paginated firing history for 7d in descending order.",
+      "expected_output": "Agent fetches the rule, decodes the multi-severity threshold spec (warning at lag >= 50, critical at >= 200), explains the tiered routing. Performs Step 5 audit: considers groupBy cardinality, evaluates threshold calibration, suggests runbook annotations and alertOnAbsent if relevant. Pulls paginated firing history for 7d in descending order.",
       "expectations": [
         "For a v2 threshold rule with usePolicy=false, the explanation derives each tier's routing only from that threshold's channels array",
-        "The explanation never uses top-level preferredChannels as a fallback for an empty v2 threshold tier; it identifies such a tier as unrouted or misconfigured"
+        "The explanation never uses top-level preferredChannels as a fallback for an empty v2 threshold tier; it identifies such a tier as unrouted or misconfigured",
+        "The audit never claims a missing labels.severity breaks routing, and never recommends a static labels.severity to fix routing"
       ],
       "files": []
     },
