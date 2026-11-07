@@ -23,7 +23,7 @@
   "interface": {
     "displayName": "SigNoz",
     "shortDescription": "Metrics, logs, traces & alerts",
-    "longDescription": "Query metrics, logs, and traces; investigate issues; manage dashboards, alerts, and saved views in SigNoz. Configure the MCP connection for your SigNoz Cloud region or self-hosted instance.",
+    "longDescription": "Query metrics, logs, and traces; investigate issues; manage dashboards, alerts, and saved views in SigNoz. Find instrumentation and troubleshooting guidance in the SigNoz documentation.",
     "developerName": "SigNoz",
     "category": "Developer Tools",
     "capabilities": [
