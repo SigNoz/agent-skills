@@ -106,6 +106,7 @@ def build(output: Path) -> Path:
         temporary_package.mkdir()
         for filename in PORTABLE_ROOT_FILES:
             shutil.copy2(SOURCE_ROOT / filename, temporary_package / filename)
+        shutil.copytree(SOURCE_ROOT / "assets", temporary_package / "assets")
         shutil.copy2(REPO_ROOT / "LICENSE", temporary_package / "LICENSE")
         shutil.copytree(
             SKILLS_ROOT,

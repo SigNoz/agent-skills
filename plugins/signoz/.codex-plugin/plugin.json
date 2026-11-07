@@ -22,15 +22,20 @@
   "skills": "./skills/",
   "interface": {
     "displayName": "SigNoz",
-    "shortDescription": "Official SigNoz MCP setup and skills for docs, queries, dashboards, and alerts",
-    "longDescription": "Installs the official SigNoz skills and a bundled MCP server registration for Codex. Use signoz-mcp-setup to configure a SigNoz Cloud region, hosted MCP URL, or self-hosted HTTP endpoint before running docs, query, dashboard, alert, and view workflows.",
+    "shortDescription": "Metrics, logs, traces & alerts",
+    "longDescription": "Query metrics, logs, and traces; investigate issues; manage dashboards, alerts, and saved views in SigNoz. The bundled MCP connection uses SigNoz Cloud US2. Configure a separate connection for other regions or self-hosted instances.",
     "developerName": "SigNoz",
-    "category": "Productivity",
+    "category": "Developer Tools",
     "capabilities": [
       "Read",
       "Write"
     ],
     "websiteURL": "https://signoz.io",
+    "supportURL": "https://signoz.io/support/",
+    "privacyPolicyURL": "https://signoz.io/legal/privacy/",
+    "termsOfServiceURL": "https://signoz.io/legal/terms-of-service/",
+    "composerIcon": "./assets/signoz-icon.png",
+    "logo": "./assets/signoz-icon.png",
     "defaultPrompt": [
       "Set up SigNoz MCP for my SigNoz Cloud region.",
       "Investigate checkout errors across logs, traces, and metrics.",
