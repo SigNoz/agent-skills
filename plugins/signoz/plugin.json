@@ -18,5 +18,31 @@
     "clickhouse",
     "tracing",
     "logging"
-  ]
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "SigNoz",
+        "shortDescription": "Metrics, logs, traces & alerts",
+        "longDescription": "Query metrics, logs, and traces; investigate issues; manage dashboards, alerts, and saved views in SigNoz. Find instrumentation and troubleshooting guidance in the SigNoz documentation.",
+        "developerName": "SigNoz",
+        "category": "Developer Tools",
+        "capabilities": [
+          "Read",
+          "Write"
+        ],
+        "websiteURL": "https://signoz.io",
+        "supportURL": "https://signoz.io/support/",
+        "privacyPolicyURL": "https://signoz.io/legal/privacy/",
+        "termsOfServiceURL": "https://signoz.io/legal/terms-of-service/",
+        "composerIcon": "./assets/signoz-icon.png",
+        "logo": "./assets/signoz-icon.png",
+        "defaultPrompt": [
+          "Set up SigNoz MCP for my SigNoz Cloud region.",
+          "Investigate checkout errors across logs, traces, and metrics.",
+          "Create a checkout dashboard and 5xx alert."
+        ]
+      }
+    }
+  }
 }

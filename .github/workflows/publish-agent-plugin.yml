@@ -33,7 +33,7 @@ jobs:
 
       - name: Check portable package boundary
         run: |
-          EXPECTED=$'LICENSE\nmcp.json\nplugin.json\nskills'
+          EXPECTED=$'LICENSE\nassets\nmcp.json\nplugin.json\nskills'
           ACTUAL=$(find "$RUNNER_TEMP/signoz" -mindepth 1 -maxdepth 1 -printf '%f\n' | sort)
           if [[ "$ACTUAL" != "$EXPECTED" ]]; then
             echo "Unexpected portable package entries:"
