@@ -154,8 +154,7 @@ clear the explicit plugin setting and reload the client.
 ### Update behavior and durable Codex config
 
 The portable and Cursor files live inside the installed plugin. Plugin updates
-can reset the portable endpoint to the bundled US2 default and Cursor to its
-placeholder. If the `signoz` server uses the wrong region or returns to
+can reset them to the placeholder. If the `signoz` server returns to
 **not-setup** after an update, rerun `signoz-mcp-setup`. Claude Code's endpoint
 is a persisted plugin option and survives plugin updates. For durable native
 client configuration, use the client-specific recipes in `client-configs.md`.

@@ -24,7 +24,7 @@
       "interface": {
         "displayName": "SigNoz",
         "shortDescription": "Metrics, logs, traces & alerts",
-        "longDescription": "Query metrics, logs, and traces; investigate issues; manage dashboards, alerts, and saved views in SigNoz. The bundled MCP connection uses SigNoz Cloud US2. Configure a separate connection for other regions or self-hosted instances.",
+        "longDescription": "Query metrics, logs, and traces; investigate issues; manage dashboards, alerts, and saved views in SigNoz. Configure the MCP connection for your SigNoz Cloud region or self-hosted instance.",
         "developerName": "SigNoz",
         "category": "Developer Tools",
         "capabilities": [
