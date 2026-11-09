@@ -71,16 +71,21 @@ complete `groupBy` and report the top
 before any signal-level change: https://signoz.io/docs/ingestion/signoz-cloud/keys/
 
 **Ingestion keys at their limit.** If `signoz_get_field_keys` returns a field that identifies the
-ingestion key (for example `signoz.workspace.key.id`), run each signal's size or datapoint query
-grouped by it and read every key's hourly values. A key is at its limit when both hold: its data
-stops partway through the day and returns at the same hour each day, and the volume between one
-return and the next stop is equal from day to day (a raised limit shows as a step to a new equal
-value). When a key reaches its limit, SigNoz drops that signal's data for the key until the limit
-resets. Report every such key in the cost orientation with its signal, the volume it reaches each
-day, and the hours with no data. A reduction on that key restores hours of lost data and does not
-lower the bill; never count it as a cost saving. A share measured over hours the limit cut off is
-skewed: measure it on hours before the cut-off, or state that it is skewed. Steady traffic alone
-is not a limit; require both signs.
+ingestion key (for example `signoz.workspace.key.id`), run each signal's size or datapoint query,
+and its record-count query, grouped by it, and read every key's hourly values. If it returns no such
+field, say the per-key check was not possible. A key is at a daily limit when, on at least two days,
+every service on the key stops sending in the same hour, data returns at the same hour, and the size
+or count between a return and the next stop is the same each day to within one hour's volume (a
+raised limit shows as a step to a new level). When a key reaches its limit, SigNoz drops that
+signal's data for the key until the limit resets. Docs:
+https://signoz.io/docs/ingestion/signoz-cloud/keys/
+
+Report every such key in the cost orientation with its signal, the volume it reaches each day, and
+the hours with no data (convert the timestamps before stating hours). While a key reaches its
+limit, a reduction on it first fills the cut-off hours; it lowers billed volume only once the key
+no longer reaches its limit, and nothing measures the dropped volume. Report a reduction there as
+hours of data regained, never as a cost cut. A share measured over cut-off hours is skewed:
+measure it on hours before the cut-off, or state that it is skewed.
 
 ### Step 2: Metrics
 
@@ -171,23 +176,9 @@ explicitly asks about log cost.
 step are candidates only. Complete the alert check in Step 3c before recommending any log-volume
 reduction, including a source log-level change.
 
-**Duplicate copies (either path).** The same records can arrive twice: over OTLP from an SDK or
-log bridge, and again from a file or stdout collector such as k8s-infra's container-log
-collection. Look for this when a service sends logs over OTLP and its container's output is also
-collected: compare record counts per container and hour on both paths, and match a sample of
-records by timestamp and message. Stopping either copy is a candidate only after all three checks:
-- **Fields only that copy carries.** List them (resource attributes such as
-  `k8s.deployment.name`, file-path attributes, parsed fields). Check every alert (Step 3c),
-  dashboard, and saved view that filters, groups, or aggregates on one of them. A query on such a
-  field breaks when that copy stops, even if no query names the service or container.
-- **Records only that copy has.** Count them and their severities. Crash output and runtime errors
-  can reach stdout without passing through the SDK; if those records include WARN or higher, keep
-  that copy or keep those records.
-- **Which copy to stop.** Decide by what depends on each copy; the number of attributes a copy
-  carries does not decide it. Size the saving as the stopped copy's share only.
-
-Excluding containers from collection uses the k8s-infra `presets.logsCollection.blacklist`
-values: https://signoz.io/docs/userguide/collect_kubernetes_pod_logs/
+**Duplicate copies (either path).** When a service sends logs over OTLP and its container or host
+output is also collected, read `references/duplicate-log-copies.md` before recommending that
+either copy stop.
 
 **Path A, service mode (≥ 10%).** Get the severity mix with `signoz_aggregate_logs`,
 `aggregations: "count()"`, `groupBy: "service.name,severity_text"`. Classify severities: REDUCIBLE =
@@ -336,16 +327,16 @@ a signal the workflow already analyzed.
   direction:"desc"}]`. This is wire `order`, not dashboard `orderBy`; preserve
   it in grouped queries. The limit ranks groups over the whole window, so call
   out the possibility that a short-lived group falls outside the top N.
-- **Check a share measured on a shorter window before applying it to the week.** Compare that
-  window's Cost Meter total for the signal with the week's daily totals. If it is more than 20%
-  away from the daily average, measure the share on a second, typical day too and report both.
-- **A part can't be bigger than the group it belongs to.** Check each item's share against the
-  Cost Meter share of the environment, service, or ingestion key that contains it. If the item is
-  bigger, the measurement is wrong; find out why before reporting it.
-- **Reconcile estimates with the Cost Meter.** When a size comes from records rather than the
-  Cost Meter (record counts, or byte or sample estimates from a query), compute the same estimate
-  for a group the Cost Meter also reports, over the same window, and state the ratio. If they
-  differ by more than 10%, explain the gap before using the estimate.
+- **Check a share measured on a shorter window before applying it to the week.** Report that
+  window's Cost Meter total for the signal next to the week's daily average. If the window is the
+  week's highest or lowest day, measure the share on a second day too and report both.
+- **Check each share against the group that contains it.** Compare an item's share with the Cost
+  Meter share of the environment, service, or ingestion key it belongs to, on the same window and
+  the same grouped basis (Step 3a). If the item is larger, find the cause before reporting it.
+- **Size byte or sample estimates through the Cost Meter.** When a query estimates bytes or
+  samples from the records themselves, size an item as its share of that estimate's total for the
+  same window times the Cost Meter total, never as the raw estimate, and state the ratio of the
+  estimate's total to the Cost Meter total. Never use record counts as a size.
 - **Never present an Infra-page or APM metric as safe to drop** (see
   `references/infra-do-not-drop.md`), even when usage-check shows no dashboards or alerts.
 - **Logs:** never recommend dropping/filtering a whole service or namespace that carries active
@@ -356,12 +347,6 @@ a signal the workflow already analyzed.
 - **Traces:** never recommend or configure head, probabilistic, tail, or any other sampling.
   Sampling limits the built-in APM/Services metrics to retained traces, so absolute request counts
   and rates no longer represent all traffic.
-- **A Collector filter removes only the data that passes through that Collector.** Before
-  recommending one, identify which Collector each affected service's data passes through (from
-  attributes a Collector adds, such as k8s metadata or a component name, or from the ingestion key
-  the data arrives on) and check that it covers every source in the measured share. Size the
-  change on the part it reaches. If no Collector can be identified, say so and prefer a fix at the
-  source (SDK or agent).
 - **UNBOUNDED and IDENTIFIER labels are always worth flagging**: the problem is trajectory, not
   just current count.
 - **Never suggest changing retention. Never estimate dollar savings.** Never call a dashboard or
@@ -372,6 +357,8 @@ a signal the workflow already analyzed.
 
 ## Additional resources
 
+- `references/duplicate-log-copies.md`: confirming duplicate log copies, the checks before
+  stopping either copy, and where to stop it.
 - `references/cost-meter-queries.md`: Cost Meter discovery, the full
   `signoz_execute_builder_query` template, unit conversion, and the grouped-vs-ungrouped caveat.
 - `references/infra-do-not-drop.md`: the metrics behind the built-in Infrastructure and
