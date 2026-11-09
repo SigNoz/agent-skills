@@ -70,6 +70,18 @@ complete `groupBy` and report the top
 `sandbox`, `preview`, `uat`, …) is > 40% of volume, recommend Ingestion Limits on that key
 before any signal-level change: https://signoz.io/docs/ingestion/signoz-cloud/keys/
 
+**Ingestion keys at their limit.** If `signoz_get_field_keys` returns a field that identifies the
+ingestion key (for example `signoz.workspace.key.id`), run each signal's size or datapoint query
+grouped by it and read every key's hourly values. A key is at its limit when both hold: its data
+stops partway through the day and returns at the same hour each day, and the volume between one
+return and the next stop is equal from day to day (a raised limit shows as a step to a new equal
+value). When a key reaches its limit, SigNoz drops that signal's data for the key until the limit
+resets. Report every such key in the cost orientation with its signal, the volume it reaches each
+day, and the hours with no data. A reduction on that key restores hours of lost data and does not
+lower the bill; never count it as a cost saving. A share measured over hours the limit cut off is
+skewed: measure it on hours before the cut-off, or state that it is skewed. Steady traffic alone
+is not a limit; require both signs.
+
 ### Step 2: Metrics
 
 Run when the Cost Meter shows metric data, ordered by its cost contribution, or when the user
@@ -158,6 +170,24 @@ explicitly asks about log cost.
 **3b. Analyze the selected attribution path and identify candidate fixes.** The fixes in this
 step are candidates only. Complete the alert check in Step 3c before recommending any log-volume
 reduction, including a source log-level change.
+
+**Duplicate copies (either path).** The same records can arrive twice: over OTLP from an SDK or
+log bridge, and again from a file or stdout collector such as k8s-infra's container-log
+collection. Look for this when a service sends logs over OTLP and its container's output is also
+collected: compare record counts per container and hour on both paths, and match a sample of
+records by timestamp and message. Stopping either copy is a candidate only after all three checks:
+- **Fields only that copy carries.** List them (resource attributes such as
+  `k8s.deployment.name`, file-path attributes, parsed fields). Check every alert (Step 3c),
+  dashboard, and saved view that filters, groups, or aggregates on one of them. A query on such a
+  field breaks when that copy stops, even if no query names the service or container.
+- **Records only that copy has.** Count them and their severities. Crash output and runtime errors
+  can reach stdout without passing through the SDK; if those records include WARN or higher, keep
+  that copy or keep those records.
+- **Which copy to stop.** Decide by what depends on each copy; the number of attributes a copy
+  carries does not decide it. Size the saving as the stopped copy's share only.
+
+Excluding containers from collection uses the k8s-infra `presets.logsCollection.blacklist`
+values: https://signoz.io/docs/userguide/collect_kubernetes_pod_logs/
 
 **Path A, service mode (≥ 10%).** Get the severity mix with `signoz_aggregate_logs`,
 `aggregations: "count()"`, `groupBy: "service.name,severity_text"`. Classify severities: REDUCIBLE =
@@ -274,7 +304,8 @@ Docs: https://signoz.io/docs/traces-management/guides/drop-spans/
 Lead with a **TL;DR**: concise, no headers, two parts:
 1. **Cost orientation**: which signal is the primary driver, how much, and what generates it
    (name the service, environment, or metric). If several things together dominate, name them
-   with individual shares and combined impact.
+   with individual shares and combined impact. Name any ingestion key at its limit (Step 1) and
+   the hours of data it loses each day.
 2. **Prioritized action list**: every actionable finding in priority order, each with its
    status inline: **Safe to implement** / **Needs one check first** (state what) / **Will break
    dashboards** (name them) / **Will break alert coverage** (name the alert) / **Infra-page
@@ -305,6 +336,16 @@ a signal the workflow already analyzed.
   direction:"desc"}]`. This is wire `order`, not dashboard `orderBy`; preserve
   it in grouped queries. The limit ranks groups over the whole window, so call
   out the possibility that a short-lived group falls outside the top N.
+- **Check a share measured on a shorter window before applying it to the week.** Compare that
+  window's Cost Meter total for the signal with the week's daily totals. If it is more than 20%
+  away from the daily average, measure the share on a second, typical day too and report both.
+- **A part can't be bigger than the group it belongs to.** Check each item's share against the
+  Cost Meter share of the environment, service, or ingestion key that contains it. If the item is
+  bigger, the measurement is wrong; find out why before reporting it.
+- **Reconcile estimates with the Cost Meter.** When a size comes from records rather than the
+  Cost Meter (record counts, or byte or sample estimates from a query), compute the same estimate
+  for a group the Cost Meter also reports, over the same window, and state the ratio. If they
+  differ by more than 10%, explain the gap before using the estimate.
 - **Never present an Infra-page or APM metric as safe to drop** (see
   `references/infra-do-not-drop.md`), even when usage-check shows no dashboards or alerts.
 - **Logs:** never recommend dropping/filtering a whole service or namespace that carries active
@@ -315,6 +356,12 @@ a signal the workflow already analyzed.
 - **Traces:** never recommend or configure head, probabilistic, tail, or any other sampling.
   Sampling limits the built-in APM/Services metrics to retained traces, so absolute request counts
   and rates no longer represent all traffic.
+- **A Collector filter removes only the data that passes through that Collector.** Before
+  recommending one, identify which Collector each affected service's data passes through (from
+  attributes a Collector adds, such as k8s metadata or a component name, or from the ingestion key
+  the data arrives on) and check that it covers every source in the measured share. Size the
+  change on the part it reaches. If no Collector can be identified, say so and prefer a fix at the
+  source (SDK or agent).
 - **UNBOUNDED and IDENTIFIER labels are always worth flagging**: the problem is trajectory, not
   just current count.
 - **Never suggest changing retention. Never estimate dollar savings.** Never call a dashboard or

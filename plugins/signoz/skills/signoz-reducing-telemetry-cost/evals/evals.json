@@ -94,6 +94,128 @@
         "Agent keeps LOG_LEVEL=WARN and any INFO/DEBUG-only filter as candidates until those checks complete"
       ],
       "files": []
+    },
+    {
+      "id": 7,
+      "eval_name": "ingestion-key-at-its-limit",
+      "prompt": "Traces are our biggest cost. Grouped by ingestion key, the Cost Meter's hourly span bytes for key k-1 add up to exactly 200 GiB each day, then every hourly value is zero from about 13:00 UTC until 00:00 UTC, every day of the week. Key k-2 varies normally. Which trace changes should we make to cut cost?",
+      "expected_output": "Agent recognises that key k-1 is at its ingestion limit: data stops partway through each day and the volume before the stop is the same every day, so SigNoz is dropping k-1's spans for about 11 hours a day. It reports this in the cost orientation, says reductions on k-1 buy back hours of data rather than lowering the bill, and does not count them as savings. Shares for k-1's services are measured on hours before the cut-off or flagged as skewed.",
+      "expectations": [
+        "Agent groups the Cost Meter span-size query by the ingestion-key field returned by signoz_get_field_keys",
+        "Agent states that key k-1 is at its ingestion limit and that its spans are dropped for part of each day",
+        "Agent names the hours with no data for key k-1",
+        "Agent does not count a reduction on key k-1's traffic as a cost saving",
+        "Agent measures k-1 service shares on hours before the cut-off, or states that they are skewed",
+        "Agent does not report key k-2 as capped"
+      ],
+      "files": []
+    },
+    {
+      "id": 8,
+      "eval_name": "steady-key-is-not-a-limit",
+      "prompt": "Logs are our main cost. Grouped by ingestion key, the Cost Meter shows key k-3 sending 95 to 105 GiB a day with data in every hour, and its hourly values follow the usual day and night pattern. Is anything wrong with our ingestion keys, and where should we cut log cost?",
+      "expected_output": "Agent checks the per-key hourly values, finds data in every hour and daily volumes that vary, and does not claim that key k-3 is at an ingestion limit. It proceeds with the normal logs workflow.",
+      "expectations": [
+        "Agent checks the per-key hourly Cost Meter values",
+        "Agent does not say that key k-3 is at its ingestion limit or that its data is being dropped",
+        "Agent continues with the logs attribution and severity steps"
+      ],
+      "files": []
+    },
+    {
+      "id": 9,
+      "eval_name": "one-day-share-checked-against-the-week",
+      "prompt": "We scanned yesterday's logs and the payments-worker container produced 18% of log bytes. The Cost Meter's daily log totals for the week average 1,000 GiB, and yesterday was 700 GiB. Size dropping payments-worker's INFO logs for a month.",
+      "expected_output": "Agent compares yesterday's Cost Meter log total (700 GiB) with the weekly daily average (1,000 GiB), sees it is 30% low, and does not apply the 18% share to the week as it is. It measures the share on a second, typical day and reports both before sizing the change.",
+      "expectations": [
+        "Agent compares the scanned day's Cost Meter total with the week's daily totals",
+        "Agent identifies the scanned day as more than 20% below the daily average",
+        "Agent measures the share on a second, typical day before sizing the change",
+        "Agent reports both days' shares",
+        "Agent does not quote a dollar savings figure"
+      ],
+      "files": []
+    },
+    {
+      "id": 10,
+      "eval_name": "item-share-larger-than-its-group",
+      "prompt": "Our VPC flow logs all arrive on ingestion key k-vpc, which the Cost Meter puts at 22% of the week's log bytes. A one-day scan says the ACCEPT records alone are 25% of log bytes. Recommend what to do about ACCEPT flow logs.",
+      "expected_output": "Agent notices that the ACCEPT records (25%) can't be bigger than the ingestion key that contains them (22%), treats the measurement as wrong, and finds the cause (for example a non-typical scan day or a different byte basis) before reporting a size for the item.",
+      "expectations": [
+        "Agent compares the item's share with the Cost Meter share of the ingestion key that contains it",
+        "Agent states that the ACCEPT share can't exceed the key's 22%",
+        "Agent does not report the 25% share as the item's size",
+        "Agent re-measures or explains the cause before sizing the item"
+      ],
+      "files": []
+    },
+    {
+      "id": 11,
+      "eval_name": "query-estimate-reconciled-with-the-meter",
+      "prompt": "I estimated log bytes per namespace with a ClickHouse query summing body and attribute lengths. For service checkout, the estimate over the last 24 hours is 80 GiB, and the Cost Meter's log size for checkout over the same 24 hours is 100 GiB. Use the estimate to rank which namespaces to reduce.",
+      "expected_output": "Agent computes the ratio of the query estimate to the Cost Meter for the same group and window (0.8), states it, and because the gap is more than 10% explains or corrects it (for example missing resource attributes in the byte formula) before ranking namespaces with the estimate.",
+      "expectations": [
+        "Agent compares the query estimate with the Cost Meter for the same service and window",
+        "Agent states the ratio or the 20% gap",
+        "Agent explains or corrects the gap before using the estimate to rank namespaces",
+        "Agent uses Cost Meter bytes, not record counts, as volume"
+      ],
+      "files": []
+    },
+    {
+      "id": 12,
+      "eval_name": "collector-filter-must-reach-the-data",
+      "prompt": "The Node service orders-api produces 12% of span bytes from middleware spans. Its spans carry no k8s attributes and no Collector component attribute, and they arrive on an ingestion key used only by SDKs exporting straight to SigNoz Cloud. Give me a Collector filter to drop those spans.",
+      "expected_output": "Agent checks which Collector orders-api's spans pass through, finds no evidence of one, and says so. It does not present a Collector filter as covering this volume; it prefers the SDK or instrumentation library's documented control at the source, and notes the spans will disappear from APM.",
+      "expectations": [
+        "Agent looks for evidence of a Collector on orders-api's trace path (Collector-added attributes or the ingestion key)",
+        "Agent states that no Collector could be identified for these spans",
+        "Agent does not present a Collector filter as removing the 12%",
+        "Agent prefers a source-side (SDK or instrumentation library) control",
+        "Agent does not recommend trace sampling"
+      ],
+      "files": []
+    },
+    {
+      "id": 13,
+      "eval_name": "duplicate-copy-field-used-by-an-alert",
+      "prompt": "Service billing-api sends logs over OTLP with the pino instrumentation, and k8s-infra also collects the same container's stdout. Both copies have the same hourly counts. The stdout copy has k8s.deployment.name; the OTLP copy doesn't. One log alert counts errors filtered on k8s.deployment.name = 'billing-api'. Which copy should we stop?",
+      "expected_output": "Agent confirms the duplicate, lists the fields only the stdout copy carries, and finds the alert that filters on k8s.deployment.name. It marks stopping the stdout copy as Will break alert coverage and names the alert, and considers stopping the OTLP copy instead, subject to its own checks. The saving is one copy's share, not both.",
+      "expectations": [
+        "Agent lists the fields that only the stdout copy carries",
+        "Agent checks alerts, dashboards, and saved views for queries on those fields",
+        "Agent marks stopping the stdout copy as Will break alert coverage and names the alert",
+        "Agent does not choose the copy to stop by which copy has more attributes",
+        "Agent sizes the saving as one copy's share"
+      ],
+      "files": []
+    },
+    {
+      "id": 14,
+      "eval_name": "duplicate-copy-with-nothing-depending",
+      "prompt": "Service search-api sends every log over OTLP and k8s-infra also collects its stdout. Matching a sample by timestamp and message shows every stdout line is also in the OTLP copy. No alert, dashboard, or saved view filters, groups, or aggregates on any field that only the stdout copy has. Can we stop the stdout copy?",
+      "expected_output": "Agent runs the three duplicate-copy checks, finds no field-level dependency and no records only in the stdout copy, and presents excluding search-api's container from k8s-infra log collection as a candidate, sized as the stdout copy's share only, with the blacklist doc.",
+      "expectations": [
+        "Agent checks fields only the stdout copy carries against alerts, dashboards, and saved views",
+        "Agent checks for records only the stdout copy has",
+        "Agent presents stopping the stdout copy as a candidate rather than blocking it",
+        "Agent sizes the change as the stdout copy's share only",
+        "Agent cites the k8s-infra log collection exclude docs"
+      ],
+      "files": []
+    },
+    {
+      "id": 15,
+      "eval_name": "duplicate-copy-with-errors-only-on-stdout",
+      "prompt": "Service ledger-api logs over OTLP and k8s-infra also collects its stdout. About 1% of stdout lines have no OTLP twin, and those lines are ERROR-level crash output and runtime panics. Stop the stdout copy to save cost.",
+      "expected_output": "Agent counts the records only the stdout copy has, sees they are ERROR-level crash output that the SDK never sends, and does not recommend stopping the stdout copy outright. It keeps that copy or keeps those records (for example by filtering only the duplicated INFO lines).",
+      "expectations": [
+        "Agent counts the records only the stdout copy has and their severities",
+        "Agent identifies that those records are ERROR-level and absent from the OTLP copy",
+        "Agent does not recommend stopping the stdout copy outright",
+        "Agent proposes keeping the stdout copy or keeping its error records"
+      ],
+      "files": []
     }
   ]
 }
