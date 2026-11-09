@@ -1,0 +1,39 @@
+{
+  "mode": "offline_mcp_fixture",
+  "instructions": "Use these responses to answer offline. Do not query a live tenant. Both calls succeeded.",
+  "responses": [
+    {
+      "tool": "signoz_list_services",
+      "request": {
+        "timeRange": "6h"
+      },
+      "response": {
+        "data": [
+          {
+            "serviceName": "checkout"
+          },
+          {
+            "serviceName": "payments"
+          }
+        ],
+        "pagination": {
+          "hasMore": false
+        }
+      }
+    },
+    {
+      "tool": "signoz_search_traces",
+      "request": {
+        "service": "billing-worker",
+        "timeRange": "15m",
+        "limit": 100
+      },
+      "response": {
+        "data": {
+          "rows": []
+        },
+        "note": "note: returned 0 rows (limit 100); all matching results returned (hasMore=false)."
+      }
+    }
+  ]
+}

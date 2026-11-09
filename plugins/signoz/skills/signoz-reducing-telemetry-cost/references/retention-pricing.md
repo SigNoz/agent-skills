@@ -1,7 +1,7 @@
 # Retention pricing
 
 Used in Step 1 to weight cost by each signal's configured retention. Ask the user for their
-currently configured retention per signal before applying these rates — never assume a tier.
+currently configured retention per signal before applying these rates; never assume a tier.
 
 These rates are for orientation only (ranking signals against each other), never quote the
 resulting dollar figure to the user as a cost estimate.

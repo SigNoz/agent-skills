@@ -39,6 +39,8 @@ jobs:
             ':(glob)plugins/*/.claude-plugin/plugin.json' \
             ':(glob)plugins/*/.codex-plugin/plugin.json' \
             ':(glob)plugins/*/.cursor-plugin/plugin.json' \
+            ':(glob)plugins/*/.grok-plugin/plugin.json' \
+            ':(glob)plugins/*/plugin.json' \
             'gemini-extension.json' \
             '.devin-plugin/plugin.json')
           if [[ -z "$BASE_SHA" ]]; then
@@ -49,8 +51,10 @@ jobs:
             'plugins/' \
             'gemini-extension.json' \
             '.devin-plugin/' \
+            'LICENSE' \
             'plugin.json' \
             'mcp_config.json' \
+            'scripts/package_agent_plugin.py' \
             'skills')
 
           if [[ -z "$CHANGED" ]]; then
@@ -63,14 +67,25 @@ jobs:
           # such as plugins/README.md are repository metadata, not plugins.
           PLUGIN_DIRS=$(echo "$CHANGED" | awk -F/ '$1 == "plugins" && NF >= 3 {print $1 "/" $2}' | sort -u)
 
-          # The root Gemini, Devin, and Antigravity files are ports of the
-          # signoz plugin, so a root-only port change also bumps signoz.
-          if echo "$CHANGED" | grep -qE '^(gemini-extension\.json|\.devin-plugin/.*|plugin\.json|mcp_config\.json|skills)$'; then
+          # Root compatibility surfaces and portable package inputs belong to
+          # the signoz plugin, so their changes also bump signoz.
+          if echo "$CHANGED" | grep -qE '^(gemini-extension\.json|\.devin-plugin/.*|LICENSE|plugin\.json|mcp_config\.json|scripts/package_agent_plugin\.py|skills)$'; then
             PLUGIN_DIRS=$(printf '%s\n%s\n' "$PLUGIN_DIRS" 'plugins/signoz' | sort -u)
           fi
 
           TODAY=$(date -u +%Y.%m.%d)
           COUNT=0
+
+          set_json_version() {
+            local MANIFEST="$1"
+            local VERSION="$2"
+            local TEMP_FILE="${MANIFEST}.tmp"
+            if ! jq --arg version "$VERSION" '.version = $version' "$MANIFEST" > "$TEMP_FILE"; then
+              rm -f "$TEMP_FILE"
+              return 1
+            fi
+            mv "$TEMP_FILE" "$MANIFEST"
+          }
 
           for PLUGIN_DIR in $PLUGIN_DIRS; do
             if [[ ! -d "$PLUGIN_DIR" ]]; then
@@ -78,18 +93,12 @@ jobs:
               continue
             fi
 
-            # Read current version from the primary manifest
-            CLAUDE_JSON="$PLUGIN_DIR/.claude-plugin/plugin.json"
-            if [[ ! -f "$CLAUDE_JSON" ]]; then
-              echo "ERROR: Required plugin manifest is missing: $CLAUDE_JSON"
-              exit 1
-            fi
+            PLUGIN_NAME=$(basename "$PLUGIN_DIR")
 
-            CURRENT=$(jq -r '.version // empty' "$CLAUDE_JSON")
-            if [[ -z "$CURRENT" ]]; then
-              echo "ERROR: No version field in $CLAUDE_JSON"
-              exit 1
-            fi
+            # Use the same parity contract as pull-request validation before
+            # calculating or writing the next version.
+            python3 scripts/check_plugin_versions.py check "$PLUGIN_DIR"
+            CURRENT=$(jq -r '.version' "$PLUGIN_DIR/.claude-plugin/plugin.json")
 
             # CalVer bump logic
             if [[ "$CURRENT" == "$TODAY" ]]; then
@@ -110,25 +119,20 @@ jobs:
               continue
             fi
 
-            # Every logical plugin must ship all three versioned manifests.
-            # Fail instead of silently leaving one client on a stale version.
+            PORTABLE_JSON="$PLUGIN_DIR/plugin.json"
+            SEMVER_VERSION=$(python3 scripts/check_plugin_versions.py encode "$NEW")
+
             for MANIFEST in \
               "$PLUGIN_DIR/.claude-plugin/plugin.json" \
               "$PLUGIN_DIR/.codex-plugin/plugin.json" \
-              "$PLUGIN_DIR/.cursor-plugin/plugin.json"; do
-              if [[ ! -f "$MANIFEST" ]]; then
-                echo "ERROR: Required plugin manifest is missing: $MANIFEST"
-                exit 1
-              fi
-              if ! jq --arg v "$NEW" '.version = $v' "$MANIFEST" > "${MANIFEST}.tmp"; then
-                echo "ERROR: jq failed on $MANIFEST"
-                rm -f "${MANIFEST}.tmp"
-                exit 1
-              fi
-              mv "${MANIFEST}.tmp" "$MANIFEST"
+              "$PLUGIN_DIR/.cursor-plugin/plugin.json" \
+              "$PLUGIN_DIR/.grok-plugin/plugin.json"; do
+              set_json_version "$MANIFEST" "$NEW"
             done
 
-            PLUGIN_NAME=$(basename "$PLUGIN_DIR")
+            set_json_version "$PORTABLE_JSON" "$SEMVER_VERSION"
+            echo "Bumped $PORTABLE_JSON -> $SEMVER_VERSION"
+
             COUNT=$((COUNT + 1))
             echo "Bumped $PLUGIN_NAME: $CURRENT -> $NEW"
 
@@ -136,50 +140,13 @@ jobs:
             # manifest mirror the signoz plugin, so keep their versions in
             # lockstep with the same bump.
             if [[ "$PLUGIN_NAME" == "signoz" ]]; then
-              if [[ ! -f "gemini-extension.json" ]]; then
-                echo "ERROR: Required Gemini manifest is missing: gemini-extension.json"
-                exit 1
-              fi
-              if ! jq --arg v "$NEW" '.version = $v' "gemini-extension.json" > "gemini-extension.json.tmp"; then
-                echo "ERROR: jq failed on gemini-extension.json"
-                rm -f "gemini-extension.json.tmp"
-                exit 1
-              fi
-              mv "gemini-extension.json.tmp" "gemini-extension.json"
+              set_json_version "gemini-extension.json" "$NEW"
               echo "Bumped gemini-extension.json -> $NEW (lockstep with signoz)"
 
-              if [[ ! -f ".devin-plugin/plugin.json" ]]; then
-                echo "ERROR: Required Devin manifest is missing: .devin-plugin/plugin.json"
-                exit 1
-              fi
-              # Devin's plugin loader enforces strict semver, which forbids
-              # leading zeros in numeric identifiers — CalVer's MM/DD segments
-              # have one whenever the month or day is under 10 (base-10 forced
-              # via `10#` so bash doesn't misread "08"/"09" as invalid octal).
-              # Fold the day and any same-day micro suffix into the patch
-              # number itself (day*100 + micro) rather than build metadata:
-              # semver explicitly excludes build metadata (+x) from precedence
-              # comparisons, so a same-day micro bump encoded that way would
-              # compare equal to the base version and a strict-semver update
-              # path could skip it. Encoding it in patch keeps same-day bumps
-              # strictly increasing, e.g.:
-              #   2026.07.02   -> 2026.7.200
-              #   2026.07.02.1 -> 2026.7.201
-              #   2026.07.02.2 -> 2026.7.202
-              IFS='.' read -ra VER_PARTS <<< "$NEW"
-              DEVIN_DAY=$((10#${VER_PARTS[2]}))
-              DEVIN_MICRO="${VER_PARTS[3]:-0}"
-              DEVIN_MICRO=$((10#$DEVIN_MICRO))
-              DEVIN_PATCH=$((DEVIN_DAY * 100 + DEVIN_MICRO))
-              DEVIN_VERSION="${VER_PARTS[0]}.$((10#${VER_PARTS[1]})).${DEVIN_PATCH}"
-
-              if ! jq --arg v "$DEVIN_VERSION" '.version = $v' ".devin-plugin/plugin.json" > ".devin-plugin/plugin.json.tmp"; then
-                echo "ERROR: jq failed on .devin-plugin/plugin.json"
-                rm -f ".devin-plugin/plugin.json.tmp"
-                exit 1
-              fi
-              mv ".devin-plugin/plugin.json.tmp" ".devin-plugin/plugin.json"
-              echo "Bumped .devin-plugin/plugin.json -> $DEVIN_VERSION (semver form of $NEW, lockstep with signoz)"
+              # Devin also enforces strict SemVer, so reuse the portable
+              # manifest's monotonic SemVer encoding.
+              set_json_version ".devin-plugin/plugin.json" "$SEMVER_VERSION"
+              echo "Bumped .devin-plugin/plugin.json -> $SEMVER_VERSION (semver form of $NEW, lockstep with signoz)"
             fi
           done
 
@@ -204,7 +171,7 @@ jobs:
 
           # The branch is automation-owned and is regenerated from current main.
           git switch -C "$BUMP_BRANCH"
-          git add plugins/**/.claude-plugin/plugin.json plugins/**/.codex-plugin/plugin.json plugins/**/.cursor-plugin/plugin.json gemini-extension.json .devin-plugin/plugin.json
+          git add plugins/**/.claude-plugin/plugin.json plugins/**/.codex-plugin/plugin.json plugins/**/.cursor-plugin/plugin.json plugins/**/.grok-plugin/plugin.json plugins/**/plugin.json gemini-extension.json .devin-plugin/plugin.json
           PR_TITLE="chore: auto-bump CalVer for $BUMP_COUNT plugin(s)"
           git commit -m "$PR_TITLE"
           git push --force-with-lease --set-upstream origin "$BUMP_BRANCH"

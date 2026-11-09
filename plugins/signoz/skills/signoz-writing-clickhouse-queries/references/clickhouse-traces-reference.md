@@ -231,7 +231,7 @@ ORDER BY value DESC;
 
 ## Query Examples
 
-### Timeseries — Error spans per service per minute
+### Timeseries: Error spans per service per minute
 
 Shows `has_error` filtering, resource attribute in SELECT, and multi-series grouping.
 
@@ -250,7 +250,7 @@ GROUP BY `service.name`, ts
 ORDER BY ts ASC;
 ```
 
-### Table — Average duration by HTTP method
+### Table: Average duration by HTTP method
 
 ```sql
 WITH __resource_filter AS (

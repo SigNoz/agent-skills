@@ -1,6 +1,8 @@
 {
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
   "mcpServers": {
     "signoz": {
+      "type": "streamable-http",
       "url": "https://not-setup/mcp"
     }
   }

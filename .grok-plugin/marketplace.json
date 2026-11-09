@@ -1,0 +1,29 @@
+{
+  "name": "signoz-skills",
+  "description": "Official SigNoz marketplace for Grok Build skills and MCP",
+  "owner": {
+    "name": "SigNoz"
+  },
+  "plugins": [
+    {
+      "name": "signoz",
+      "description": "Official SigNoz plugin for MCP setup, docs, queries, dashboards, and alerts. Investigate metrics, traces, and logs, build dashboards and alert rules, and manage saved views through the SigNoz MCP server.",
+      "category": "observability",
+      "source": {
+        "type": "local",
+        "path": "./plugins/signoz"
+      },
+      "homepage": "https://signoz.io/docs/ai/signoz-mcp-server/",
+      "keywords": [
+        "signoz",
+        "signoz cloud",
+        "signoz dashboard",
+        "signoz alert",
+        "signoz mcp"
+      ],
+      "domains": [
+        "signoz.io"
+      ]
+    }
+  ]
+}

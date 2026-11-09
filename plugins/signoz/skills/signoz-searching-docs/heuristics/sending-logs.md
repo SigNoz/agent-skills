@@ -11,7 +11,7 @@ When a user asks about sending/collecting/forwarding logs to SigNoz, **do not ju
 
 ## 2. Is trace-log correlation needed?
 
-- **Yes** → SDK OTLP export (Path 1) — the only path with automatic `trace_id`/`span_id` injection
+- **Yes** → SDK OTLP export (Path 1), the only path with automatic `trace_id`/`span_id` injection
 - **No** → choose based on simplicity, reliability, and where logs already live
 
 ## 3. Is reliability or external collection more important than in-app export?

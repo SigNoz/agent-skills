@@ -68,14 +68,14 @@
       "id": 3,
       "eval_name": "codex-repeated-cache-reset-durable-config",
       "prompt": "My Codex SigNoz plugin keeps resetting back to not-setup after plugin updates. Fix it for http://localhost:8000/mcp and make it durable.",
-      "expected_output": "Agent updates the active bundled Codex plugin .mcp.json to http://localhost:8000/mcp and also creates or updates the native Codex MCP server named signoz using `codex mcp add signoz --url http://localhost:8000/mcp` or the equivalent `[mcp_servers.signoz]` TOML entry. It explains that plugin cache files are versioned and can be regenerated from repository placeholders, while the native Codex MCP entry persists across plugin updates. It verifies the effective URL with `codex mcp get signoz` or `codex mcp list`.",
+      "expected_output": "Agent identifies the active Codex package as Agent Plugins v1, updates the bundled mcp.json to http://localhost:8000/mcp while preserving the signoz server key and type=streamable-http, and also creates or updates the native Codex MCP server named signoz using `codex mcp add signoz --url http://localhost:8000/mcp` or the equivalent `[mcp_servers.signoz]` TOML entry. It explains that plugin cache files are versioned and can be regenerated from repository placeholders, while the native Codex MCP entry persists across plugin updates. It verifies the effective URL with `codex mcp get signoz` or `codex mcp list`.",
       "assertions": [
         {
-          "text": "Agent identifies versioned plugin cache refresh as the reason the bundled .mcp.json reset to not-setup",
+          "text": "Agent identifies versioned plugin cache refresh as the reason the bundled mcp.json reset to not-setup",
           "description": "The root cause is cache regeneration from source defaults, not an MCP runtime bug"
         },
         {
-          "text": "Agent updates the current bundled Codex plugin .mcp.json to the resolved endpoint",
+          "text": "Agent identifies the active Codex package as Agent Plugins v1 and updates the bundled mcp.json to the resolved endpoint while preserving the signoz server key and type streamable-http",
           "description": "The immediate plugin install is repaired"
         },
         {
@@ -85,6 +85,144 @@
         {
           "text": "Agent verifies the effective signoz URL with codex mcp get or codex mcp list",
           "description": "The outcome is checked through Codex's resolved server view"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": 4,
+      "eval_name": "portable-non-loopback-http-routes-native",
+      "prompt": "I installed the portable Agent Plugins v1 package in VS Code. Configure SigNoz at http://signoz.internal:8000/mcp.",
+      "expected_output": "Agent does not write the non-loopback HTTP URL into the plugin-root mcp.json because Agent Plugins v1 requires HTTPS for non-loopback endpoints. It routes the endpoint to VS Code's native .vscode/mcp.json or user MCP configuration instead, preserving unrelated native servers.",
+      "assertions": [
+        {
+          "text": "Agent does not write http://signoz.internal:8000/mcp into the portable plugin-root mcp.json",
+          "description": "Non-loopback HTTP is invalid in the Agent Plugins v1 remote transport"
+        },
+        {
+          "text": "Agent explains that portable non-loopback endpoints must use HTTPS",
+          "description": "The user receives the contract reason rather than a silent failure"
+        },
+        {
+          "text": "Agent configures the endpoint through VS Code native MCP configuration",
+          "description": "The unsupported portable value is routed to the identified client's native surface"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": 5,
+      "eval_name": "vscode-native-mcp-json-is-not-portable-file",
+      "prompt": "My VS Code workspace already has .vscode/mcp.json. Change its SigNoz server to https://mcp.eu.signoz.cloud/mcp without touching plugin files.",
+      "expected_output": "Agent treats .vscode/mcp.json as the active native VS Code configuration rather than confusing it with the portable plugin-root mcp.json. It updates only the existing signoz server URL, preserves unrelated servers and settings, and gives the VS Code authentication finish step.",
+      "assertions": [
+        {
+          "text": "Agent reads and updates .vscode/mcp.json instead of skipping it because its basename is mcp.json",
+          "description": "The plugin-root exclusion must not hide native VS Code configuration"
+        },
+        {
+          "text": "Agent changes only the existing signoz server URL and preserves unrelated native configuration",
+          "description": "The repair avoids duplicate or destructive native entries"
+        },
+        {
+          "text": "Agent provides the VS Code approval or authentication finish step",
+          "description": "The native registration is completed through the identified client"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": 6,
+      "eval_name": "portable-https-happy-path-preserves-contract",
+      "prompt": "I installed the portable Agent Plugins v1 package. Configure its SigNoz MCP server for the eu2 region.",
+      "expected_output": "Agent resolves eu2 to https://mcp.eu2.signoz.cloud/mcp and updates only the url in the installed plugin-root mcp.json. It preserves the Agent Plugins v1 schema URL, the signoz server key, and type=streamable-http, then gives the client-specific OAuth or reload finish step.",
+      "assertions": [
+        {
+          "text": "Agent updates the installed portable plugin-root mcp.json URL to https://mcp.eu2.signoz.cloud/mcp",
+          "description": "The portable hosted-region happy path edits the correct registration file"
+        },
+        {
+          "text": "Agent preserves $schema, the signoz server key, and type streamable-http",
+          "description": "The edit retains every required part of the Agent Plugins v1 MCP contract"
+        },
+        {
+          "text": "Agent changes only the URL and provides the identified client's authentication or reload finish step",
+          "description": "The update is minimal and completes the client workflow"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": 7,
+      "eval_name": "compatibility-package-wins-over-portable-files",
+      "prompt": "I installed the SigNoz marketplace plugin in Claude Code. Its plugin root contains mcp.json as well as .signoz_claude_mcp.json. Configure it for the eu region.",
+      "expected_output": "Agent uses the explicit Claude Code marketplace installation to identify the Claude Code compatibility package, despite the colocated portable mcp.json. It identifies the exact enabled SigNoz plugin ID, updates only pluginConfigs[<plugin-id>].options.SIGNOZ_MCP_URL in ~/.claude/settings.json to https://mcp.eu.signoz.cloud/mcp regardless of installation scope, and preserves unrelated settings. It does not write project or local pluginConfigs. It leaves both .signoz_claude_mcp.json and the portable mcp.json unchanged, runs or requests /reload-plugins, then tells the user to select the signoz plugin's mcp server for authentication. If a managed or --settings source controls the option, it reports that higher-precedence source instead of claiming the user setting won.",
+      "assertions": [
+        {
+          "text": "Agent treats the install as the Claude Code compatibility package rather than a portable package",
+          "description": "The explicit Claude Code marketplace installation identifies the active package format"
+        },
+        {
+          "text": "Agent identifies the exact enabled SigNoz plugin ID and updates only pluginConfigs[<plugin-id>].options.SIGNOZ_MCP_URL in ~/.claude/settings.json regardless of installation scope while preserving unrelated settings; it does not write project or local pluginConfigs",
+          "description": "The endpoint is written to Claude Code's persisted userConfig option"
+        },
+        {
+          "text": "Agent leaves .signoz_claude_mcp.json and plugin-root mcp.json unchanged",
+          "description": "The cached substitution template and inactive portable registration are not mutated"
+        },
+        {
+          "text": "Agent reloads plugins and tells the user to authenticate the signoz plugin's mcp server, not a server named signoz",
+          "description": "Claude re-substitutes the persisted option and authentication targets the retained connector"
+        },
+        {
+          "text": "If managed settings or a --settings source controls the option, Agent reports the higher-precedence source instead of claiming the user setting took effect",
+          "description": "Claude's pluginConfig precedence is respected"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": 8,
+      "eval_name": "vscode-agent-plugin-repairs-native-duplicate",
+      "prompt": "I'm running this from the SigNoz plugin in VS Code. I installed it with Chat: Install Plugin From Source from https://github.com/SigNoz/agent-skills. The installed plugin root's plugin.json declares the canonical Agent Plugins schema, and the root also contains mcp.json, .signoz_claude_mcp.json, and .signoz_cursor_mcp.json. A previous run of this setup skill accidentally created a second signoz server in my VS Code user MCP config for http://localhost:8000/mcp. Configure the plugin for that URL and remove the duplicate. There is no .vscode/mcp.json in this workspace.",
+      "expected_output": "Agent treats the explicit VS Code Install Plugin From Source installation as Agent Plugins v1 even though client-specific compatibility files coexist. It updates only mcpServers.signoz.url in the plugin-root mcp.json to http://localhost:8000/mcp, preserves the portable schema, signoz server key, and type=streamable-http, and leaves the compatibility files unchanged. Because the user explicitly identified the VS Code user signoz entry as an accidental duplicate, it removes only that entry while preserving unrelated user configuration and does not create .vscode/mcp.json. It then tells the user to reload or approve the plugin-provided signoz server without requiring OAuth unless the self-hosted server enables it.",
+      "assertions": [
+        {
+          "text": "Agent treats the VS Code Install Plugin From Source installation as the portable Agent Plugins v1 package even though client-specific compatibility files are present",
+          "description": "Explicit installation provenance identifies the package format"
+        },
+        {
+          "text": "Agent changes only mcpServers.signoz.url in the plugin-root mcp.json to http://localhost:8000/mcp and preserves $schema, the signoz server key, and type streamable-http",
+          "description": "The active portable registration is updated without changing its contract"
+        },
+        {
+          "text": "Agent removes only the explicitly confirmed accidental signoz entry from VS Code user MCP configuration, preserves unrelated user settings, does not create .vscode/mcp.json, and leaves .signoz_claude_mcp.json and .signoz_cursor_mcp.json unchanged",
+          "description": "The repair removes the known duplicate without modifying unrelated config or inactive compatibility packages"
+        },
+        {
+          "text": "Agent tells the user to reload or approve the plugin-provided signoz server and does not require OAuth for self-hosted MCP unless OAUTH_ENABLED is true",
+          "description": "The finish step matches self-hosted VS Code authentication behavior"
+        }
+      ],
+      "files": []
+    },
+    {
+      "id": 9,
+      "eval_name": "codex-non-loopback-http-routes-native",
+      "prompt": "I installed the SigNoz Agent Plugins v1 package in Codex. Configure it for http://signoz.internal:8000/mcp.",
+      "expected_output": "Agent does not write the non-loopback plain-HTTP URL into the plugin-root mcp.json because Agent Plugins requires HTTPS away from loopback. It leaves mcp.json unchanged and creates or updates the native Codex MCP server named signoz with `codex mcp add signoz --url http://signoz.internal:8000/mcp` or the equivalent `[mcp_servers.signoz]` TOML entry, preserving unrelated native configuration. It verifies the effective server with `codex mcp get signoz` or `codex mcp list`.",
+      "assertions": [
+        {
+          "text": "Agent leaves plugin-root mcp.json unchanged and explains that Agent Plugins requires HTTPS for non-loopback endpoints",
+          "description": "The invalid portable endpoint is not written into the installed package"
+        },
+        {
+          "text": "Agent creates or updates the native Codex server named signoz with http://signoz.internal:8000/mcp while preserving unrelated native configuration",
+          "description": "The unsupported portable endpoint is routed to the identified client's native surface"
+        },
+        {
+          "text": "Agent verifies the effective signoz registration with codex mcp get or codex mcp list",
+          "description": "The native fallback is checked after configuration"
         }
       ],
       "files": []

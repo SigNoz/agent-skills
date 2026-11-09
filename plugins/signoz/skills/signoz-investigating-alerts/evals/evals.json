@@ -5,7 +5,7 @@
       "id": 0,
       "eval_name": "full-rca-firing",
       "prompt": "The 'RED — p99 Latency > 2s by Service' alert (019ddf83-7d04-74c4-97c7-fea13d72c091) is firing. Investigate the most recent fire and tell me the root cause.",
-      "expected_output": "Agent runs full 3-tier flow: signoz_get_alert + cursor-paginated signoz_get_alert_history, reconstructs the rule incident from overall transitions and partitions label groups by fingerprint, then Tier-1 re-runs the alert query around that window; Tier-2 compares neighbor signals; Tier-3 pulls error traces/logs and maps trace_id plus the fire-window bounds to trace details. Outputs ranked hypotheses with evidence + supporting query, plus next steps.",
+      "expected_output": "Agent runs full 3-tier flow: signoz_get_alert + cursor-paginated signoz_get_alert_history, reconstructs the rule incident from overall transitions and partitions label groups by fingerprint, then Tier-1 re-runs the alert query around that window; Tier-2 compares neighbor signals; Tier-3 pulls error traces/logs and passes each returned trace_id alone to trace details. Outputs ranked hypotheses with evidence + supporting query, plus next steps.",
       "expectations": [
         "The first signoz_get_alert_history call uses timeRange=7d and order=desc without a state filter",
         "Each history continuation uses data.nextCursor as cursor plus the resolved absolute start/end and preserves state, filter, and order",
@@ -13,9 +13,9 @@
         "The rule incident is bounded by distinct overallStateChanged transitions, while group-specific transitions are partitioned by fingerprint and require stateChanged=true",
         "The agent never infers flapping by alternating rows from different fingerprints",
         "Each Tier-2 signoz_execute_builder_query call has an outer query object with Unix-ms start/end, requestType=time_series, compositeQuery, formatOptions, variables, and stepInterval",
-        "Tier 1 preserves the stored positive bounds to reproduce the alert exactly; if a formula input is below 10000, the agent identifies pre-formula truncation risk and compares against limit=10000 before ruling groups out. New Tier-2 standalone/formula-result queries use 100, formula inputs use 10000, all with v5 order rather than dashboard orderBy",
+        "Tier 1 preserves the stored positive bounds to reproduce the alert exactly; if a formula input carries a limit, the agent identifies pre-formula truncation risk and compares against that input with no limit before ruling groups out. New Tier-2 standalone/formula-result queries use 100 with v5 order rather than dashboard orderBy, and formula inputs carry no limit",
         "Trace drill-down groups by status_message rather than nonexistent error_message",
-        "When drilling into a searched trace, signoz_get_trace_details receives the returned trace_id as traceId plus the same absolute start/end used for the fire-window trace search"
+        "When drilling into a searched trace, signoz_get_trace_details receives the returned trace_id as traceId and no time window"
       ],
       "files": []
     },
@@ -35,9 +35,15 @@
     },
     {
       "id": 3,
-      "eval_name": "never-fired-stop",
+      "eval_name": "no-firing-events-stop",
       "prompt": "RCA for the [eval-3-ws-anomaly] frontend service request rate anomaly alert please. Rule ID 019de287-6752-7629-83e4-375919d56dd8.",
-      "expected_output": "Agent fetches alert + paginated 7d firing history in descending order. Detects that the alert is disabled and has no firing transition in the queried lookback. Stops per skill guardrail with the message 'Alert has not fired in the last 7d, so there is no fire window to investigate.' Suggests using signoz-explaining-alerts to explain the rule, or to enable the alert. Does NOT claim the rule has never fired or proceed to Tier-1/2/3 against synthetic data.",
+      "expected_output": "Agent fetches alert + paginated 7d history in descending order. Detects that the alert is disabled and that the complete history returned no firing transition in the queried lookback. Stops per skill guardrail with the message 'No firing events were returned for alert ... in the last 7d, so there is no fire window to investigate.' Suggests using signoz-explaining-alerts to explain the rule, or to enable the alert. Does NOT claim the rule has not fired or never fired, and does NOT proceed to Tier-1/2/3 against synthetic data.",
+      "expectations": [
+        "The stop message says no firing events were returned for the last 7d; it does not state 'has not fired' or 'never fired' as fact",
+        "If the user is told why history could be empty, the reasons are retention or a rule recreated under a new ID, presented as possibilities; the agent does not suggest pages may be missing after fetching every page",
+        "The disabled setting is reported separately from firing history and is not used as proof that the rule did not fire in the window",
+        "The agent does not run Tier-1, Tier-2, or Tier-3 queries"
+      ],
       "files": []
     },
     {

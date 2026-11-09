@@ -6,7 +6,7 @@ comparison). Pull every signal in the row; rank by absolute deviation
 from baseline.
 
 The MCP server's "always prefer resource attributes" guideline applies
-to all of these queries — use the same resource-attribute filter as
+to all of these queries: use the same resource-attribute filter as
 the alert itself.
 
 ## Service-level scope (`service.name = X`)
@@ -33,7 +33,7 @@ infrastructure-level.
 
 | Signal | Source | Aggregation | Why it matters |
 |---|---|---|---|
-| CPU utilization | metrics | `system.cpu.utilization` time-avg space-avg | Already may be the alert metric — pull anyway to see how peak relates to threshold. |
+| CPU utilization | metrics | `system.cpu.utilization` time-avg space-avg | Already may be the alert metric; pull anyway to see how peak relates to threshold. |
 | Memory pressure | metrics | `system.memory.utilization` or free pages | OOM and swap activity. |
 | Disk I/O wait | metrics | `system.disk.io_time` or iowait equivalent | Disk saturation often masquerades as CPU pressure. |
 | Network I/O | metrics | `system.network.io` | Network saturation or NIC errors. |
@@ -46,7 +46,7 @@ The alert is scoped to a k8s namespace, deployment, or pod set.
 
 | Signal | Source | Aggregation | Why it matters |
 |---|---|---|---|
-| Pod restart count | metrics | restarts in fire window vs baseline | Crash loops dominate every other signal — surface first. |
+| Pod restart count | metrics | restarts in fire window vs baseline | Crash loops dominate every other signal; surface first. |
 | CPU vs requests/limits | metrics | `container.cpu.utilization` divided by limit | Throttling shows up here even when raw CPU% looks healthy. |
 | Memory vs limit | metrics | `container.memory.usage / container.memory.limit` | OOMKilled is the most common k8s failure. |
 | Node pressure | metrics | `kube_node_status_condition` for pressure conditions | Node-level resource exhaustion bleeds into all pods scheduled there. |
@@ -72,7 +72,7 @@ Tier 2 against that service's row from the table above.
    filter.** If the alert filters on both `k8s.namespace.name` and
    `service.name`, prefer the k8s row plus `service.name` cross-cuts.
 2. **Skip a signal if the data is not available.** Don't fabricate
-   queries against metrics that don't exist — call `signoz_list_metrics`
+   queries against metrics that don't exist; call `signoz_list_metrics`
    to verify metric names before querying.
 3. **Cap signal pulls at 6 queries per tier** to keep context bounded.
    Pick the most informative for the alert's signal type.
