@@ -60,7 +60,9 @@ For a rolling 7-day window (`end` = now, `start` = end − 7 days), get the per-
   currently configured retention for each of the three signals before ranking which one costs
   more. This is a factual input needed to weight cost accurately, not a suggestion to change
   retention (that guardrail still applies below). If the user doesn't know, ask them to check
-  their SigNoz plan/retention settings. Rates by tier are in
+  their SigNoz plan/retention settings. If no answer is possible (an unattended run) or they
+  still don't know, rank with the default retention, 15 days for traces and logs and 1 month for
+  metrics, and state that the ranking assumes it. Rates by tier are in
   `references/retention-pricing.md`.
 
 - **Primary cost driver.** The signal with the highest *dollar* weight, using each signal's own
@@ -401,7 +403,7 @@ a signal the workflow already analyzed.
 - `references/infra-do-not-drop.md`: the metrics behind the built-in Infrastructure and
   APM/Services pages that must never be recommended for dropping.
 - `references/otel-attribute-cardinality.md`: reference for classifying metric labels
+  (UNBOUNDED / ACCUMULATING / BOUNDED / IDENTIFIER).
 - `references/retention-pricing.md`: $/GB and $/M-samples rates by retention tier, used to
   weight cost by signal in Step 1.
-  (UNBOUNDED / ACCUMULATING / BOUNDED / IDENTIFIER).
 - `signoz-generating-queries` skill: for the ad-hoc follow-up queries this investigation points to.

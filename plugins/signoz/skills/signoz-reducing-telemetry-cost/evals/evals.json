@@ -94,6 +94,20 @@
         "Agent keeps LOG_LEVEL=WARN and any INFO/DEBUG-only filter as candidates until those checks complete"
       ],
       "files": []
+    },
+    {
+      "id": 6,
+      "eval_name": "unknown-retention-uses-default-and-says-so",
+      "prompt": "This is an unattended scheduled run: nobody can answer questions. Find what drives our SigNoz ingestion cost across metrics, logs, and traces and rank the signals.",
+      "expected_output": "Agent cannot ask for retention, so it ranks the signals with the default retention rates (15 days for traces and logs, 1 month for metrics) and states that the ranking assumes default retention. It does not stop to wait for an answer, does not assume a longer tier, and still never quotes a dollar estimate or savings figure.",
+      "expectations": [
+        "Agent does not stop the investigation to wait for a retention answer",
+        "Agent ranks signals with the 15-day traces/logs rate and the 1-month metrics rate from references/retention-pricing.md",
+        "Agent states that the cost ranking assumes default retention",
+        "Agent does not assume a retention tier longer than the default",
+        "Agent does not quote a dollar estimate or savings figure to the user"
+      ],
+      "files": []
     }
   ]
 }
