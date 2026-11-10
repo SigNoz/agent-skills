@@ -211,6 +211,20 @@
         "Agent reports one percentage for the hour rather than a series of points"
       ],
       "files": []
+    },
+    {
+      "id": 17,
+      "eval_name": "logs-week-over-week-uses-time-shift",
+      "prompt": "How do error logs in the last hour compare with the same hour last week? Give me the change per 15 minutes.",
+      "expected_output": "Agent reads references/functions.md, then calls signoz_execute_builder_query with requestType=time_series, two logs builder queries with the same error filter and stepInterval=900, the second carrying functions [{\"name\": \"timeShift\", \"args\": [{\"value\": 604800}]}], and a builder_formula A - B. It leaves limit unset on A and B. It reports the change per step, notes partial first and last steps, and states both windows in absolute UTC.",
+      "expectations": [
+        "The actual signoz_execute_builder_query call has two builder queries with the same filter and stepInterval, and only the second carries timeShift with a positive value of 604800",
+        "The call has a builder_formula whose expression subtracts the shifted query from the current one, such as A - B",
+        "The builder queries the formula references have no limit",
+        "Agent does not shift the window by changing start and end on a second call when it builds the one-result comparison",
+        "Agent reports both windows in absolute UTC"
+      ],
+      "files": []
     }
   ]
 }

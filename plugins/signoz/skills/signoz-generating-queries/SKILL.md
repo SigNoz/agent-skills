@@ -153,6 +153,11 @@ first query about LLM calls or AI-agent runs. It covers when to set
 aggregation rules SigNoz enforces, and checking attribute mappings when AI
 Observability shows no data.
 
+**Comparing windows and shaping a series:** read `references/functions.md`
+when the user compares a window with an earlier one (week over week, day over
+day, before and after a deploy), or asks for a smoothed series, zeros for
+missing steps, capped spikes, the change per step, or a running total.
+
 **Canonical log search contract:**
 
 - `signoz_search_logs` accepts `filter`; the former `query` alias is
