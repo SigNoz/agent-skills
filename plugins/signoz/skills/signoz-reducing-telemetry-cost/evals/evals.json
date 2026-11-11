@@ -108,6 +108,116 @@
         "Agent does not quote a dollar estimate or savings figure to the user"
       ],
       "files": []
+    },
+    {
+      "id": 7,
+      "eval_name": "ingestion-key-at-its-limit",
+      "prompt": "Traces are our biggest cost. Grouped by ingestion key, the Cost Meter's hourly span bytes for key k-1 add up to the same 200 GB each day, and every service on k-1 stops sending at about 13:00 UTC and resumes at 00:00 UTC, every day of the week. Key k-2 varies normally. Which trace changes should we make to cut cost?",
+      "expected_output": "Agent recognizes that key k-1 is at its ingestion limit: every service on the key stops in the same hour, data returns at the same hour, and the volume between is the same each day, so SigNoz is dropping k-1's spans for about 11 hours a day. It reports this in the cost orientation, reports reductions on k-1 as hours of data regained rather than a cost cut, and measures k-1 service shares on hours before the cut-off or flags them as skewed.",
+      "expectations": [
+        "Agent groups the Cost Meter span-size query by the ingestion-key field returned by signoz_get_field_keys",
+        "Agent states that key k-1 is at its ingestion limit and that its spans are dropped for part of each day",
+        "Agent names the hours with no data for key k-1",
+        "Agent reports a reduction on key k-1 as hours of data regained, not as a cost cut",
+        "Agent measures k-1 service shares on hours before the cut-off, or states that they are skewed",
+        "Agent does not report key k-2 as at its limit"
+      ],
+      "files": []
+    },
+    {
+      "id": 8,
+      "eval_name": "steady-key-is-not-a-limit",
+      "prompt": "Logs are our main cost. Key k-3 carries one batch service that runs from 06:00 to 18:00 UTC every day and sends nothing overnight. Its daily log volume over the week was 60, 95, 110, 70, 88, 102 and 64 GB. Is any ingestion key at its limit, and where should we cut log cost?",
+      "expected_output": "Agent checks the per-key hourly values and sees that k-3 stops at the same hour each day, but its daily volume varies widely, so the stop matches the batch schedule rather than a limit. It does not claim k-3 is at its ingestion limit and continues with the logs workflow.",
+      "expectations": [
+        "Agent checks the per-key hourly Cost Meter values",
+        "Agent notes that key k-3's daily volume varies from day to day",
+        "Agent does not say that key k-3 is at its ingestion limit or that its data is being dropped",
+        "Agent continues with the logs attribution and severity steps"
+      ],
+      "files": []
+    },
+    {
+      "id": 9,
+      "eval_name": "one-day-share-checked-against-the-week",
+      "prompt": "We scanned yesterday's logs and the payments-worker container produced 18% of log bytes. The Cost Meter's daily log totals for the week average 1,000 GB, and yesterday, at 700 GB, was the week's lowest day. Size dropping payments-worker's INFO logs.",
+      "expected_output": "Agent reports yesterday's Cost Meter log total (700 GB) next to the weekly daily average (1,000 GB), notes that it was the week's lowest day, and does not apply the 18% share to the week as it is. It measures the share on a second day and reports both before sizing the change.",
+      "expectations": [
+        "Agent reports the scanned day's Cost Meter total next to the week's daily average",
+        "Agent notes that the scanned day was the week's lowest",
+        "Agent measures the share on a second day before sizing the change",
+        "Agent reports both days' shares",
+        "Agent does not quote a dollar savings figure"
+      ],
+      "files": []
+    },
+    {
+      "id": 10,
+      "eval_name": "item-share-larger-than-its-group",
+      "prompt": "An access-log source sends all its logs on ingestion key k-a, which the Cost Meter puts at 22% of the week's log bytes. A one-day scan says that source's INFO access records alone are 25% of log bytes. Recommend what to do about those access records.",
+      "expected_output": "Agent notices that the access records (25%) can't be larger than the ingestion key that contains them (22%) when both are compared on the same window and basis, treats the measurement as wrong, and finds the cause (for example a non-typical scan day or a different byte basis) before reporting a size for the item.",
+      "expectations": [
+        "Agent compares the item's share with the Cost Meter share of the ingestion key that contains it",
+        "Agent compares them on the same window and grouped basis",
+        "Agent states that the access-record share can't exceed the key's share",
+        "Agent does not report the 25% share as the item's size",
+        "Agent re-measures or explains the cause before sizing the item"
+      ],
+      "files": []
+    },
+    {
+      "id": 11,
+      "eval_name": "query-estimate-reconciled-with-the-meter",
+      "prompt": "I estimated log bytes per namespace with a ClickHouse query summing body and attribute lengths. Over the last 24 hours the estimate totals 800 GB and namespace orders is 80 GB of it; the Cost Meter's log size for the same 24 hours is 1,000 GB. How big is orders, and which namespaces should we reduce?",
+      "expected_output": "Agent sizes orders as its share of the estimate (80 ÷ 800 = 10%) times the Cost Meter total (1,000 GB), about 100 GB, not as the raw 80 GB estimate, and states that the estimate covers 0.8 of the Cost Meter total for the window.",
+      "expectations": [
+        "Agent computes orders' share of the estimate's total for the same window",
+        "Agent applies that share to the Cost Meter total instead of using the raw estimate",
+        "Agent states the ratio of the estimate's total to the Cost Meter total",
+        "Agent uses bytes, not record counts, as the size"
+      ],
+      "files": []
+    },
+    {
+      "id": 12,
+      "eval_name": "duplicate-copy-field-used-by-an-alert",
+      "prompt": "Service billing-api sends logs over OTLP through its Node logging library's instrumentation, and k8s-infra also collects the same container's stdout. Both copies have the same hourly counts. The stdout copy has k8s.deployment.name; the OTLP copy doesn't, but it has trace_id and span_id. The log alert \"Billing errors\" counts errors filtered on k8s.deployment.name = 'billing-api'. Which copy should we stop?",
+      "expected_output": "Agent confirms the duplicate and lists the fields only each copy carries. It finds that \"Billing errors\" filters on k8s.deployment.name, so stopping the stdout copy is Will break alert coverage, naming the alert. It notes that stopping the OTLP copy instead loses the link from those logs to their traces, and states that before presenting it. The change is sized as one copy's share, not both.",
+      "expectations": [
+        "Agent lists the fields only each copy carries, including trace_id and span_id on the OTLP copy",
+        "Agent checks alerts, dashboards, and saved views for queries on those fields",
+        "Agent marks stopping the stdout copy as Will break alert coverage and names \"Billing errors\"",
+        "Agent states that stopping the OTLP copy loses the link from these logs to their traces",
+        "Agent sizes the change as one copy's share"
+      ],
+      "files": []
+    },
+    {
+      "id": 13,
+      "eval_name": "duplicate-copy-with-nothing-depending",
+      "prompt": "Service search-api sends every log over OTLP, with trace_id on each record, and k8s-infra also collects its stdout. Matching a sample by timestamp and message shows every stdout line is also in the OTLP copy. No alert, dashboard, or saved view filters, groups, or aggregates on any field that only the stdout copy has. Can we stop one copy?",
+      "expected_output": "Agent runs the duplicate-copy checks, finds no field-level dependency and no records only in the stdout copy, and presents stopping k8s-infra collection for search-api's pods as a candidate, keeping the OTLP copy with its trace links. It sizes the change as the stdout copy's share only and cites the k8s-infra configuration docs.",
+      "expectations": [
+        "Agent checks fields only the stdout copy carries against alerts, dashboards, and saved views",
+        "Agent checks for records only the stdout copy has",
+        "Agent presents stopping the stdout copy as a candidate and keeps the OTLP copy",
+        "Agent sizes the change as the stdout copy's share only",
+        "Agent cites the k8s-infra configuration docs"
+      ],
+      "files": []
+    },
+    {
+      "id": 14,
+      "eval_name": "duplicate-copy-with-errors-only-on-stdout",
+      "prompt": "Service ledger-api logs over OTLP and k8s-infra also collects its stdout. About 1% of stdout lines have no OTLP twin, and those lines are ERROR-level crash output and runtime panics. Stop the stdout copy to save cost.",
+      "expected_output": "Agent counts the records only the stdout copy has, sees they are ERROR-level crash output that the SDK never sends, and does not recommend stopping the stdout copy outright. It keeps that copy or keeps those records (for example by filtering only the duplicated INFO lines).",
+      "expectations": [
+        "Agent counts the records only the stdout copy has and their severities",
+        "Agent identifies that those records are ERROR-level and absent from the OTLP copy",
+        "Agent does not recommend stopping the stdout copy outright",
+        "Agent proposes keeping the stdout copy or keeping its error records"
+      ],
+      "files": []
     }
   ]
 }
