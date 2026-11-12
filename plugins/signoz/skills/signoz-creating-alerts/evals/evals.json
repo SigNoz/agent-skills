@@ -9,12 +9,12 @@
       "expectations": [
         "Before direct-routing creation, the agent reuses a fully paginated signoz_list_notification_channels result only from the same still-current prepared operation or calls it until pagination.hasMore=false; if a requested name is unavailable, it presents exact returned choices and asks the user instead of guessing",
         "No query in the signoz_create_alert payload carries limit or order; any limit/order used in the signoz_execute_builder_query dry-run stays in the dry-run envelope",
-        "The signoz_create_alert payload sets schemaVersion=v2alpha1, an explicit evaluation block (rolling, evalWindow, frequency), notificationSettings, labels.severity, and condition.compositeQuery.panelType=graph",
+        "The signoz_create_alert payload sets schemaVersion=v2alpha1, an explicit evaluation block (rolling, evalWindow, frequency), notificationSettings, and condition.compositeQuery.panelType=graph, and sets no labels.severity",
         "Every signoz_execute_builder_query dry-run carries start and end as JSON integer Unix-millisecond values in the outer query",
         "The data probe calls signoz_query_metrics with a concrete metricName and the cartservice filter; it never sends count() or count_distinct(service.name) as a metrics aggregation expression",
         "The signoz_create_alert payload puts Slack in the warning threshold channels and PagerDuty in the critical threshold channels",
         "The signoz_create_alert payload puts the exact returned Slack displayName in warning channels and exact returned PagerDuty displayName in critical channels; machine names are not used",
-        "The threshold-rule create payload does not rely on top-level preferredChannels for its per-severity routing"
+        "The threshold-rule create payload routes each severity through its threshold tier channels and does not send top-level preferredChannels"
       ],
       "files": []
     },
@@ -51,13 +51,13 @@
       "id": 3,
       "eval_name": "anomaly-frontend-request-rate",
       "prompt": "set up anomaly detection for frontend service request rate: alert me if traffic suddenly drops or spikes versus normal patterns. slack #staging-alerts is fine.",
-      "expected_output": "METRIC_BASED_ALERT with anomaly_rule, algorithm=standard (z-score based), seasonality=daily or hourly. Uses signoz_calls_total or http.server.request.count metric filtered by service.name='frontend'. A schemaVersion v2alpha1 rule with evaluation, notificationSettings, and one threshold tier using op='outside_bounds' with target ~3 standard deviations, because the request covers both drops and spikes and the anomaly score is signed. Skips the 'would have fired N times' breach count but dry-runs the underlying metric query and routes to Slack through the tier's channels.",
+      "expected_output": "METRIC_BASED_ALERT with anomaly_rule and seasonality=daily or hourly. Uses signoz_calls_total or http.server.request.count metric filtered by service.name='frontend'. A schemaVersion v2alpha1 rule with evaluation, notificationSettings, and one threshold tier using op='outside_bounds' with target ~3 standard deviations, because the request covers both drops and spikes and the anomaly score is signed. Skips the 'would have fired N times' breach count but dry-runs the underlying metric query and routes to Slack through the tier's channels.",
       "expectations": [
         "The anomaly create payload sets schemaVersion v2alpha1, evaluation, notificationSettings, and condition.thresholds",
         "The metric data probe calls signoz_query_metrics with a concrete metricName and service.name='frontend'; it never uses an expression-only count() metrics aggregation",
-        "The persisted base metric builder_query carries no limit, order, or dashboard orderBy; the anomaly payload sets evaluation.spec evalWindow and frequency, condition.algorithm and condition.seasonality, and a threshold tier with op, matchType, and target explicitly",
+        "The persisted base metric builder_query carries no limit, order, or dashboard orderBy; the anomaly payload sets evaluation.spec evalWindow and frequency, condition.seasonality and no condition.algorithm, and a threshold tier with op, matchType, and target explicitly",
         "The threshold tier covers both directions: op outside_bounds with a positive target, not above alone",
-        "The signoz_create_alert threshold tier channels contain the selected Slack displayName, not its machine name, and the payload does not rely on top-level preferredChannels",
+        "The signoz_create_alert threshold tier channels contain the selected Slack displayName, not its machine name, and the payload does not send top-level preferredChannels",
         "The signoz_execute_builder_query dry-run validates the base metric query without claiming to validate the anomaly functions transform or anomaly score"
       ],
       "files": []
@@ -98,7 +98,7 @@
       "expectations": [
         "The signoz_create_alert payload sets notificationSettings.usePolicy=true",
         "The policy-routed create payload omits condition.thresholds.spec[].channels and top-level preferredChannels without asking the user to choose a direct channel",
-        "The alert carries labels.team=checkout and labels.severity=critical and names the threshold critical so the confirmed policy match inputs are preserved; it does not invent different matcher labels",
+        "The alert carries labels.team=checkout, names the threshold critical, and sets no labels.severity, so the confirmed policy match inputs are preserved; it does not invent different matcher labels",
         "The response does not call signoz_create_notification_channel or claim that the alert write created the org notification policy"
       ],
       "files": []
@@ -167,7 +167,7 @@
         "The preview shown before signoz_create_alert states the severity as critical",
         "The preview gives the error-rate default (threshold above 1%) as the reason for critical, not a user cue",
         "The agent does not choose warning on the grounds that the user did not say page, wake up, or critical",
-        "If creation proceeds, the signoz_create_alert payload sets labels.severity=critical and names its threshold tier critical, with the returned Slack displayName in that tier's channels"
+        "If creation proceeds, the signoz_create_alert payload names its threshold tier critical and sets no labels.severity, with the returned Slack displayName in that tier's channels"
       ],
       "files": []
     },
@@ -180,7 +180,7 @@
         "The preview shown before signoz_create_alert states the severity as warning",
         "The preview gives the user's \"just FYI\" cue as the reason the severity is below the critical default",
         "The agent neither keeps critical nor lowers the severity two tiers to info",
-        "If creation proceeds, the signoz_create_alert payload sets labels.severity=warning and names its threshold tier warning"
+        "If creation proceeds, the signoz_create_alert payload names its threshold tier warning and sets no labels.severity"
       ],
       "files": []
     }

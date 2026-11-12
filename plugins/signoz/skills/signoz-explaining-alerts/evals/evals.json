@@ -25,9 +25,9 @@
       "id": 2,
       "eval_name": "anomaly-threshold-explain",
       "prompt": "Help me understand alert rule 019de287-6752-7629-83e4-375919d56dd8 — I'm confused about how anomaly thresholds work versus regular ones.",
-      "expected_output": "Agent fetches the rule, identifies ruleType=anomaly_rule and algorithm=standard, and explicitly contrasts anomaly vs threshold semantics: target=3 means 3 standard deviations from the learned baseline, NOT 3 raw req/s. Explains daily seasonality, which directions the signed score catches for the rule's op, and effective routing for the rule's schemaVersion. Pulls paginated firing history for 7d in descending order and includes a rule-incident fire-frequency summary.",
+      "expected_output": "Agent fetches the rule, identifies ruleType=anomaly_rule and explicitly contrasts anomaly vs threshold semantics: target=3 means 3 standard deviations from the learned baseline, NOT 3 raw req/s. Explains daily seasonality, which directions the signed score catches for the rule's op, and the effective routing. Pulls paginated firing history for 7d in descending order and includes a rule-incident fire-frequency summary.",
       "expectations": [
-        "The explanation derives routing from the fetched rule's schemaVersion: threshold tier channels (or usePolicy) for a v2alpha1 anomaly rule, top-level preferredChannels only for a v1 anomaly rule",
+        "The explanation derives routing from the threshold tier channels, or from usePolicy, and never from top-level preferredChannels",
         "The fire-frequency summary counts rule-wide overallStateChanged transitions, not per-fingerprint rows"
       ],
       "files": []
@@ -43,10 +43,11 @@
       "id": 4,
       "eval_name": "multi-severity-audit-kafka",
       "prompt": "Audit alert 019dad90-1c73-715e-b040-79901928deb2 (kafka consumer lag) — anything I should change?",
-      "expected_output": "Agent fetches the rule, decodes the multi-severity threshold spec (warning at lag >= 50, critical at >= 200), explains the tiered routing. Performs Step 5 audit: flags missing labels.severity (rule has no severity label even though thresholds have severity tiers), considers groupBy cardinality, evaluates threshold calibration, suggests adding severity label, runbook annotations, alertOnAbsent if relevant. Pulls paginated firing history for 7d in descending order.",
+      "expected_output": "Agent fetches the rule, decodes the multi-severity threshold spec (warning at lag >= 50, critical at >= 200), explains the tiered routing. Performs Step 5 audit: considers groupBy cardinality, evaluates threshold calibration, suggests runbook annotations and alertOnAbsent if relevant. Pulls paginated firing history for 7d in descending order.",
       "expectations": [
         "For a v2 threshold rule with usePolicy=false, the explanation derives each tier's routing only from that threshold's channels array",
-        "The explanation never uses top-level preferredChannels as a fallback for an empty v2 threshold tier; it identifies such a tier as unrouted or misconfigured"
+        "The explanation never uses top-level preferredChannels as a fallback for an empty v2 threshold tier; it identifies such a tier as unrouted or misconfigured",
+        "The audit never reports a missing labels.severity as a gap, and never recommends adding a static labels.severity"
       ],
       "files": []
     },
