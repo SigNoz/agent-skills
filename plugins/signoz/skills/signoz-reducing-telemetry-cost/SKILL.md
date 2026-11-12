@@ -55,9 +55,20 @@ computed; never invent a total. If the tools are unavailable, follow the prerequ
 For a rolling 7-day window (`end` = now, `start` = end − 7 days), get the per-signal totals
 (span size, log size, metric datapoints), then compute and report:
 
-- **Primary cost driver.** The signal with the highest *dollar* weight: traces/logs at
-  $0.30/GB, metrics at $0.10/M samples (orientation only; never quote dollar savings). This
-  picks by cost, not by raw volume.
+- **Ask for retention before weighting cost.** Price scales with retention tier, and traces,
+  logs, and metrics can each be retained for a different period, so ask the user for their
+  currently configured retention for each of the three signals before ranking which one costs
+  more. This is a factual input needed to weight cost accurately, not a suggestion to change
+  retention (that guardrail still applies below). If the user doesn't know, ask them to check
+  their SigNoz plan/retention settings. If no answer is possible (an unattended run) or they
+  still don't know, rank with the default retention, 15 days for traces and logs and 1 month for
+  metrics, and state that the ranking assumes it. Rates by tier are in
+  `references/retention-pricing.md`.
+
+- **Primary cost driver.** The signal with the highest *dollar* weight, using each signal's own
+  retention-matched rate from `references/retention-pricing.md` (orientation only; never quote
+  the resulting dollar figure to the user; it is for ranking signals against each other, not a
+  cost estimate). This picks by cost, not by raw volume.
 - **Bytes per record.** span.size ÷ span.count and log.size ÷ log.count, which tells you whether a
   signal is a payload-size problem or a volume problem.
 
@@ -69,6 +80,23 @@ complete `groupBy` and report the top
 ~10 per group with their share. If a non-prod environment (`staging`, `dev`, `test`, `qa`,
 `sandbox`, `preview`, `uat`, …) is > 40% of volume, recommend Ingestion Limits on that key
 before any signal-level change: https://signoz.io/docs/ingestion/signoz-cloud/keys/
+
+**Ingestion keys at their limit.** If `signoz_get_field_keys` returns a field that identifies the
+ingestion key (for example `signoz.workspace.key.id`), run each signal's size or datapoint query,
+and its record-count query, grouped by it, and read every key's hourly values. If it returns no such
+field, say the per-key check was not possible. A key is at a daily limit when, on at least two days,
+every service on the key stops sending in the same hour, data returns at the same hour, and the size
+or count between a return and the next stop is the same each day to within one hour's volume (a
+raised limit shows as a step to a new level). When a key reaches its limit, SigNoz drops that
+signal's data for the key until the limit resets. Docs:
+https://signoz.io/docs/ingestion/signoz-cloud/keys/
+
+Report every such key in the cost orientation with its signal, the volume it reaches each day, and
+the hours with no data (convert the timestamps before stating hours). While a key reaches its
+limit, a reduction on it first fills the cut-off hours; it lowers billed volume only once the key
+no longer reaches its limit, and nothing measures the dropped volume. Report a reduction there as
+hours of data regained, never as a cost cut. A share measured over cut-off hours is skewed:
+measure it on hours before the cut-off, or state that it is skewed.
 
 ### Step 2: Metrics
 
@@ -129,9 +157,10 @@ it is produced and its current interval before recommending a change. A longer i
 ingested datapoints but also lowers time resolution, so preserve the resolution required by its
 dashboards and alerts. Use the source's own control: a receiver `collection_interval` for
 Collector-generated metrics, the scrape interval for Prometheus-scraped metrics, or
-`OTEL_METRIC_EXPORT_INTERVAL` for SDK push metrics when that SDK supports it. Never recommend
-switching a metric between delta and cumulative temporality; changing temporality for the same
-metric can break SigNoz queries.
+`OTEL_METRIC_EXPORT_INTERVAL` for SDK push metrics when that SDK supports it. Verify the exact
+setting name against the source's own documentation before stating it (see the verification
+guardrail below). Never recommend switching a metric between delta and cumulative temporality;
+changing temporality for the same metric can break SigNoz queries.
 
 ### Step 3: Logs
 
@@ -159,12 +188,18 @@ explicitly asks about log cost.
 step are candidates only. Complete the alert check in Step 3c before recommending any log-volume
 reduction, including a source log-level change.
 
+**Duplicate copies (either path).** When a service sends logs over OTLP and its container or host
+output is also collected, read `references/duplicate-log-copies.md` before recommending that
+either copy stop.
+
 **Path A, service mode (≥ 10%).** Get the severity mix with `signoz_aggregate_logs`,
 `aggregations: "count()"`, `groupBy: "service.name,severity_text"`. Classify severities: REDUCIBLE =
 INFO, INFORMATION, DEBUG, TRACE, VERBOSE; HIGH-SIGNAL = ERROR, FATAL, CRITICAL, WARN, WARNING.
 For each top service by GB:
-- Reducible-dominant + own service code → candidate: set `LOG_LEVEL=WARN` (stops generation at
-  source).
+- Reducible-dominant + own service code → candidate: raise the log level to WARN (stops
+  generation at source). `LOG_LEVEL=WARN` is a common convention, not a universal one; confirm
+  the actual variable, config key, or logger-config call the service's language/framework uses
+  before naming it (see the verification guardrail below).
 - Reducible-dominant + third-party library → candidate: Collector filter on
   `instrumentation_scope.name`
   (read the scope from a `signoz_search_logs` sample's `scope_name`).
@@ -207,13 +242,16 @@ For each top service by GB:
   impossible).
 - `k8s.event.*` logs are often high-volume / low-value → droppable if not alerted on.
 
-**3c. Log alerts: check before any log-reduction recommendation.** `signoz_list_alert_rules`,
-**paginating through every page** (follow `pagination.nextOffset` until `pagination.hasMore` is
-false; do not stop at the first page, or an alert on a later page is missed and a filter looks
-safe when it isn't). Keep `alertType == "LOGS_BASED_ALERT"`. For each, `signoz_get_alert(id)` and read
-`condition.compositeQuery.queries[].spec.filter.expression` + `groupBy` to see which service /
-severity / namespace it guards. If a filter would blind an alert, mark it **Will break alert
-coverage** and name the alert. Docs: https://signoz.io/docs/logs-management/guides/drop-logs/
+**3c. Log alerts, dashboards, and saved views: check before any log-reduction recommendation.**
+`signoz_list_alert_rules`, **paginating through every page** (follow `pagination.nextOffset`
+until `pagination.hasMore` is false; do not stop at the first page, or an alert on a later page
+is missed and a filter looks safe when it isn't). Keep `alertType == "LOGS_BASED_ALERT"`. For
+each, `signoz_get_alert(id)` and read `condition.compositeQuery.queries[].spec.filter.expression`
++ `groupBy` to see which service / severity / namespace it guards. Check every query the alert's
+condition depends on, not just the one that looks related (see the formula-dependency guardrail
+below). If a filter would blind an alert, mark it **Will break alert coverage** and name the
+alert. Then check dashboards and saved views the same way (see the dashboard/view coverage
+guardrail below). Docs: https://signoz.io/docs/logs-management/guides/drop-logs/
 
 ### Step 4: Traces
 
@@ -240,9 +278,12 @@ service you consider reducing.
 **4c. Error rate per service.** `signoz_aggregate_traces`, `aggregations: "count()"`, `groupBy: "service.name"`
 (total), then again with `error: true`. Error rate = errors ÷ total, per service.
 
-**4d. Trace alerts.** `signoz_list_alert_rules`, **paginating through every page** (follow
-`pagination.nextOffset` until `pagination.hasMore` is false). Keep
-`alertType == "TRACES_BASED_ALERT"`; `signoz_get_alert(id)` for what each guards.
+**4d. Trace alerts, dashboards, and saved views.** `signoz_list_alert_rules`, **paginating
+through every page** (follow `pagination.nextOffset` until `pagination.hasMore` is false). Keep
+`alertType == "TRACES_BASED_ALERT"`; `signoz_get_alert(id)` for what each guards. Check every
+query the alert's condition depends on, not just the one that looks related (see the
+formula-dependency guardrail below). Then check dashboards and saved views the same way (see the
+dashboard/view coverage guardrail below).
 
 **Classify the dominant operations.**
 - Common noise candidates: health/liveness (`/health`, `/ping`, `/ready`,
@@ -256,7 +297,9 @@ service you consider reducing.
 **Fix layer.** For a confirmed noise operation, prefer the deployed SDK or instrumentation
 library's documented disable/exclusion control so generation stops at source. Identify the
 language and library before naming a setting; Java, Python, Node.js, and .NET use different
-controls. If no SDK control exists, use a Collector filter on the operation name.
+controls. Verify the exact env var, config key, or code snippet against that library's own
+documentation before stating it (see the verification guardrail below); do not name a setting
+from memory alone. If no SDK control exists, use a Collector filter on the operation name.
 
 > **Span → APM guard (mandatory).** Never recommend or configure head, probabilistic, tail, or
 > any other trace sampling as a cost-reduction lever. When a user asks for sampling, state both
@@ -269,12 +312,26 @@ controls. If no SDK control exists, use a Collector filter on the operation name
 > will disappear from APM before giving a configuration.
 Docs: https://signoz.io/docs/traces-management/guides/drop-spans/
 
+**4e. Span attribute and event size (only when bytes-per-span is unusually high).** Run this only
+when Step 1's bytes-per-record check (`span.size ÷ span.count`) flags a service as a payload-size
+problem, not a volume problem. Sample its spans with `signoz_search_traces`, identify which
+attributes or events are driving the size, and report them with their approximate size
+contribution; do not assert they're noise. Ask the user directly whether each large attribute or
+event is operationally necessary before recommending anything; usefulness here is contextual, not
+something to judge unilaterally. The same posture applies to attributes carrying real diagnostic
+content (`db.query.text`, `url.full`, `exception.stacktrace`, correlation IDs like
+`user.id`/`request.id`); size alone doesn't make them noise. If the user confirms one isn't
+needed, use the `attributes` processor (`action: delete`) for span attributes, or the filter
+processor's `traces.spanevent` OTTL context for span events specifically; the `transform`
+processor cannot target individual events.
+
 ### Step 5: Report what you found
 
 Lead with a **TL;DR**: concise, no headers, two parts:
 1. **Cost orientation**: which signal is the primary driver, how much, and what generates it
    (name the service, environment, or metric). If several things together dominate, name them
-   with individual shares and combined impact.
+   with individual shares and combined impact. Name any ingestion key at its limit (Step 1) and
+   the hours of data it loses each day.
 2. **Prioritized action list**: every actionable finding in priority order, each with its
    status inline: **Safe to implement** / **Needs one check first** (state what) / **Will break
    dashboards** (name them) / **Will break alert coverage** (name the alert) / **Infra-page
@@ -295,6 +352,33 @@ a signal the workflow already analyzed.
   `signoz_list_alert_rules` fully (through `pagination.hasMore`) before ruling out alert impact,
   and treat a non-empty `error` from `signoz_check_metric_usage` as *unknown* usage (needs a
   manual check), not as "unused." An incomplete lookup is not a green light.
+- **Check every query an alert's condition depends on, not just the one that looks related.**
+  This applies to both log and trace alerts. An alert can combine two or more queries in a
+  formula (e.g., an error rate computed as errors ÷ total calls) or use a single query with no
+  filter at all (e.g., counting any log record to track instance liveness). A volume-reduction
+  recommendation can shift or trip such an alert even when it only touches data that looks
+  unrelated to what the alert is nominally about. Dropping non-error spans changes the "total
+  calls" denominator of an error-rate formula just as much as dropping error spans would, and
+  dropping DEBUG logs can undercount instances a replica-count alert expects to see from every
+  record regardless of severity. When reading `condition.compositeQuery` in Step 3c or 4d,
+  identify every query the condition depends on and check whether the proposed change affects
+  any of them, not only the one whose filter matches the category being reduced.
+- **Check dashboards and saved views too, not just alerts, for log and trace reductions.** For
+  metrics, `signoz_check_metric_usage` returns both `dashboards` and `alerts` in a single call.
+  No equivalent tool exists for logs or traces, so perform this check manually before marking any
+  log-severity or trace-operation reduction "Safe to implement": call `signoz_list_dashboards`
+  and `signoz_list_views` (scoped to the affected signal), **paginating through every page**
+  (follow `pagination.nextOffset` until `pagination.hasMore` is false, the same rule as the
+  alert-rule check above). Name and tags are not a reliable filter: a dashboard called
+  "Operations Overview" can hold a panel querying the exact service/operation with no mention of
+  either in its metadata. Do not use name/tags/description to narrow which dashboards or views get
+  checked; call `signoz_get_dashboard` / `signoz_get_view` on **every** one returned (across all
+  pages) and read its persisted queries, including raw PromQL or ClickHouse SQL panels, not just
+  structured builder queries, for any reference to the data being reduced. If one depends on it,
+  mark the finding **Will break dashboards** (or name the saved view) instead of a clean drop. If
+  the dashboard/view count is too large to fully inspect in the investigation, do not mark the
+  reduction "Safe to implement"; mark it **Needs one check first** (dashboard/view dependency
+  unconfirmed) rather than reporting a false "Safe."
 - **Volume comes from discovered Cost Meter metrics and their live units:** bytes for span/log
   volume or samples for metric volume. Never cite span/log record counts as volume.
 - **Cost totals and grouped total attribution use `signoz_execute_builder_query`** with raw
@@ -305,6 +389,16 @@ a signal the workflow already analyzed.
   direction:"desc"}]`. This is wire `order`, not dashboard `orderBy`; preserve
   it in grouped queries. The limit ranks groups over the whole window, so call
   out the possibility that a short-lived group falls outside the top N.
+- **Check a share measured on a shorter window before applying it to the week.** Report that
+  window's Cost Meter total for the signal next to the week's daily average. If the window is the
+  week's highest or lowest day, measure the share on a second day too and report both.
+- **Check each share against the group that contains it.** Compare an item's share with the Cost
+  Meter share of the environment, service, or ingestion key it belongs to, on the same window and
+  the same grouped basis (Step 3a). If the item is larger, find the cause before reporting it.
+- **Size byte or sample estimates through the Cost Meter.** When a query estimates bytes or
+  samples from the records themselves, size an item as its share of that estimate's total for the
+  same window times the Cost Meter total, never as the raw estimate, and state the ratio of the
+  estimate's total to the Cost Meter total. Never use record counts as a size.
 - **Never present an Infra-page or APM metric as safe to drop** (see
   `references/infra-do-not-drop.md`), even when usage-check shows no dashboards or alerts.
 - **Logs:** never recommend dropping/filtering a whole service or namespace that carries active
@@ -317,18 +411,33 @@ a signal the workflow already analyzed.
   and rates no longer represent all traffic.
 - **UNBOUNDED and IDENTIFIER labels are always worth flagging**: the problem is trajectory, not
   just current count.
-- **Never suggest changing retention. Never estimate dollar savings.** Never call a dashboard or
-  alert unused/noisy/redundant; report counts only.
+- **Never suggest changing retention. Never estimate dollar savings.** Asking the user their
+  currently configured retention (Step 1, to weight cost accurately) is required and does not
+  violate this guardrail; recommending they change it does. Using retention-matched rates to
+  rank signals against each other internally is required; presenting the resulting figure to the
+  user as a dollar estimate or savings number is not. Never call a dashboard or alert
+  unused/noisy/redundant; report counts only.
 - **Anchor claims to query results.** If a signal has no Cost Meter data, say so; do not
   substitute count-based proxies. Don't re-list metrics already shown in the breakdown; metrics
   outside the top ~20 by volume are individually negligible.
+- **Verify configuration specifics before stating them as fact.** An env var, config key, flag, or
+  code snippet for disabling instrumentation, changing a collection interval, or filtering logs is
+  a factual claim about a specific library or the Collector, not something to pattern-match from
+  memory. Before naming one, check it against that library's or the Collector's actual
+  documentation: WebFetch/WebSearch the official docs, changelog, or repo, or read the matching
+  `signoz://` doc resource for SigNoz-side syntax. If it can't be verified, say so explicitly and
+  present it as an unconfirmed guess to check, never as a directive to apply.
 
 ## Additional resources
 
+- `references/duplicate-log-copies.md`: confirming duplicate log copies, the checks before
+  stopping either copy, and where to stop it.
 - `references/cost-meter-queries.md`: Cost Meter discovery, the full
   `signoz_execute_builder_query` template, unit conversion, and the grouped-vs-ungrouped caveat.
 - `references/infra-do-not-drop.md`: the metrics behind the built-in Infrastructure and
   APM/Services pages that must never be recommended for dropping.
 - `references/otel-attribute-cardinality.md`: reference for classifying metric labels
   (UNBOUNDED / ACCUMULATING / BOUNDED / IDENTIFIER).
+- `references/retention-pricing.md`: $/GB and $/M-samples rates by retention tier, used to
+  weight cost by signal in Step 1.
 - `signoz-generating-queries` skill: for the ad-hoc follow-up queries this investigation points to.
