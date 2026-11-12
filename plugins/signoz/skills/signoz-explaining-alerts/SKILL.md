@@ -239,8 +239,12 @@ high-impact ones:
 - **Template variable bugs**: `{{$topic}}` won't interpolate; the
   correct form is `{{$labels.topic}}`. Dots in label keys become
   underscores (`service.name` → `{{$labels.service_name}}`).
-- **Multiple severity tiers but `labels.severity` missing on the rule**:
-  breaks label-based routing policies. Common gap.
+- **Multiple severity tiers and a static `labels.severity`**: the static
+  label replaces each tier's `severity` on every alert, so a warning
+  breach reports the static value and a policy that matches `severity`
+  cannot tell the tiers apart. Recommend removing the label; the cost is
+  that the alert-rule list shows no severity for the rule. A missing
+  `labels.severity` is not a gap.
 - **All tiers route to the same channel**: defeats the point of
   graduated thresholds.
 - **High-cardinality `groupBy`** (e.g. `pod.name` × `partition`) →
