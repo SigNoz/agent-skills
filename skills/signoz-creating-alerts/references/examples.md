@@ -27,9 +27,9 @@ log-volume groupBy, and anomaly detection.
 5. Builds JSON: `METRIC_BASED_ALERT`, `threshold_rule`,
    `schemaVersion: "v2alpha1"`, `signal=metrics`, two thresholds named
    `warning` and `critical` (`op="above"`, `matchType="on_average"`,
-   `targetUnit="percent"`), `labels.severity: critical` (the highest tier;
-   direct routing still sends each tier to its own channels by
-   `threshold.name`), filter `service.name = 'checkout'`, an explicit
+   `targetUnit="percent"`), `compositeQuery.unit: "percentunit"` (the metric
+   is a 0 to 1 ratio), no `labels.severity` (each alert carries the severity
+   of the tier that fired), filter `service.name = 'checkout'`, an explicit
    `evaluation` block (rolling, 5m window, 1m frequency),
    `notificationSettings`, and `panelType: "graph"`. The builder query
    carries no `limit` or `order`.
@@ -56,7 +56,8 @@ log-volume groupBy, and anomaly detection.
    service, formula F1 = `A * 100 / B`, `selectedQueryName: "F1"`,
    one threshold tier named `critical` with target 5,
    `targetUnit: "percent"`, `op: "above"`, `matchType: "at_least_once"`
-   (catch any breach), and `labels.severity: critical`.
+   (catch any breach), `compositeQuery.unit: "percent"`, and no
+   `labels.severity`.
 5. No channel was named, so it reuses a fully paginated same-operation
    `signoz_list_notification_channels` result, or calls it through
    `pagination.hasMore=false`; the user picks `slack-payments`. If none fits,
@@ -107,7 +108,7 @@ log-volume groupBy, and anomaly detection.
 2. `signoz_list_metrics searchText=duration` → finds
    `http.server.request.duration`.
 3. Builds a v2alpha1 anomaly rule: `schemaVersion: "v2alpha1"`,
-   `anomaly_rule`, `algorithm=standard` (z-score based), `seasonality=daily`,
+   `anomaly_rule`, `seasonality=daily`,
    the anomaly function with `z_score_threshold: 3`, `evaluation` with a
    rolling `evalWindow: "24h"` and `frequency: "3h"`, and
    `notificationSettings`. One threshold tier named `warning`: `op:

@@ -187,21 +187,27 @@ resources for the canonical, version-current shape.
 Compose the full payload; no field is filled in for you. Set these
 explicitly on every rule, anomaly rules included:
 
-- `schemaVersion: "v2alpha1"`. An omitted `schemaVersion` is read with v1
-  semantics and rejected for missing v1 condition fields.
+- `schemaVersion: "v2alpha1"`. SigNoz rejects a rule that omits it.
 - `evaluation`: `{ "kind": "rolling", "spec": { "evalWindow": "5m0s",
   "frequency": "1m0s" } }` unless the intent implies another cadence.
   Required on v2alpha1 rules.
 - `notificationSettings`: required on v2alpha1 rules; set `usePolicy` per
   Step 7 and `groupBy` on high-cardinality queries.
-- `labels.severity`: the highest tier's severity from *Severity defaults*
-  below. Without it the rule has no severity in the alert list.
-- `condition.compositeQuery.panelType: "graph"`. An omitted value is stored
-  empty.
+- `condition.compositeQuery.panelType: "graph"`. SigNoz rejects a rule that
+  omits it.
+- `condition.compositeQuery.unit`: the unit the query returns, on every rule
+  whose tiers set `targetUnit` (`ns` for `duration_nano`, `percentunit` for a
+  0 to 1 ratio). With an empty unit SigNoz does not convert the target, so
+  `target: 80`, `targetUnit: "percent"` is compared as 80 against a ratio
+  series and never fires.
 
-Anomaly rules use the same v2alpha1 shape and add `condition.algorithm:
-"standard"` and `condition.seasonality`. Their threshold tiers compare a
-signed anomaly score (see *Threshold `op` and `matchType` values*), so leave
+Do not send `labels.severity`, `condition.algorithm`, or top-level
+`preferredChannels`. SigNoz rejects the last two; *Severity defaults* below
+covers the first.
+
+Anomaly rules use the same v2alpha1 shape and add `condition.seasonality`.
+Their threshold tiers compare a signed anomaly score (see *Threshold `op` and
+`matchType` values*), so leave
 `targetUnit` empty; a unit would rescale the score. An anomaly `evaluation`
 uses a longer window, for example `evalWindow: "24h"`, `frequency: "3h"`.
 
@@ -259,10 +265,12 @@ preview):**
    default one tier (`critical` to `warning`, `warning` to `info`, `info`
    stays `info`). A cue tied to one threshold ("page me at 90%") applies
    only to that tier. Ask when urgency cues conflict on the same tier.
-3. Name each threshold tier by its severity and set `labels.severity` to the
-   highest tier, which SigNoz's alert-rule list sorts and filters by. Every
-   firing carries that label, so on a multi-tier rule only `threshold.name`
-   shows which tier fired. The Step 8 preview states each tier's severity and why.
+3. Name each threshold tier by its severity and do not set `labels.severity`.
+   Each alert carries `severity` and `threshold.name` equal to the tier that
+   fired. A static `labels.severity` replaces that `severity` on every alert,
+   so every tier would report the same one. SigNoz's alert-rule list reads
+   severity from the label only, so the rule lists with no severity. The
+   Step 8 preview states each tier's severity and why.
 
 | Alert intent | Default severity |
 |---|---|
@@ -309,8 +317,9 @@ schema:
   signal: forgetting this clutters the preview with three series and
   confuses the on-call engineer reading the notification.
 - **p99 latency:** the query emits nanoseconds, but express the threshold in
-  the user's unit (for example `target: 2`, `targetUnit: "s"`); SigNoz converts
-  it during evaluation.
+  the user's unit (for example `target: 2`, `targetUnit: "s"`) and set
+  `compositeQuery.unit: "ns"`; SigNoz converts the target to that unit during
+  evaluation.
 - **Low-traffic percentile guard:** put `count() > N` in the percentile
   query's `having.expression` and set `stepInterval` to the requested bucket
   size (for example, `60` for “per minute”). Do not invent comparison operators
@@ -412,11 +421,10 @@ channel does not authorize policy routing.
 
 For a confirmed existing org policy, set
 `notificationSettings.usePolicy: true`, preserve the confirmed matcher labels
-and threshold tier, and omit threshold channels and `preferredChannels`. This
-skill does not create policies. If the policy or match criteria are not
-confirmed, stop and ask. If the criteria route
-tiers by `severity`, stop and ask: every tier matches as the highest (Step 5).
-Offer a `threshold.name` matcher, one rule per tier, or direct routing.
+and threshold tier, and omit threshold channels. This skill does not create
+policies. If the policy or match criteria are not confirmed, stop and ask. A
+policy that matches `severity` needs no static label: each alert carries the
+`severity` of the tier that fired (Step 5), so name the tier to match.
 
 For direct routing, reuse a fully paginated same-operation channel result or
 page `signoz_list_notification_channels` until `hasMore=false`; its `total`
@@ -433,9 +441,8 @@ secret store. If routing remains unresolved, stop and ask.
 
 Put exact returned display names in each threshold's `channels`, anomaly
 rules included. A threshold tier with no channels, or a displayName that does not
-exist, fails unless `notificationSettings.usePolicy` is `true`. Top-level
-`preferredChannels` on a v2alpha1 rule is stored unused, so a rule routed
-only through it saves and notifies nobody.
+exist, fails unless `notificationSettings.usePolicy` is `true`. SigNoz
+rejects top-level `preferredChannels`.
 
 #### Updating or handling secret-bearing channel config
 
@@ -515,8 +522,8 @@ does).
 - **Threshold operators use canonical words** Use the `op` and `matchType`
   words from Step 5, never `equals`.
 - **Compose the full payload** Set `schemaVersion`, `evaluation`,
-  `notificationSettings`, `labels.severity`, and `panelType` yourself (Step
-  5); nothing fills them in.
+  `notificationSettings`, and `panelType` yourself (Step 5); nothing fills
+  them in.
 - **No `limit` or `order` on persisted alert queries** They cap a grouped
   alert to its top-N series (Step 6). Keep them in the dry-run envelope only.
 - **Signal must match alertType** `signal: "logs"` requires
