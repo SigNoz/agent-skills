@@ -1,0 +1,55 @@
+{
+  "mode": "offline_mcp_fixture",
+  "instructions": "Use these responses to answer offline. Do not query a live tenant. The MCP server supports source=\"audit\" on the log tools. Both calls succeeded.",
+  "responses": [
+    {
+      "tool": "signoz_search_logs",
+      "request": {
+        "source": "audit",
+        "filter": "signoz.resource.kind = 'rule'",
+        "timeRange": "1h",
+        "limit": 100
+      },
+      "response": {
+        "data": {
+          "rows": []
+        },
+        "note": "note: returned 0 rows (limit 100); all matching results returned (hasMore=false)."
+      }
+    },
+    {
+      "tool": "signoz_aggregate_logs",
+      "request": {
+        "source": "audit",
+        "aggregations": "count()",
+        "timeRange": "30d"
+      },
+      "response": {
+        "status": "success",
+        "data": {
+          "type": "scalar",
+          "data": {
+            "results": [
+              {
+                "queryName": "A",
+                "columns": [
+                  {
+                    "name": "count()",
+                    "queryName": "A",
+                    "aggregationIndex": 0,
+                    "columnType": "aggregation"
+                  }
+                ],
+                "data": [
+                  [
+                    0
+                  ]
+                ]
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

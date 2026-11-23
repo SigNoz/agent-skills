@@ -9,7 +9,7 @@ description: >
   the payment endpoint", "find slow traces", "errors in the last hour",
   "which agent runs cost the most", "LLM token usage by model",
   "LLM calls from agent runs with many tool calls", "why does AI
-  Observability show no data",
+  Observability show no data", "who deleted the checkout dashboard",
   or otherwise asks an exploratory question that needs live observability
   data, even if they don't say "query" or "search" explicitly.
 ---
@@ -55,6 +55,7 @@ Map the user's intent to the right signal:
 | Ingestion volume (bytes or count), cost, or billing usage | **metrics** with `source=meter` (Cost Meter) | `signoz.meter.*` ingestion metrics (logs/spans/datapoints by count **and** bytes) live only in the meter store; bytes are unavailable on the raw signals. Dollar **cost is not a metric**; derive it from volume × per-unit price (see Step 2). groupBy/filter work like a normal metric, but only over the limited attribute set the meter retains (not arbitrary log/trace fields). For a *count* sliced by an attribute the meter doesn't carry, aggregate logs/traces directly instead. |
 | LLM or AI-agent cost, tokens, models, or tool calls | **traces** (`gen_ai.*` span attributes) | See `references/ai-queries.md`. LLM token cost is a trace attribute, not SigNoz ingestion cost; never answer it from the Cost Meter. |
 | "How many X per Y" (count/rate grouped by dimension) | **traces** or **logs** (aggregate) | Use `signoz_aggregate_traces` or `signoz_aggregate_logs` for grouped counts. |
+| Who created, changed, or deleted a SigNoz dashboard, alert rule, view, channel, user, or role | **logs** with `source: "audit"` | SigNoz audit events. See `references/audit-queries.md`. |
 
 Traces have no unqualified full-text search; use `CONTAINS` against a discovered
 structured trace field. `searchText` convenience search is logs-only.
@@ -213,6 +214,9 @@ first query about LLM calls or AI-agent runs. It covers when to set
 `queryType: "builder_ai_query"`, per-call versus per-run queries, the
 aggregation rules SigNoz enforces, and checking attribute mappings when AI
 Observability shows no data.
+
+**Change history:** read `references/audit-queries.md` before the first
+query about who created, changed, or deleted something in SigNoz.
 
 **Comparing windows and shaping a series:** read `references/functions.md`
 when the user compares a window with an earlier one (week over week, day over
@@ -424,7 +428,7 @@ attribute mappings as `references/ai-queries.md` describes.
   `apply_filter` when the user's primary intent is to obtain a runnable query,
   not when the user is asking a one-shot data question that the analysis text
   already answers. For a Cost Meter query keep `signal: metrics` and ensure the
-  copied query spec carries `source: meter`.
+  copied query spec carries `source: meter`. Never emit it for an audit query.
 
 ## Examples
 
