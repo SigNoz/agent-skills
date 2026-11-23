@@ -116,7 +116,8 @@ re-fetch between changes.
 Default to `signoz_patch_dashboard` (RFC 6902): it sends only the changed ops,
 so it cannot drop a panel that was never in question. Reach for
 `signoz_update_dashboard` (a full replacement merged into the Step 2 state)
-only when most of the dashboard changes. The Step 5 rules apply to both.
+only when most of the dashboard changes or `signoz_patch_dashboard` is
+unavailable. The Step 5 rules apply to both.
 
 Read these before composing the change:
 

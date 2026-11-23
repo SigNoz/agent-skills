@@ -72,6 +72,30 @@ tenant's error.
 Metrics: where a Workflow step names the reference, build from the examples
 resource and check column names and types against the schema resource.
 
+The metrics examples assume a cumulative counter, underscore label names such
+as `service_name`, and one join shape. A query that assumes wrong returns no
+rows, or a fraction of the true value, without an error. For a metrics query:
+
+1. Call `signoz_list_metrics` with the metric name and read its temporality.
+   For a `Delta` counter, filter `temporality = 'Delta'` and compute the rate
+   as `sum(value) / <bucket seconds>`. The `lagInFrame` difference in the
+   examples is for cumulative counters only.
+2. Call `signoz_get_field_keys` with `signal: "metrics"` and the metric name.
+   Use the label names it returns, exactly as spelled, in
+   `JSONExtractString(labels, '<name>')`: one tenant stores `service.name`,
+   another `service_name`.
+3. Keep the examples' join shape: `distributed_samples_v4` joined directly to
+   the label subquery on the local `time_series_v4*` table, in one `SELECT`.
+   If the samples are aggregated in a subquery before the join, read the
+   labels from `distributed_time_series_v4*`. On a sharded cluster the local
+   table holds only part of the series, and the join drops the rest.
+4. Check the result. Run the SQL through `signoz_execute_builder_query` as a
+   `clickhouse_sql` query over a short window, and run `signoz_query_metrics`
+   for the same metric, window, and grouping. The values for one group must
+   agree. If they differ, or the SQL returns no rows, fix the query before
+   giving it to the user. If the tools are unavailable, say the query was not
+   checked.
+
 If the client cannot read `signoz://` resources in this session, use the
 local reference for logs and traces. For metrics, tell the user that the
 metrics schema could not be read; do not guess table or column names.

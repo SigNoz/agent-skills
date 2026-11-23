@@ -277,7 +277,7 @@
       "id": 13,
       "eval_name": "list-panel-execution-and-update-wrapper-contract",
       "prompt": "Using the attached offline fixture, change the Recent Errors list on Error Explorer to 25 rows and sort oldest first, then apply the update.",
-      "expected_output": "Agent fetches the dashboard, dry-runs the changed raw query, and applies the edit through the write path the skill mandates for a two-field change on one panel: signoz_patch_dashboard with ops targeting that query's limit and order. The saved query spec is the execution spec, so the dry-run sends the same limit and order it is about to persist.",
+      "expected_output": "Agent fetches the dashboard, dry-runs the changed raw query, and applies the edit through the write path the skill mandates for a two-field change on one panel: signoz_patch_dashboard with ops at or under that panel's query path, /spec/panels/recent-errors/spec/queries/0. The saved query spec is the execution spec, so the dry-run sends the same limit and order it is about to persist.",
       "files": [
         "evals/files/update-payload-contract.json"
       ],
@@ -291,7 +291,7 @@
         "The dry-run query spec contains none of filters, pageSize, orderBy, selectColumns, queryName, or dataSource",
         "The legacy fixture's widget-only fields are not copied into a v6 replacement",
         "The ops set limit to 25 and order to [{key:{name:'timestamp'},direction:'asc'}]",
-        "The patch payload is {id, patch: [...]} where every path is a JSON Pointer under /spec/panels/recent-errors/spec/queries/0",
+        "The patch payload is {id, patch: [...]} where every path is /spec/panels/recent-errors/spec/queries/0 or a JSON Pointer under it",
         "The signoz_execute_builder_query call uses requestType='raw' with limit=25 and the same ascending timestamp order",
         "The write is called only after the dry-run succeeds"
       ]
