@@ -138,13 +138,14 @@ threshold tickle or flap) and quantifies the magnitude.
    - If the rule carries `limit` and `order` on a grouped query, also run
      it as stored over the evaluation window that fired,
      `[fire_start - evalWindow, fire_start]` (for a cumulative rule, from
-     the schedule's last reset). SigNoz ranks the top-N groups over the
-     whole requested window, so only this run shows the subset the rule
-     evaluated; the centered hour can rank other groups. Record the cap as
-     a finding: a breaching group outside the top N was never evaluated,
-     and a `below` rule ordered descending can exclude every breaching
-     series. The remediation is to update the rule without `limit`/`order`
-     unless top-N alerting was the intent.
+     the schedule's last reset). SigNoz ranks top-N groups over the whole
+     requested window, so this run is the closest view of the subset the
+     rule evaluated. It is not exact: the rule's window ends an evaluation
+     delay (2 minutes by default) earlier, rounded down to the minute.
+     Record the cap as a finding: a breaching group outside the top N was
+     never evaluated, and a `below` rule ordered descending can exclude
+     every breaching series. Remediation: drop `limit`/`order` from the
+     rule unless top-N alerting was the intent.
    - If the stored queries carry no bounds, the alert evaluated every
      series, but `signoz_execute_builder_query` still applies its own display
      `limit`. To check a specific fingerprint from Step 1, add its labels to
@@ -181,11 +182,10 @@ baseline window.
    note it in the output but still proceed.
 2. **Look up neighbor signals** for the alert's resource type. See
    `references/neighbor-signals.md` for the lookup table. Common cases:
-   - **Service-level alert** (`service.name = X`): pull error rate,
-     p95/p99 latency, request throughput, dependency error rates if
-     trace data is available. A service's requests are its entry spans:
-     filter these trace queries on `isEntryPoint = true OR isRoot = true`,
-     and call a number computed over every span span-level.
+   - **Service-level alert** (`service.name = X`): error rate, p95/p99
+     latency, and request throughput on entry spans, filtered with
+     `isEntryPoint = true OR isRoot = true`, plus dependency error rates on
+     outbound spans, if trace data is available.
    - **Host / VM alert** (`host.name = X`): CPU, memory, disk I/O,
      network I/O.
    - **K8s pod / namespace alert**: pod restarts, container CPU/memory

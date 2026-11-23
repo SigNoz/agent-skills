@@ -172,8 +172,10 @@ metrics (`signoz_calls_total`, `signoz_latency`, DB/external-call span
 metrics) are pre-aggregated and cheap over a long alert window, but they
 count every span, so a request with nested spans counts several times. Use
 them for a request SLI only after comparing their totals with the
-entry-span count over the same window; otherwise label the panel or alert
-span-level. (Confirm exact metric/label names via discovery; don't hardcode.)
+entry-span count over the same window, and say in the handoff that the
+match breaks if the service starts recording nested spans; otherwise label
+the panel or alert span-level. (Confirm exact metric/label names via
+discovery; don't hardcode.)
 
 **Render any counter by the volume you just measured, not by reflex.**
 This applies to every counter you'll graph (request rate, **error

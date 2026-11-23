@@ -91,10 +91,11 @@ rows, or a fraction of the true value, without an error. For a metrics query:
    table holds only part of the series, and the join drops the rest.
 4. Check the result. Run the SQL through `signoz_execute_builder_query` as a
    `clickhouse_sql` query over a short window, and run `signoz_query_metrics`
-   for the same metric, window, and grouping. The values for one group must
-   agree. If they differ, or the SQL returns no rows, fix the query before
-   giving it to the user. If the tools are unavailable, say the query was not
-   checked.
+   for the same metric, window, step, filter, and grouping. Compare one
+   group: the final values when the builder can express the same
+   calculation, otherwise the plain rate or sum that the SQL builds on. If
+   they differ, or the SQL returns no rows, fix the query before giving it
+   to the user. If the tools are unavailable, say the query was not checked.
 
 If the client cannot read `signoz://` resources in this session, use the
 local reference for logs and traces. For metrics, tell the user that the

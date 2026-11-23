@@ -41,7 +41,8 @@ for p99 request latency, and `signoz://query-builder/examples` has one
 request per query type. The tool's input schema describes the outer
 fields; `formatOptions` and `variables` are optional. If the client cannot
 read those resources, start from this minimal request for p99 request
-latency and change only the `spec`:
+latency, set `start` and `end` to each comparison window, and adapt the
+`spec` to the signal:
 
 ```json
 {

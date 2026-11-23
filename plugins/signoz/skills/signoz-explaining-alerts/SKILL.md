@@ -247,8 +247,8 @@ high-impact ones:
   shows `{{$labels.service_name}}` for the `service.name` label and
   `signoz://alert/examples` writes `{{$service.name}}`, so do not call
   either form broken from the config alone. Flag a variable only when it
-  names something the rule does not produce (not a `groupBy` key or a rule
-  label).
+  names something the rule does not produce (not a `groupBy` key, `$value`,
+  or `$threshold`). A static rule label is not available to an annotation.
 - **`having` on an aggregation a logs or traces query does not select**:
   the alert guide requires a `having.expression` aggregation to be in that
   query's own `aggregations`. Flag `count() > N` on a query whose

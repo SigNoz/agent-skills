@@ -341,9 +341,12 @@ otherwise.
 - **Name** Leave the top-level `name` out on create; the server derives that
   immutable label from `spec.display.name`.
 - **Default time range and refresh** `spec.duration` and
-  `spec.refreshInterval` store them, but the UI does not apply either: panels
-  compute over the range the viewer selects. Set them when the user asks for
-  a default, and tell the user in the handoff to select that range in the UI.
+  `spec.refreshInterval` store them. Set them when the user asks for a
+  default. Whether the UI applies them depends on the SigNoz version, so
+  read each field's description in the `signoz_create_dashboard` input
+  schema. When it says the UI does not apply the field, panels compute over
+  the range the viewer selects: tell the user in the handoff to select that
+  range in the UI.
   Do not invent `timeRange`, `defaultTimeRange`, or `refresh` fields, and do
   not encode a PromQL range selector inside a Builder query.
 - **Placement** Give every panel the user should see exactly one grid item.

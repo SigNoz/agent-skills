@@ -476,8 +476,8 @@ routes. Step 6's dry-run catches query-shape errors; reading JSON does not.
 - **Dry-run is mandatory** Complete Steps 4 and 6 before
   `signoz_create_alert`; a rule on a query with no data gives false confidence.
 - **Compose the full payload** SigNoz fills in almost nothing. Supply every
-  field the Step 5 guide and the tool schema require, including each metrics
-  query's `timeAggregation`.
+  field the Step 5 guide and the tool schema require, including
+  `timeAggregation` on each gauge, sum, and summary metrics query.
 - **No `limit` or `order` on persisted alert queries** They cap a grouped
   alert to its top-N series (Step 6).
 - **Match `alertType` to the query signal** SigNoz evaluates the query

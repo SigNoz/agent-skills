@@ -92,8 +92,8 @@ Run discovery calls in parallel where possible:
   Choose `timeAggregation` for the question, from the discovered metric type.
   Omit it for the type's default: `avg` for a gauge or a non-monotonic sum,
   `rate` for a counter, none for a histogram percentile. On a counter, `rate`
-  is per second and `increase` is the count in each step; `latest`, `max`,
-  `min`, `avg`, and `sum` read its running total since it started.
+  is per second and `increase` is the count in each step; on a cumulative
+  counter `latest`, `max`, `min`, `avg`, and `sum` read its running total.
 - **For Cost Meter** (ingestion volume, cost, billing): pass `source=meter` to
   `signoz_list_metrics` to discover the metrics (`signoz.meter.*`); they're
   invisible in the default store and the set evolves, so don't hardcode it.
@@ -158,8 +158,8 @@ A call that uses only shortcut parameters and `searchText` does not need it.
 2. Logs: `signoz://logs/query-builder-guide`.
 3. Metrics, formulas, and `reduceTo`: `signoz://metrics-aggregation-guide`.
 4. PromQL: `signoz://promql/instructions`.
-5. A full `signoz_execute_builder_query` payload:
-   `signoz://query-builder/examples`.
+5. A full `signoz_execute_builder_query` payload: `signoz://query-builder/examples`.
+6. LLM and AI-agent queries: `signoz://ai/query-builder-guide`.
 
 **Two rules change the number without raising an error.** They apply even
 when you skip the guides:
@@ -194,10 +194,12 @@ SQL. Before writing the SQL:
    shape. SigNoz fills `$start_timestamp`, `$end_timestamp`,
    `$start_timestamp_nano`, `$end_timestamp_nano`, `$start_datetime`, and
    `$end_datetime` from the request's `start` and `end`.
-3. Bound both time columns of every table the query reads: `timestamp`, and
+3. Bound both time columns of every log and span table: `timestamp`, and
    `ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp`.
+   Bound a resource table on `seen_at_ts_bucket_start` instead.
 4. Filter on the resource when the question names a service, namespace, or
-   host, and use `GLOBAL IN` for any subquery that reads a distributed table.
+   host. Use `GLOBAL IN` for a subquery on a distributed table, or `GLOBAL
+   JOIN` with a time-bounded right side when you need columns from both.
 5. End with a `LIMIT`, and aggregate in SQL; do not pull raw rows to join or
    count them yourself.
 
@@ -247,8 +249,9 @@ formulas require `signoz_execute_builder_query`.
 For every `signoz_execute_builder_query` payload, put a positive `limit` and
 non-empty `order` on each `builder_formula` spec and on each `builder_query`
 spec no formula references: 100 rows or groups unless the question needs
-another bound, ordered by `__result` desc for metrics and formulas and by the
-primary aggregation desc for logs and traces. Leave `limit` and `order` unset on every `builder_query` that a
+another bound. Order raw rows by `timestamp` desc (logs: then `id` desc),
+metrics and formulas by `__result` desc, and other aggregates by the primary
+aggregation desc. Leave `limit` and `order` unset on every `builder_query` that a
 formula references: an input limit applies before the formula runs and cuts
 each input to its own top N, which can drop a high-ratio group. To find those
 inputs, inspect every formula expression, including formulas with
