@@ -384,8 +384,9 @@ What this orchestration layer adds on top of that skill:
   for anything tied to the Phase 2 SLO.
 - **The burn-rate recipe** (the one thing `signoz-creating-alerts`
   can't derive without the SLO). Hand it the *inputs*, not a rule shape:
-  the bad/total event definition (counted on entry spans), the long+short window
-  lengths from Phase 5, and the firing target `burnRate × (1 − SLO)`.
+  the bad/total event definition (entry spans when it comes from traces,
+  or a request counter that measures the Phase 2 event), the long+short
+  window lengths from Phase 5, and the firing target `burnRate × (1 − SLO)`.
   Two judgment calls travel with those inputs. The long and short
   windows must be evaluated as **one rule that ANDs both** (two
   independent rules page on every short spike; if the SigNoz version

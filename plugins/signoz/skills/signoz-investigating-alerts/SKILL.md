@@ -135,17 +135,17 @@ threshold tickle or flap) and quantifies the magnitude.
 2. Re-run the alert's stored query (builder, formula, PromQL, or ClickHouse
    envelope) over a window centered on the fire start,
    `[fire_start - 30m, fire_start + 30m]`, for magnitude and context.
-   - If the rule carries `limit` and `order` on a grouped query, also run
-     it as stored over the evaluation window that fired,
-     `[fire_start - evalWindow - delay, fire_start - delay]`, with both
-     bounds rounded down to the minute (a cumulative rule starts at the
-     schedule's last reset). `delay` is the ruler's evaluation delay, 2
-     minutes by default; call the window an estimate when you assume it.
-     SigNoz ranks top-N groups over the whole requested window, so only
-     this run shows the subset the rule evaluated. Record the cap as a
-     finding: a breaching group outside the top N was never evaluated, and
-     a `below` rule ordered descending can exclude every breaching series.
-     Remediation: drop `limit`/`order` unless top-N alerting was the intent.
+   - If the rule carries `limit` and `order` on a grouped query, also run it
+     as stored over `[start - delay, fire_start - delay]`, both bounds rounded
+     down to the minute. `start` is `fire_start - evalWindow`, or the
+     schedule's last reset for a cumulative rule; `delay` is the ruler's
+     evaluation delay, 2 minutes by default. SigNoz ranks top-N groups over
+     the whole window, so this run estimates the subset the rule evaluated:
+     late data or an assumed delay can change the ranking, and the Step 1
+     fingerprints show which groups fired. Record the cap as a finding: a
+     breaching group outside the top N was never evaluated, and a `below` rule
+     ordered descending can exclude every breaching series. Remediation: drop
+     `limit`/`order` unless top-N was intended.
    - If the stored queries carry no bounds, the alert evaluated every
      series, but `signoz_execute_builder_query` still applies its own display
      `limit`. To check a specific fingerprint from Step 1, add its labels to
