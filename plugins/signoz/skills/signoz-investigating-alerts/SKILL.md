@@ -137,15 +137,15 @@ threshold tickle or flap) and quantifies the magnitude.
    `[fire_start - 30m, fire_start + 30m]`, for magnitude and context.
    - If the rule carries `limit` and `order` on a grouped query, also run
      it as stored over the evaluation window that fired,
-     `[fire_start - evalWindow, fire_start]` (for a cumulative rule, from
-     the schedule's last reset). SigNoz ranks top-N groups over the whole
-     requested window, so this run is the closest view of the subset the
-     rule evaluated. It is not exact: the rule's window ends an evaluation
-     delay (2 minutes by default) earlier, rounded down to the minute.
-     Record the cap as a finding: a breaching group outside the top N was
-     never evaluated, and a `below` rule ordered descending can exclude
-     every breaching series. Remediation: drop `limit`/`order` from the
-     rule unless top-N alerting was the intent.
+     `[fire_start - evalWindow - delay, fire_start - delay]`, with both
+     bounds rounded down to the minute (a cumulative rule starts at the
+     schedule's last reset). `delay` is the ruler's evaluation delay, 2
+     minutes by default; call the window an estimate when you assume it.
+     SigNoz ranks top-N groups over the whole requested window, so only
+     this run shows the subset the rule evaluated. Record the cap as a
+     finding: a breaching group outside the top N was never evaluated, and
+     a `below` rule ordered descending can exclude every breaching series.
+     Remediation: drop `limit`/`order` unless top-N alerting was the intent.
    - If the stored queries carry no bounds, the alert evaluated every
      series, but `signoz_execute_builder_query` still applies its own display
      `limit`. To check a specific fingerprint from Step 1, add its labels to

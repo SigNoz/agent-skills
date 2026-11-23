@@ -163,8 +163,8 @@ for the first removal from each array.
 - **Default time range and refresh.** `spec.duration` and
   `spec.refreshInterval` store them, so set them when the user asks. Whether
   the UI applies them depends on the SigNoz version: read each field's
-  description in the write tool's input schema and tell the user what it
-  says. Do not invent `timeRange`, `defaultTimeRange`, or `refresh` fields.
+  description in the `signoz_update_dashboard` input schema and tell the user
+  what it says. Do not invent `timeRange`, `defaultTimeRange`, or `refresh` fields.
 
 - **Preserve supported mutable state.** Copy the fetched dashboard, change only
   what the user requested, and compare semantics after MCP normalization. Do not

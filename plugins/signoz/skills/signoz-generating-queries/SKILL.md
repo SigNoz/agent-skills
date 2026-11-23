@@ -198,8 +198,8 @@ SQL. Before writing the SQL:
    `ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp`.
    Bound a resource table on `seen_at_ts_bucket_start` instead.
 4. Filter on the resource when the question names a service, namespace, or
-   host. Use `GLOBAL IN` for a subquery on a distributed table, or `GLOBAL
-   JOIN` with a time-bounded right side when you need columns from both.
+   host. Use `GLOBAL IN` for a subquery on a distributed table. When you
+   need columns from both, `GLOBAL JOIN` a small, time-bounded right side.
 5. End with a `LIMIT`, and aggregate in SQL; do not pull raw rows to join or
    count them yourself.
 

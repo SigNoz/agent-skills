@@ -93,7 +93,7 @@ rows, or a fraction of the true value, without an error. For a metrics query:
    `clickhouse_sql` query over a short window, and run `signoz_query_metrics`
    for the same metric, window, step, filter, and grouping. Compare one
    group: the final values when the builder can express the same
-   calculation, otherwise the plain rate or sum that the SQL builds on. If
+   calculation, otherwise the per-step aggregation the SQL builds on. If
    they differ, or the SQL returns no rows, fix the query before giving it
    to the user. If the tools are unavailable, say the query was not checked.
 

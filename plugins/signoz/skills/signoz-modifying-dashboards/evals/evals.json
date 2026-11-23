@@ -265,12 +265,12 @@
       "id": 12,
       "eval_name": "unsupported-default-range-and-refresh",
       "prompt": "Set my API Monitoring dashboard's default range to 7 days and auto-refresh it every 30 seconds.",
-      "expected_output": "Agent explains that spec.duration and spec.refreshInterval store a default time range and refresh interval, and reports whether the UI applies them as the write tool's input schema describes it. At MCP server v1.0.0 the schema says stored but not applied, so panels still follow the range and refresh the viewer selects. Its patch, prepared or applied, sets spec.duration to 7d and spec.refreshInterval to 30s and adds no timeRange, defaultTimeRange, or refresh fields.",
+      "expected_output": "Agent explains that spec.duration and spec.refreshInterval store a default time range and refresh interval, and reports whether the UI applies them as the signoz_update_dashboard input schema describes it. At MCP server v1.0.0 the schema says stored but not applied, so panels still follow the range and refresh the viewer selects. Its patch, prepared or applied, sets spec.duration to 7d and spec.refreshInterval to 30s and adds no timeRange, defaultTimeRange, or refresh fields.",
       "files": [],
       "expectations": [
         "The prepared or applied patch sets /spec/duration to 7d and /spec/refreshInterval to 30s, and does not invent timeRange, defaultTimeRange, or refresh fields",
         "Agent does not invent timeRange, defaultTimeRange, or refresh fields in any patch or update body",
-        "Agent tells the user whether the UI applies spec.duration and spec.refreshInterval, as the write tool's input schema describes it, and does not promise the dashboard opens on 7 days when the schema says the UI does not apply the field"
+        "Agent tells the user whether the UI applies spec.duration and spec.refreshInterval, as the signoz_update_dashboard input schema describes it, and does not promise the dashboard opens on 7 days when the schema says the UI does not apply the field"
       ]
     },
     {

@@ -170,12 +170,10 @@ its entry spans: for a request count, rate, error rate, or latency, filter
 the trace query on `isEntryPoint = true OR isRoot = true`. SigNoz's span
 metrics (`signoz_calls_total`, `signoz_latency`, DB/external-call span
 metrics) are pre-aggregated and cheap over a long alert window, but they
-count every span, so a request with nested spans counts several times. Use
-them for a request SLI only after comparing their totals with the
-entry-span count over the same window, and say in the handoff that the
-match breaks if the service starts recording nested spans; otherwise label
-the panel or alert span-level. (Confirm exact metric/label names via
-discovery; don't hardcode.)
+count every span, so a request with nested spans counts several times. A
+panel or alert built on them is span-level: label it so, and do not present
+it as the request SLI. (Confirm exact metric/label names via discovery;
+don't hardcode.)
 
 **Render any counter by the volume you just measured, not by reflex.**
 This applies to every counter you'll graph (request rate, **error
@@ -386,8 +384,7 @@ What this orchestration layer adds on top of that skill:
   for anything tied to the Phase 2 SLO.
 - **The burn-rate recipe** (the one thing `signoz-creating-alerts`
   can't derive without the SLO). Hand it the *inputs*, not a rule shape:
-  the bad/total event definition (entry spans, or a span-metric split
-  Phase 3 verified against them), the long+short window
+  the bad/total event definition (counted on entry spans), the long+short window
   lengths from Phase 5, and the firing target `burnRate × (1 − SLO)`.
   Two judgment calls travel with those inputs. The long and short
   windows must be evaluated as **one rule that ANDs both** (two
