@@ -12,17 +12,18 @@ template import without data, duplicate-found choice, and custom build.
    dashboard exists.
 2. Says: "I'll create a new dashboard for PostgreSQL. Proceed?" User
    confirms.
-3. `signoz_list_dashboard_templates` → picks
+3. `signoz_list_dashboard_templates searchText="postgres"` → picks
    `postgresql/postgresql.json`. Tells user: "I found a pre-built
    PostgreSQL template and will use it."
 4. No-data probe: `signoz_list_metrics searchText="postgresql"`
    → returns `postgresql.connections.usage`, `postgresql.commits`, etc.
-   Data flowing.
+   Those metrics were active in the last hour.
 5. Calls `signoz_import_dashboard path=postgresql/postgresql.json`.
 6. Reports: "Created 'PostgreSQL Overview' (id `…`) with 24 panels
    across Overview / Connections / Throughput / Replication. Variables:
-   `postgresql.host.name`. Probe found data for all headline panels.
-   Want me to adjust anything, or wire alerts for slow queries?"
+   `postgresql.host.name`. The probe found `postgresql.connections.usage`
+   and `postgresql.commits` active in the last hour; I did not check each
+   panel. Want me to adjust anything, or wire alerts for slow queries?"
 
 *Variant, no PG data ingested:* the probe in step 4 returns empty;
 agent emits the verbatim no-data warning from Step 3b-i.1 and waits for
@@ -36,9 +37,9 @@ the user to choose between "create anyway" and "stop".
 1. `signoz_list_dashboards` (paginated) → no APM dashboard.
 2. Says: "I'll create a new APM dashboard. Want me to show you what
    templates we have first?" User: yes.
-3. `signoz_list_dashboard_templates` → reads the full catalog
-   in-context, filters to APM entries (APM RED, APM Errors, etc.).
-4. Presents the list and asks which to import. User picks "APM RED".
+3. `signoz_list_dashboard_templates searchText="apm"` → returns the APM
+   entries.
+4. Presents their titles and asks which to import. User picks one.
 5. No-data probe: `signoz_aggregate_traces aggregations="count()"
    timeRange=1h` → returns rows. Data flowing.
 6. Imports, reports panels and variables. Offers to wire latency
@@ -51,8 +52,9 @@ dashboard found)
 
 **Agent:** surfaces the existing dashboard with its id and `createdAt`,
 asks the user (a) modify / (b) create new / (c) stop. If user picks
-(b), follows the PostgreSQL flow above against the `redis/redis.json`
-template. If (a), hands off to `signoz-modifying-dashboards` with the
+(b), follows the PostgreSQL flow above against the Redis entry that
+`signoz_list_dashboard_templates searchText="redis"` returns, using its
+`path`. If (a), hands off to `signoz-modifying-dashboards` with the
 dashboard's id and the user's intent (no `signoz_get_dashboard` call
 from this skill).
 
@@ -73,10 +75,15 @@ from this skill).
    `deployment.environment` (no `.name` suffix in this install);
    `signoz_get_field_values signal=traces name=service.name` → user picks
    `checkout`, `payments`, `inventory`, `notifications`.
-5. Reads the `signoz://dashboard/*` MCP resources. Builds Grid sections
+5. Reads the Step 3b-ii.3 guides: `signoz://dashboard/instructions`,
+   `signoz://dashboard/widgets-instructions`,
+   `signoz://dashboard/widgets-examples`, `signoz://dashboard/examples`,
+   `signoz://dashboard/query-builder-example`, and
+   `signoz://traces/query-builder-guide`. Builds Grid sections
    Overview / Latency / Errors / Throughput, with headline panels
    (request rate, p99 latency, an error-rate `signoz/CompositeQuery`
-   computing `A*100/B`, throughput) and the two variables.
+   computing `A*100/B`, throughput), each scoped to entry spans, and the
+   two variables.
 6. Per-panel dry-run via `signoz_execute_builder_query` for
    **every** panel (envelope lift per Step 3b-ii.6, with
    `name` preserved on each `builder_query.spec` so formulas

@@ -33,7 +33,7 @@
           "description": "Skill requires a preview step; without it user cannot catch errors"
         },
         {
-          "text": "Create payload uses schemaVersion='v2', source='traces', and spec with displayName, panelType, requestType, and queries",
+          "text": "Create payload uses source='traces' and a spec with displayName, panelType, requestType, and queries; schemaVersion is 'v2' or omitted, because the server fills it in",
           "description": "Current saved-view contract"
         },
         {
@@ -49,7 +49,7 @@
           "description": "User needs UUID for future get/update/delete operations"
         },
         {
-          "text": "The actual signoz_create_view payload sets spec to exactly displayName, panelType='list', requestType='raw', and queries copied losslessly from the successful execution query.compositeQuery.queries",
+          "text": "The actual signoz_create_view payload sets spec.displayName, panelType='list', requestType='raw', and queries copied losslessly from the successful execution query.compositeQuery.queries; selectedFields for the list columns may also be set",
           "description": "Execution and saved-view envelopes differ; the validated inner queries must be preserved while the v2 spec is constructed explicitly"
         },
         {
@@ -61,7 +61,7 @@
           "description": "Saved-view queries share the execution wire shape and must remain explicitly bounded and ordered during translation"
         },
         {
-          "text": "The created view's returned displayName and canonical id are reported",
+          "text": "The view's displayName and the id returned by signoz_create_view are reported",
           "description": "Recognizable handoff"
         },
         {
@@ -74,7 +74,7 @@
         },
         {
           "text": "source is set to 'traces' (not logs or metrics)",
-          "description": "source must match the user's intent; wrong value is a 400"
+          "description": "source must match the user's intent; a wrong Explorer saves without error and files the view where the user will not look"
         }
       ]
     },
@@ -82,7 +82,7 @@
       "id": 1,
       "name": "list-views-no-source",
       "prompt": "Show me all my saved views.",
-      "expected_output": "Agent recognizes no source was given and calls signoz_list_views once with source omitted, which lists every Explorer's views in one call. It does not fan out one call per source or guess a source. It walks pagination.hasMore to the end and presents the results organized by source.",
+      "expected_output": "Agent recognizes no source was given and runs one signoz_list_views listing with source omitted, which covers every Explorer's views. It does not fan out one call per source or guess a source. It walks pagination.hasMore to the end and presents the results organized by source.",
       "files": [],
       "assertions": [
         {
@@ -115,7 +115,7 @@
       "id": 2,
       "name": "rename-existing-view",
       "prompt": "Rename the 'slow-checkout' view to 'slow-checkout-p99'.",
-      "expected_output": "Because the source is unknown, the agent calls signoz_list_views with source omitted and walks pagination to the end, then calls signoz_get_view. It previews a rename-only diff and calls signoz_update_view with the full fetched view body, changing only spec.displayName (the machine name is immutable server-side) and keeping the fetched source. Reports UUID, old label, and new label.",
+      "expected_output": "Because the source is unknown, the agent calls signoz_list_views with source omitted and walks pagination to the end, then calls signoz_get_view. It previews a rename-only diff and calls signoz_update_view with the fetched view body minus its server-populated fields, changing only spec.displayName (the machine name is immutable server-side) and keeping the fetched source. Reports UUID, old label, and new label.",
       "files": [],
       "assertions": [
         {
@@ -131,7 +131,7 @@
           "description": "Blind update without lookup risks wrong UUID"
         },
         {
-          "text": "Agent calls signoz_update_view with the full fetched view body, preserving source and every unchanged spec field",
+          "text": "Agent calls signoz_update_view with the fetched view body minus its server-populated fields, preserving source and every unchanged spec field",
           "description": "The replace is full-body; a label-only payload would wipe state"
         },
         {
@@ -233,7 +233,7 @@
       "id": 4,
       "name": "update-view-filter",
       "prompt": "Update the 'checkout-errors' view to show only error spans slower than one second.",
-      "expected_output": "Because the source is unknown, the agent calls signoz_list_views with source omitted and walks pagination to the end, then gets the full view. It uses signoz-generating-queries to build has_error=true AND duration_nano>1000000000, sample-fetches the exact filter, previews the diff, confirms, and calls signoz_update_view with the full fetched view body containing the validated queries and the fetched source unchanged.",
+      "expected_output": "Because the source is unknown, the agent calls signoz_list_views with source omitted and walks pagination to the end, then gets the full view. It uses signoz-generating-queries to build has_error=true AND duration_nano>1000000000, sample-fetches the exact filter, previews the diff, confirms, and calls signoz_update_view with the fetched view body minus its server-populated fields, containing the validated queries and the fetched source unchanged.",
       "files": [],
       "assertions": [
         {
@@ -245,7 +245,7 @@
           "description": "Full replacement; not fetching first risks wiping fields"
         },
         {
-          "text": "Agent calls signoz_update_view with the full fetched view body, preserving source and every unchanged spec field while replacing spec.queries with the validated query",
+          "text": "Agent calls signoz_update_view with the fetched view body minus its server-populated fields, preserving source and every unchanged spec field while replacing spec.queries with the validated query",
           "description": "The filter change must be written without dropping unrelated state"
         },
         {

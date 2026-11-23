@@ -12,9 +12,9 @@
 Cost Meter data lives in the metrics store under `source: "meter"`. Query it with
 `signoz_execute_builder_query` and an explicit `timeAggregation: "sum"`.
 
-Do **not** use `signoz_query_metrics` for Cost Meter totals. Use
-`signoz_execute_builder_query`, which honors the explicit raw builder `sum` required for these
-meter metrics.
+Do **not** use `signoz_query_metrics` for Cost Meter totals. This skill computes totals with
+`signoz_execute_builder_query` so the request carries the full discovered `groupBy` field
+descriptors and the explicit `sum` aggregation exactly as written.
 
 ## Discover meter metrics
 
@@ -26,6 +26,11 @@ exhaustive table. Do not query an example name that discovery did not return. Co
 metric's returned `temporality` into the raw builder aggregation.
 
 ## Per-signal total (template)
+
+The Cost Meter section of `signoz://metrics-aggregation-guide` has the request shape and a
+worked request; read it first. The request below is that shape with this skill's accounting
+choices: the discovered `temporality`, `timeAggregation: "sum"` and `spaceAggregation: "sum"`
+for a total, and gaps left unfilled. Use it as written when the client cannot read resources.
 
 Call `signoz_execute_builder_query` once per discovered meter metric. Replace
 `<discovered_meter_metric_name>` with the live name returned by `signoz_list_metrics`; replace
@@ -78,9 +83,10 @@ with a short-lived local spike can fall outside the returned top N; narrow the
 window or choose a deliberate positive override when that matters. Query Range
 uses `order`; `orderBy` is only for dashboard editor payloads.
 
-Meter buckets are hourly, so keep `stepInterval: 3600`. Sum all complete hourly values across
-every returned series, excluding datapoints with `partial: true`; they are incomplete edge
-buckets. Use the unit returned by discovery when labeling or converting the total.
+Meter data is stored in hourly buckets, so keep `stepInterval: 3600`. Over a long window SigNoz
+raises the step above an hour; `data.meta.stepIntervals` in the response gives the step it applied.
+Sum all complete values across every returned series, excluding datapoints with `partial: true`;
+they are incomplete edge buckets. Use the unit returned by discovery when labeling or converting the total.
 
 ## Breakdown by environment / service
 

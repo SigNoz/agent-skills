@@ -141,6 +141,8 @@ INDEX body_index_v2_token  lower(body) TYPE tokenbf_v1(10000, 2, 0)   GRANULARIT
 INDEX body_index_v2_ngram  lower(body) TYPE ngrambf_v1(4, 15000, 3, 0) GRANULARITY 1
 ```
 
+Index names depend on which migrations the tenant has run: a tenant on the older schema has one `body_idx` ngram index on `lower(body)` and no token index. Run `EXPLAIN indexes=1` (below) to see which indexes the tenant has.
+
 ClickHouse compares predicate ASTs to the index expression **literally**. A predicate must reference `lower(body)` to engage either index; `hasToken(body, …)` and `body LIKE '%x%'` prune nothing.
 
 #### Predicate engagement
@@ -234,6 +236,7 @@ simpleJSONExtractString(labels, 'service.name') = 'myservice'
 ```sql
 attributes_string['method'] = 'GET'
 attributes_number['response.time'] > 1000
+attributes_number['http.status_code'] = 200.0  -- `=` and `!=` need a Float64 literal; `= 200` fails with code 170
 attributes_bool['is_error'] = true
 ```
 

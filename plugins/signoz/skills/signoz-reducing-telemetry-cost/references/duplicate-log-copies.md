@@ -18,8 +18,8 @@ records by timestamp and message; do not treat similar counts alone as proof of 
   The OTLP copy often has `trace_id` and `span_id`, which link logs to traces, plus SDK resource
   attributes. For the copy you would stop, check every query on those fields:
   - Alerts: every log alert, as in Step 3c.
-  - Dashboards: `signoz_list_dashboards`, raising `offset` by `limit` until you reach `total`,
-    then `signoz_get_dashboard` on every one. Read every panel query, including PromQL and
+  - Dashboards: `signoz_list_dashboards`, paging as the dashboard/view coverage guardrail in
+    SKILL.md describes, then `signoz_get_dashboard` on every one. Read every panel query, including PromQL and
     ClickHouse SQL panels and dashboard variables.
   - Saved views: `signoz_list_views` with `source: "logs"`, following `pagination.nextOffset`
     while `pagination.hasMore` is true, then `signoz_get_view` on every one.

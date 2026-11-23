@@ -1,6 +1,6 @@
 {
   "mode": "offline_mcp_fixture",
-  "instructions": "Use these responses to explain the rule and compute fire frequency offline. Do not query a live tenant. History was requested with timeRange=7d, state=firing, order=desc.",
+  "instructions": "Use these responses to explain the rule and compute fire frequency offline. Do not query a live tenant. History was requested with timeRange=7d, state=firing, order=desc. Each response's note is the completeness note the tool returns as a separate text block after the JSON body.",
   "responses": [
     {
       "tool": "signoz_get_alert",
@@ -11,8 +11,12 @@
           "alert": "Checkout latency by service",
           "alertType": "TRACES_BASED_ALERT",
           "ruleType": "threshold_rule",
+          "schemaVersion": "v2alpha1",
+          "state": "firing",
+          "disabled": false,
           "condition": {
-            "compositeQuery": {"queryType": "builder", "queries": []},
+            "compositeQuery": {"queryType": "builder", "panelType": "graph", "unit": "s", "queries": [{"type": "builder_query", "spec": {"name": "A", "signal": "traces", "disabled": true, "stepInterval": 60, "aggregations": [{"expression": "p99(duration_nano)"}], "filter": {"expression": "isEntryPoint = true OR isRoot = true"}, "groupBy": [{"name": "service.name", "fieldContext": "resource", "fieldDataType": "string"}]}}, {"type": "builder_formula", "spec": {"name": "F1", "expression": "A / 1000000000"}}]},
+            "selectedQueryName": "F1",
             "thresholds": {"kind": "basic", "spec": [{"name": "critical", "target": 2, "targetUnit": "s", "op": "above", "matchType": "at_least_once", "channels": ["pagerduty-oncall"]}]}
           },
           "evaluation": {"kind": "rolling", "spec": {"evalWindow": "5m", "frequency": "1m"}},
@@ -23,17 +27,17 @@
     },
     {
       "tool": "signoz_get_alert_history",
-      "request": {"id": "019f0000-0000-7000-8000-000000000101", "timeRange": "7d", "state": "firing", "order": "desc"},
+      "request": {"id": "019f0000-0000-7000-8000-000000000101", "timeRange": "7d", "state": "firing", "order": "desc", "limit": 100},
       "response": {
         "data": {
           "items": [
-            {"overallState": "firing", "overallStateChanged": false, "state": "firing", "stateChanged": true, "unixMilli": 1750000300000, "labels": [{"key": {"name": "service.name"}, "value": "checkout"}], "fingerprint": 101, "value": 2.4},
-            {"overallState": "firing", "overallStateChanged": true, "state": "firing", "stateChanged": true, "unixMilli": 1750000000000, "labels": [{"key": {"name": "service.name"}, "value": "payments"}], "fingerprint": 202, "value": 2.8},
-            {"overallState": "firing", "overallStateChanged": true, "state": "firing", "stateChanged": true, "unixMilli": 1750000000000, "labels": [{"key": {"name": "service.name"}, "value": "checkout"}], "fingerprint": 101, "value": 2.3}
+            {"ruleId": "019f0000-0000-7000-8000-000000000101", "ruleName": "Checkout latency by service", "overallState": "firing", "overallStateChanged": false, "state": "firing", "stateChanged": true, "unixMilli": 1750000300000, "labels": [{"key": {"name": "service.name"}, "value": "checkout"}], "fingerprint": 101, "value": 2.4},
+            {"ruleId": "019f0000-0000-7000-8000-000000000101", "ruleName": "Checkout latency by service", "overallState": "firing", "overallStateChanged": true, "state": "firing", "stateChanged": true, "unixMilli": 1750000000000, "labels": [{"key": {"name": "service.name"}, "value": "payments"}], "fingerprint": 202, "value": 2.8},
+            {"ruleId": "019f0000-0000-7000-8000-000000000101", "ruleName": "Checkout latency by service", "overallState": "firing", "overallStateChanged": true, "state": "firing", "stateChanged": true, "unixMilli": 1750000000000, "labels": [{"key": {"name": "service.name"}, "value": "checkout"}], "fingerprint": 101, "value": 2.3}
           ],
           "total": 3
         },
-        "note": "hasMore: false"
+        "note": "note: returned 3 rows (limit 100); all matching results returned (hasMore=false)."
       }
     }
   ]

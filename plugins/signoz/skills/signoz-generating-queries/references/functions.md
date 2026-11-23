@@ -110,7 +110,10 @@ Error logs in the last hour against the same hour last week, as the change per
 | `cumulativeSum` | none | Replaces each point with the sum of all points up to it. The total starts again with each window. | A running total of errors in the window. |
 | `ewma3`, `ewma5`, `ewma7` | optional alpha | Exponentially weighted average; the default alpha is 0.5, 0.333, or 0.25. A higher alpha follows the raw series more closely. | Smoothing a noisy trend. |
 | `median3`, `median5`, `median7` | none | Median of the 3, 5, or 7 points around each point. A spike that lasts one step disappears. | Removing one-step spikes from a trend. |
-| `fillZero` | none | Adds a zero at each step with no data. | Counts of sparse events, such as failed requests. |
+| `fillZero` | none needed; optional start, end, and step in milliseconds | Adds a zero at each step with no data, over the request window at the query's step unless the arguments say otherwise. | Counts of sparse events, such as failed requests. |
 | `absolute`, `log2`, `log10` | none | Transform each value. Zero and negative values have no logarithm. | Series with very different sizes on one chart. |
 
-`anomaly` is for anomaly alert rules; see `signoz-creating-alerts`.
+`anomaly` takes named arguments (`seasonality`, `z_score_threshold`) and
+returns predicted, bound, and score series. Read its example in
+`signoz://query-builder/examples` before using it in a query; for an anomaly
+alert rule, use `signoz-creating-alerts`.

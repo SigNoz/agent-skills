@@ -3,20 +3,15 @@
   "evals": [
     {
       "id": 0,
-      "eval_name": "metrics-error-rate-service",
+      "eval_name": "service-error-rate-uses-service-list",
       "prompt": "Show me the error rate for the checkout-service over the last hour.",
-      "expected_output": "Agent discovers a concrete request-count metric by a matching substring, discovers both service and error label keys/values for that exact metric, and calls signoz_query_metrics with a complete A/B formula payload. Query A uses the discovered service and error labels; B uses the same discovered service label without the error condition; formula is A / B * 100. Reports the rate with the window, or correctly handles no data / missing instrumentation.",
+      "expected_output": "Agent treats this as a service's request error rate and calls signoz_list_services for the last hour, paging until it finds checkout-service. It reports that service's errorRate as a percentage with the window and its request count, or correctly handles a service with no trace activity in the window. If it aggregates traces instead, the filter on both the error count and the total includes isEntryPoint = true OR isRoot = true. It does not compute the rate from the span metric signoz_calls_total or from a count of every span.",
       "expectations": [
-        "After metric discovery and before filtering, Agent calls signoz_get_field_keys with signal=metrics and the exact metricName and discovers both service and error label keys",
-        "Agent calls signoz_get_field_values for both discovered keys with signal=metrics, each returned name/context, and the same metricName before filtering",
-        "Agent calls signoz_list_metrics with a searchText that can match the selected metric name; it does not claim searchText=error discovered signoz_calls_total",
-        "Agent uses signoz_query_metrics for the metric ratio and does not route the formula through signoz_execute_builder_query",
-        "Query B uses the same discovered service key = 'checkout-service' but omits the error-only condition",
-        "The actual signoz_query_metrics call sets formula to A / B * 100, so every referenced query name is defined",
-        "The actual signoz_query_metrics call uses the exact metricName, metricType, temporality, and isMonotonic values returned by discovery",
-        "The actual signoz_query_metrics formulaQueries is an array containing a query named B with a concrete metricName and the same discovered metric metadata as A",
-        "The actual signoz_query_metrics primary filter for query A contains the discovered service key = 'checkout-service' and the discovered error condition",
-        "If the signoz_query_metrics call uses requestType=scalar, query A and every formulaQueries item set reduceTo (sum with timeAggregation=increase for counts over the window)"
+        "Agent answers from signoz_list_services over the last hour, or from a trace aggregation whose filter includes isEntryPoint = true OR isRoot = true",
+        "Agent does not compute the error rate from signoz_calls_total or from a trace count that covers every span of the service",
+        "If a signoz_list_services page lacks checkout-service and reports more pages, Agent continues at pagination.nextOffset before concluding the service is absent",
+        "Output states the error rate as a percentage together with the one-hour window",
+        "Output describes the denominator as requests, not spans"
       ],
       "files": []
     },
@@ -31,7 +26,7 @@
       "id": 2,
       "eval_name": "traces-p99-latency-by-operation",
       "prompt": "What's the p99 latency for cart-service broken down by operation in the last 30 minutes?",
-      "expected_output": "Agent uses signoz_aggregate_traces with aggregations=p99(duration_nano), service=cart-service, groupBy=name, requestType=scalar, timeRange=30m. Reports top operations by p99.",
+      "expected_output": "Agent uses signoz_get_service_top_operations for cart-service over 30m, or signoz_aggregate_traces with aggregations=p99(duration_nano), service=cart-service, groupBy=name, requestType=scalar, timeRange=30m, and a filter that includes isEntryPoint = true OR isRoot = true so each row is a request latency. Reports top operations by p99.",
       "files": []
     },
     {
@@ -82,15 +77,16 @@
     {
       "id": 7,
       "eval_name": "traces-error-rate-ranking-needs-builder-formula",
-      "prompt": "Rank services by trace error rate, not raw error count, for the last hour.",
-      "expected_output": "Agent discovers the trace service and error fields, then uses signoz_execute_builder_query with error-count and total-count builder queries plus a sibling formula computing their ratio. The outer query uses schemaVersion v1 and absolute integer Unix-ms bounds; no aggregate convenience call is presented as sufficient for a ratio.",
+      "prompt": "Rank services by the share of their spans that errored, not by raw error-span count, for the last hour.",
+      "expected_output": "Agent discovers the trace service and error fields, then uses signoz_execute_builder_query with error-count and total-count builder queries plus a sibling formula computing their ratio. The outer query uses schemaVersion v1 and absolute integer Unix-ms bounds; no aggregate convenience call is presented as sufficient for a ratio. The answer calls the ratio a share of spans, not a request error rate.",
       "expectations": [
         "Agent discovers every trace field used in filters or groupBy with signoz_get_field_keys signal=traces",
         "Agent does not use signoz_aggregate_traces alone to answer the error-rate ranking",
         "Both trace builder_query formula inputs carry no limit or order, while the builder_formula result uses limit=100 with v5 order by __result desc",
         "Every execution groupBy entry has a non-empty discovered name and contains no dashboard-only key alias",
         "The actual outer query has schemaVersion=v1 and start/end as JSON integer Unix-millisecond values",
-        "The actual signoz_execute_builder_query call contains two trace builder_query siblings and a builder_formula sibling whose expression computes error count divided by total count"
+        "The actual signoz_execute_builder_query call contains two trace builder_query siblings and a builder_formula sibling whose expression computes error count divided by total count",
+        "Output labels the ratio as a share of spans and does not call it a request error rate"
       ],
       "files": []
     },
@@ -200,10 +196,11 @@
     },
     {
       "id": 16,
-      "eval_name": "metrics-scalar-error-rate-sets-reduce-to",
-      "prompt": "Give me one number: checkout-service's error rate over the last hour as a percentage.",
-      "expected_output": "Agent discovers a request-count metric and its service and error labels, then calls signoz_query_metrics with requestType=scalar, an A / B * 100 formula, and reduceTo on query A and on query B in formulaQueries. For a monotonic count, both queries use timeAggregation=increase with reduceTo=sum. Reports a single percentage with the window, or correctly handles no data / missing instrumentation.",
+      "eval_name": "metrics-scalar-ratio-sets-reduce-to",
+      "prompt": "Give me one number: what percentage of payment attempts failed over the last hour? We count attempts in a counter metric with an outcome label.",
+      "expected_output": "Agent discovers the counter with signoz_list_metrics and its labels with signoz_get_field_keys, then calls signoz_query_metrics with requestType=scalar, an A / B * 100 formula, and reduceTo on query A and on query B in formulaQueries. Query A filters on the discovered failed outcome; query B has no outcome filter. For a monotonic count, both queries use timeAggregation=increase with reduceTo=sum. Reports a single percentage with the window, or correctly handles no data / missing instrumentation.",
       "expectations": [
+        "Agent calls signoz_list_metrics and then signoz_get_field_keys with signal=metrics and the discovered metricName before filtering",
         "The actual signoz_query_metrics call sets requestType=scalar",
         "The actual signoz_query_metrics call sets reduceTo on query A and on every formulaQueries item",
         "For a monotonic count metric, query A and query B use timeAggregation=increase with reduceTo=sum",
@@ -223,6 +220,21 @@
         "The builder queries the formula references have no limit",
         "Agent does not shift the window by changing start and end on a second call when it builds the one-result comparison",
         "Agent reports both windows in absolute UTC"
+      ],
+      "files": []
+    },
+    {
+      "id": 18,
+      "eval_name": "logs-traces-join-uses-clickhouse-sql",
+      "prompt": "Which merchants had the most failed withdrawals in the last hour? The withdrawal failure logs carry no merchant id. It is only on the request span as the merchant.id attribute, and both carry the trace id.",
+      "expected_output": "Agent recognizes a join between logs and traces on trace_id that no builder query expresses. It reads the logs and traces ClickHouse schema resources and signoz://query-builder/examples, then sends one clickhouse_sql query through signoz_execute_builder_query that joins the two tables and groups by merchant in SQL. Each table is bounded on both timestamp and ts_bucket_start by the request window, any subquery over a distributed table uses GLOBAL IN or GLOBAL JOIN, and the query ends with a LIMIT. It reports the merchants with the one-hour window, and does not pull raw rows from each signal to join them outside SigNoz.",
+      "expectations": [
+        "Agent sends a clickhouse_sql query through signoz_execute_builder_query rather than joining raw rows from signoz_search_logs and signoz_search_traces itself",
+        "The SQL bounds timestamp and ts_bucket_start on both the logs table and the traces table using the request window",
+        "Any IN or JOIN subquery that reads a distributed table uses GLOBAL IN or GLOBAL JOIN",
+        "The SQL aggregates per merchant and ends with a LIMIT",
+        "Agent reads the ClickHouse schema resource for logs and for traces, or loads signoz-writing-clickhouse-queries, before writing the SQL",
+        "Output states the one-hour window and does not present a sample of rows as the full total"
       ],
       "files": []
     }

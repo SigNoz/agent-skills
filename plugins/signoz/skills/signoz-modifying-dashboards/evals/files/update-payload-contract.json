@@ -17,6 +17,8 @@
         "data": {
           "id": "66666666-6666-4666-8666-666666666666",
           "name": "error-explorer-9a17",
+          "schemaVersion": "v6",
+          "source": "user",
           "tags": [{"key": "signal", "value": "traces"}],
           "spec": {
             "display": {"name": "Error Explorer", "description": "Recent error traces"},

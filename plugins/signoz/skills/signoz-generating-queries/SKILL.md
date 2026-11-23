@@ -22,7 +22,8 @@ This skill calls SigNoz MCP server tools heavily (`signoz_execute_builder_query`
 `signoz_query_metrics`, `signoz_search_logs`, `signoz_search_traces`,
 `signoz_aggregate_logs`, `signoz_aggregate_traces`, `signoz_get_field_keys`,
 `signoz_get_field_values`, `signoz_list_metrics`, `signoz_list_services`,
-`signoz_get_service_top_operations`, `signoz_get_trace_details`,
+`signoz_get_service_top_operations`, `signoz_get_service_map`,
+`signoz_get_trace_details`,
 `signoz_get_ai_pricing`, `signoz_list_ai_attribute_mappings`,
 `signoz_test_ai_attribute_mapping`). Before
 running the workflow, confirm the `signoz_*` tools are available. If they
@@ -55,8 +56,9 @@ Map the user's intent to the right signal:
 
 | User intent | Signal | Why |
 |---|---|---|
-| Error rate, latency, throughput, request count | **metrics** (preferred) or **traces** | Metrics are pre-aggregated and fastest. Use traces if the user needs per-request detail or no matching metric exists. |
-| p50/p75/p90/p95/p99 latency | **metrics** (histogram) or **traces** (aggregate on `duration_nano`) | Prefer metrics if a histogram metric exists (e.g., `signoz_latency_bucket`). Fall back to trace aggregation. |
+| A service's request rate, error rate, or latency | **traces**, through `signoz_list_services` | It counts each service's requests at its entry spans. For a breakdown it does not return (by operation, over time), aggregate traces with the entry-span filter in Step 3. The span metrics `signoz_calls_total` and `signoz_latency` count every span, so they do not measure requests. |
+| Other rate, count, or throughput questions | **metrics** (preferred) or **traces** | Metrics are pre-aggregated and fastest. Use traces if the user needs per-span detail or no matching metric exists. |
+| p50/p75/p90/p95/p99 of a metric or of span duration | **metrics** (histogram) or **traces** (aggregate on `duration_nano`) | Use a histogram metric that discovery returns; fall back to trace aggregation. For a service's request latency, use the first row. |
 | Find specific log entries, error messages, stack traces | **logs** | Text search, pattern matching, severity filtering. |
 | Find specific traces, slow requests, error spans | **traces** | Per-request detail, span attributes, duration filtering. |
 | Infrastructure metrics (CPU, memory, disk, network) | **metrics** | Always metrics for resource utilization. |
@@ -87,14 +89,11 @@ Run discovery calls in parallel where possible:
   <discovered-name>)`; metric labels are not trace/log attributes (`db.system`,
   for example, is a span attribute unless discovery also returns it for metrics).
 
-  Choose `timeAggregation` from the discovered metric metadata:
-
-  | Metric type | Valid `timeAggregation` |
-  |---|---|
-  | gauge | `latest`, `sum`, `avg`, `min`, `max`, `count`, `count_distinct` |
-  | monotonic counter/sum | `rate`, `increase` |
-  | non-monotonic sum | `avg`, `sum`, `min`, `max`, `count`, `count_distinct`; never `latest` or `rate` |
-  | histogram / exponential histogram | omit; aggregation is automatic |
+  Choose `timeAggregation` for the question, from the discovered metric type.
+  Omit it for the type's default: `avg` for a gauge or a non-monotonic sum,
+  `rate` for a counter, none for a histogram percentile. On a counter, `rate`
+  is per second and `increase` is the count in each step; `latest`, `max`,
+  `min`, `avg`, and `sum` read its running total since it started.
 - **For Cost Meter** (ingestion volume, cost, billing): pass `source=meter` to
   `signoz_list_metrics` to discover the metrics (`signoz.meter.*`); they're
   invisible in the default store and the set evolves, so don't hardcode it.
@@ -133,7 +132,7 @@ An unknown filter key usually returns no rows plus a `key ... not found in
 metadata` warning instead of an error. That means the key is absent: rerun
 discovery and retry with a returned key; never report "nothing matched".
 
-### Step 3: Choose the right tool
+### Step 3: Choose the right tool and read its guide
 
 **Use the simplest tool that answers the question:**
 
@@ -146,6 +145,66 @@ discovery and retry with a returned key; never report "nothing matched".
 | Log aggregation (count, avg, percentiles) | `signoz_aggregate_logs` | Plain totals, grouped counts, and top-N by one or more aggregations. |
 | Trace aggregation (count, avg, percentiles) | `signoz_aggregate_traces` | Plain totals, grouped counts, and top-N by one or more aggregations. |
 | Complex log/trace formula or shaping | `signoz_execute_builder_query` | Use when ratios, shaping, ordering, or cardinality control exceed the convenience tools; never hand-build a plain grouped count. |
+| Which services call or depend on a service | `signoz_get_service_map` | Caller and callee edges between traced services in the window. |
+| One service's operations with latency and call counts | `signoz_get_service_top_operations` | Ranked by p99, highest first. To rank operations by calls or errors, aggregate traces instead. |
+| A join or a regex extraction no builder query expresses | `signoz_execute_builder_query` with a `clickhouse_sql` query | Only under the conditions in **ClickHouse SQL** below. |
+
+**Read the guide for the query before you write it.** Do this once per
+conversation for each guide, before the first `filter`, aggregation
+expression, formula, or `signoz_execute_builder_query` payload of that kind.
+A call that uses only shortcut parameters and `searchText` does not need it.
+
+1. Traces: `signoz://traces/query-builder-guide`.
+2. Logs: `signoz://logs/query-builder-guide`.
+3. Metrics, formulas, and `reduceTo`: `signoz://metrics-aggregation-guide`.
+4. PromQL: `signoz://promql/instructions`.
+5. A full `signoz_execute_builder_query` payload:
+   `signoz://query-builder/examples`.
+
+**Two rules change the number without raising an error.** They apply even
+when you skip the guides:
+
+- A service's requests are its entry spans. For a service's request count,
+  rate, error rate, or latency, call `signoz_list_services`, or filter the
+  trace aggregation on `isEntryPoint = true OR isRoot = true`. Keep the
+  `service` argument and set `filter` to that expression; with other
+  conditions, AND them with it in parentheses. Without it, `count()`,
+  `rate()`, and duration percentiles cover every span the service records,
+  and a request with a server span nested inside another counts twice.
+- A scalar metric value reduces one value per step: `reduceTo: "avg"` of a
+  percentile is not the window's percentile, and `reduceTo: "sum"` of a rate
+  is not a count. For a count, use `timeAggregation: "increase"` with
+  `reduceTo: "sum"`.
+
+**ClickHouse SQL.** Query Builder tools are the default. Send a
+`clickhouse_sql` query through `signoz_execute_builder_query` only when no
+builder query answers the question in one call:
+
+- a join between two sets of logs, or between logs and traces, on `trace_id`;
+- a value extracted from the log body with a regular expression, then grouped
+  or counted.
+
+Compare two time windows with `timeShift` (`references/functions.md`), not
+SQL. Before writing the SQL:
+
+1. Read `signoz://dashboard/clickhouse-schema-for-logs` or
+   `signoz://dashboard/clickhouse-schema-for-traces` for the tables, columns,
+   and column types.
+2. Read `signoz://query-builder/examples` for the `clickhouse_sql` request
+   shape. SigNoz fills `$start_timestamp`, `$end_timestamp`,
+   `$start_timestamp_nano`, `$end_timestamp_nano`, `$start_datetime`, and
+   `$end_datetime` from the request's `start` and `end`.
+3. Bound both time columns of every table the query reads: `timestamp`, and
+   `ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp`.
+4. Filter on the resource when the question names a service, namespace, or
+   host, and use `GLOBAL IN` for any subquery that reads a distributed table.
+5. End with a `LIMIT`, and aggregate in SQL; do not pull raw rows to join or
+   count them yourself.
+
+`signoz-writing-clickhouse-queries` has the query patterns and the type
+errors to avoid. If SigNoz rejects the SQL, apply the suggestion in the error
+and rerun; if a role or the host's instructions forbid ad-hoc SQL, say which
+part of the question the builder tools could not answer.
 
 **AI agent and LLM questions:** read `references/ai-queries.md` before the
 first query about LLM calls or AI-agent runs. It covers when to set
@@ -162,63 +221,42 @@ missing steps, capped spikes, the change per step, or a running total.
 
 - `signoz_search_logs` accepts `filter`; the former `query` alias is
   rejected.
-- `searchText` is literal text to find, escaped automatically.
-  `searchScope` chooses where it matches; the default is the log body. It
-  combines with `filter` using AND. `searchScope` without `searchText` is
-  ignored, and the result carries a note saying so.
-- `searchScope` values: `body` (default) for message text; `attribute` or
-  `resource` for their keys and values; `all` for every field. Scopes other
-  than `body` are slower, and SigNoz may reject them over wide time ranges.
-  Use them only when you don't know which key holds the text; when you do,
-  put a predicate such as `attribute.<key> CONTAINS 'text'` in `filter`
-  instead.
+- `searchText` matches only the log body unless `searchScope` says
+  otherwise. When a body search returns nothing and the text could be an
+  attribute value (an ID, an error message), rerun it with
+  `searchScope: "attribute"` or `"all"` before reporting no match. Those
+  scopes scan more, so narrow the time range or add a `service` filter if
+  SigNoz rejects the query. When you know which key holds the text, filter
+  on it instead (`attribute.<key> CONTAINS 'text'`).
 - For explicit cross-field search, use `filter: "search('timeout')"`.
   The `search()` scopes documented by `signoz://logs/query-builder-guide`
   support body, attribute, resource, log, or their allowed combinations.
   Unscoped `search()` means all supported log fields; enumerate scopes when
   the user requests only a subset.
-- Prefer a direct known-field predicate such as
-  `service.name = 'payments'` when the field is known, or use the `service`
-  shortcut; the server composes that shortcut into the same ANDed
-  `service.name` predicate. Discover unfamiliar fields first.
 - When constructing a search literal, escape backslashes first and apostrophes
   second. Leave a caller-authored raw `filter` untouched; do not escape it
   again.
 
-For `signoz_aggregate_logs` / `signoz_aggregate_traces`, `aggregations` takes
-Query Builder expressions: `count()`, `count_distinct(name)`, `avg(duration_nano)`,
-`sum(x)`, `min(x)`, `max(x)`, `p50(duration_nano)` to `p99(duration_nano)`,
-`rate()`, or a conditional such as `countIf(has_error = true)`. Pass one
-expression, or an array to compute several in one call (for example
-`["p50(duration_nano)", "p99(duration_nano)"]`); results come back as
-`__result_0`, `__result_1`, and so on, in that order. The tools reject the
-former `aggregation` and `aggregateOn` inputs. Omit `orderBy` for the default
-first-expression descending order; explicit ordering should use a `groupBy` key
-or an aggregation expression. Use `having` to keep only groups whose aggregate
-passes a condition (for example `count() > 100`). Custom aliases or formulas
-require `signoz_execute_builder_query`.
+For `signoz_aggregate_logs` / `signoz_aggregate_traces`, the `aggregations`
+parameter description lists the expressions; several come back as
+`__result_0`, `__result_1`, and so on, in order. The tools reject the former
+`aggregation` and `aggregateOn` inputs. Use `having` to keep only groups whose
+aggregate passes a condition (for example `count() > 100`). Custom aliases or
+formulas require `signoz_execute_builder_query`.
 
 For every `signoz_execute_builder_query` payload, put a positive `limit` and
-non-empty Query Builder v5 `order` on each `builder_formula` spec and on each
-`builder_query` spec no formula references. Raw requests and trace-signal `requestType: trace`
-default to 100 rows: traces order by timestamp desc, while raw logs order by
-timestamp desc then id desc. Scalar/time-series requests default to 100 groups
-ordered by `__result` desc for metrics/formulas or the primary aggregation desc
-for logs/traces. Formula results stay at 100, but leave `limit` and `order` unset on every
-`builder_query` referenced by a formula: each component limit is applied before
-formula evaluation and cuts each input to its own top N, which can drop a
-high-ratio group. To find those inputs, inspect every formula expression,
-including formulas with `disabled: true`, and follow formula references until
-all `builder_query` leaves are found. This dependency walk sets bounds only; it
-does not prove deterministic formula-to-formula evaluation order, so validate
-the complete composite payload. This wire field is `order`, not dashboard editor `orderBy`.
+non-empty `order` on each `builder_formula` spec and on each `builder_query`
+spec no formula references: 100 rows or groups unless the question needs
+another bound, ordered by `__result` desc for metrics and formulas and by the
+primary aggregation desc for logs and traces. Leave `limit` and `order` unset on every `builder_query` that a
+formula references: an input limit applies before the formula runs and cuts
+each input to its own top N, which can drop a high-ratio group. To find those
+inputs, inspect every formula expression, including formulas with
+`disabled: true`, and follow formula references until all `builder_query`
+leaves are found. This dependency walk sets bounds only; it does not prove
+the order in which formulas evaluate, so validate the complete payload.
 Time-series top-N ranks groups over the whole window, so a short-lived local
 spike may fall outside the returned set.
-
-**`requestType` decision for aggregations:**
-- `scalar` (default): "How many?", "What is the p99?", "Which service has the most?"
-- `time_series`: "When did errors spike?", "How did latency change?", "Show trend"
-- If the question has ANY temporal component (spike, trend, change), use `time_series`
 
 `signoz_query_metrics` defaults to `time_series`, and a scalar metrics request
 must set `reduceTo` on query A and every `formulaQueries` item: `last` for the
@@ -226,7 +264,7 @@ current value, `max` for the peak, `avg` for a typical value, or `sum` with
 `timeAggregation: "increase"` for a total count over the window.
 
 Aggregate tools accept only `scalar` or `time_series`. For builder-query
-envelopes passed to `signoz_execute_builder_query`, use only:
+envelopes passed to `signoz_execute_builder_query`, an ad-hoc question needs one of:
 
 | Signal | Valid `requestType` |
 |---|---|
@@ -235,26 +273,23 @@ envelopes passed to `signoz_execute_builder_query`, use only:
 | logs | `raw`, `scalar`, `time_series` |
 
 Never invent `aggregate`, `table`, `timeseries`, or `series`. This matrix does
-not apply to PromQL or ClickHouse SQL envelopes.
+not apply to PromQL or ClickHouse SQL envelopes, or to a dashboard panel
+dry-run such as `heatmap`.
 
 ### Step 4: Execute the query
 
-- Always include `searchContext` with the user's original question; it improves
-  result relevance.
-- Respect the requested range; otherwise use 1h. Search/aggregate log and trace
-  tools accept relative `timeRange` strings (`"1h"`, `"24h"`; default `1h`);
-  prefer them. Valid Unix-ms `start`/`end` override `timeRange`; malformed explicit
-  timestamps return validation guidance pointing to `timeRange`.
-  `signoz_execute_builder_query` has no relative option: its outer `query` requires
-  absolute `start` and `end` as JSON integer Unix-ms or fails with
-  `missing start or end timestamp`.
+- Always pass `searchContext`: the user's original request, verbatim.
+- Respect the requested range; otherwise use 1h. Prefer a relative `timeRange`
+  (`"1h"`, `"24h"`). For a fixed window pass `start`, and `end` only together
+  with it, in a form the tool's parameter description accepts; `start`
+  overrides `timeRange`. The `query` object of `signoz_execute_builder_query`
+  differs: it has no relative option and takes absolute `start` and `end` as
+  JSON integer Unix milliseconds.
 - Use shortcut parameters (`service`, `severity`, `operation`, `error`) when they
   match the user's filters; they are simpler and less error-prone than building
   `filter` expressions.
 - Combine shortcut params with `filter` for additional constraints; they
   are ANDed together.
-- For `signoz_query_metrics`, pass `metricType`, `temporality`, and `isMonotonic`
-  from the `signoz_list_metrics` response to avoid an extra auto-fetch round trip.
 - For a **Cost Meter total or grouped total attribution**, use
   `signoz_execute_builder_query`, not `signoz_query_metrics`. Pass the full tool arguments with
   an outer `query` object, Unix-millisecond `start`/`end`, `requestType: "time_series"`,
@@ -264,7 +299,9 @@ not apply to PromQL or ClickHouse SQL envelopes.
   discover the meter field with `signoz_get_field_keys` and copy its `name`,
   `fieldDataType`, `fieldContext`, and `signal` into `groupBy` without dropping
   or translating fields. Exclude datapoints marked `partial: true`, then sum the
-  complete hourly buckets for each returned group.
+  complete buckets for each returned group. Over a long window SigNoz raises
+  the step above an hour; read the step it applied from
+  `data.meta.stepIntervals`.
 - `signoz_query_metrics` remains appropriate for a Cost Meter trend or rate that is not a total
   attribution. Carry `source=meter`, use `stepInterval: 3600`, use
   `timeAggregation: increase` for a volume trend, and `rate` only for a per-second rate.
@@ -277,7 +314,7 @@ each result:
 1. **Failed read**: the tool returned an error or timed out. This is not
    evidence of absence. Say the read failed, quote the error, and never report
    zero, "none", or a total from it.
-2. **Partial result**: a raw search whose note reports `hasMore=true`, any
+2. **Partial result**: a raw search that reports `hasMore` as true, any
    response with a `nextCursor` or a note saying more results exist or may
    exist, or a `groupBy` aggregate that returned exactly `limit` groups
    (aggregate tools do not flag this, so treat it as truncated). Claims cover
@@ -285,8 +322,11 @@ each result:
    pod-a"). Never present a count of returned rows as a total, and never
    claim "none" or "all" for the full scope or window from a partial result.
 3. **Complete result**: a successful aggregate over the full requested scope
-   and window, or a raw search whose note reports `hasMore=false` (fewer rows
-   than `limit`, including zero). Only this supports "none", "all", or a
+   and window, or a raw search that reports `hasMore` as false. Read
+   `pagination.hasMore` in the JSON when the result has a `pagination`
+   object, otherwise the note's `hasMore=false`. Do not infer completeness
+   from the row count: a page can hold fewer rows than `limit` while more
+   exist. Only this supports "none", "all", or a
    total over the full scope. For a total larger than one page, use
    `signoz_aggregate_logs` or `signoz_aggregate_traces` with
    `aggregations: "count()"`.
@@ -324,8 +364,9 @@ beyond it:
    - `signoz_get_field_keys` and `signoz_get_field_values` set
      `data.complete=false` when they truncate. Narrow with `searchText`.
 
-   From a complete list, report "not seen in <signal> for <window>" rather
-   than "does not exist" or "not instrumented". Missing instrumentation is
+   From a complete list, report "not seen in <signal>" with the scope the tool
+   searched (a time window for services and metrics, retained metadata for
+   field keys) rather than "does not exist" or "not instrumented". Missing instrumentation is
    one possibility to check, alongside a wider window or a different name.
 
 **AI results.** A null or 0 cost means an unpriced model, not zero spend.
@@ -335,7 +376,7 @@ attribute mappings as `references/ai-queries.md` describes.
 **Drill-down:**
 - If an aggregation reveals an interesting pattern (spike, outlier service),
   offer to drill into individual traces or logs for that scope.
-- If a trace search returns interesting spans, offer to fetch full trace details
+- If a trace search returns interesting spans, offer to fetch that trace
   via `signoz_get_trace_details`.
 
 ## Guardrails
@@ -356,11 +397,12 @@ attribute mappings as `references/ai-queries.md` describes.
 - **One focused query per question**: Do not scatter-shot multiple queries when
   one precise query answers the question. Use parallel discovery calls, but be
   precise for execution.
-- **Respect MCP server rules**: The MCP server enforces rules about resource
-  attribute filters, filter operators, and redundant queries. Follow them,
-  especially preferring resource attributes in filters for faster queries.
-- **No raw ClickHouse SQL**: Always use the Query Builder tools. Never construct
-  raw SQL.
+- **Follow the server instructions and read result notes**: the instructions
+  cover resource-attribute filters, operators, and negative filters. A result
+  note can say what the query measured, such as every span rather than every
+  request; read the notes before reporting a number.
+- **Query Builder first**: Use ClickHouse SQL only for the two cases in
+  Step 3, with bounded time predicates and a `LIMIT`.
 - **Scope boundary**: This skill queries data. If the user wants to wrap the
   query into a recurring alert, redirect to `signoz-creating-alerts`.
 - **Emit `apply_filter` on the final message.** When the user asks you to
@@ -386,54 +428,14 @@ attribute mappings as `references/ai-queries.md` describes.
 **User:** "Show me the error rate for the checkout service in the last hour"
 
 **Agent:**
-1. Calls `signoz_list_metrics(searchText: "calls", timeRange: "1h")` and
-   selects the exact returned request-count metric. In this example discovery
-   returns `signoz_calls_total` with `metricType: "sum"`,
-   `temporality: "cumulative"`, and `isMonotonic: true`.
-2. Calls `signoz_get_field_keys(signal: "metrics", metricName:
-   "signoz_calls_total")` to discover both service and error labels, then
-   `signoz_get_field_values` for each returned `name` / `fieldContext` with the
-   same metric, confirming `checkout-service` and `STATUS_CODE_ERROR`. This
-   example's returned names are `service.name` and `status_code`; use whatever
-   names live discovery returns.
-3. Calls `signoz_query_metrics` with these complete arguments. The primary
-   arguments define query A; `formulaQueries` explicitly defines query B with
-   a different filter so the denominator includes every checkout request. Both
-   filters use the label names returned in Step 2 verbatim:
-
-   ```json
-   {
-     "searchContext": "Show me the error rate for the checkout service in the last hour",
-     "metricName": "signoz_calls_total",
-     "metricType": "sum",
-     "isMonotonic": true,
-     "temporality": "cumulative",
-     "timeAggregation": "increase",
-     "spaceAggregation": "sum",
-     "filter": "service.name = 'checkout-service' AND status_code = 'STATUS_CODE_ERROR'",
-     "timeRange": "1h",
-     "requestType": "scalar",
-     "reduceTo": "sum",
-     "formula": "A / B * 100",
-     "formulaQueries": [{
-       "name": "B",
-       "metricName": "signoz_calls_total",
-       "metricType": "sum",
-       "isMonotonic": true,
-       "temporality": "cumulative",
-       "timeAggregation": "increase",
-       "spaceAggregation": "sum",
-       "reduceTo": "sum",
-       "filter": "service.name = 'checkout-service'"
-     }]
-   }
-   ```
-
-   Replace every concrete metric, metadata value, field, and field value above
-   with the tenant's discovery results; never assume this example exists.
-4. Presents: "Error rate for checkout-service: 2.3% over the last hour (14:00–
-   15:00 UTC). 47 errors out of 2,041 total requests."
-5. Offers drill-down: "Want me to check which operations have the highest error
+1. Calls `signoz_list_services(timeRange: "1h")` and follows
+   `pagination.nextOffset` while `pagination.hasMore` is true until it finds
+   `checkout-service`.
+2. Reads that service's `errorRate` (a percentage: `0.5` means 0.5%) and
+   `numCalls` (its requests, counted at entry spans).
+3. Presents: "Error rate for checkout-service: 2.3% over the last hour
+   (14:00 to 15:00 UTC), across 2,041 requests."
+4. Offers drill-down: "Want me to check which operations have the highest error
    rate?"
 
 ---
@@ -443,32 +445,24 @@ attribute mappings as `references/ai-queries.md` describes.
 **Agent:**
 1. Calls `signoz_search_logs(searchText: "timeout", severity: "ERROR",
    timeRange: "1h")`.
-2. Presents: "Found 23 timeout errors in the last hour. Most are from
-   payment-service (18) and gateway (5). Common pattern: 'context deadline
-   exceeded' in gRPC calls to downstream-api."
-3. Offers: "Want me to check traces for these services to see where the
-   timeouts occur?"
+2. Presents what the returned page shows: "The 20 most recent timeout errors
+   in the last hour come from payment-service (15) and gateway (5), and the
+   search reports more matches. Common pattern: 'context deadline exceeded'
+   in gRPC calls to downstream-api."
+3. Offers: "Want me to count all of them by service, or check traces for
+   these services to see where the timeouts occur?"
 
 ---
 
-**User:** "What's the p99 latency for the cart service?"
+**User:** "How has p99 latency for the cart service changed over the last 6 hours?"
 
 **Agent:**
 1. Calls `signoz_aggregate_traces(aggregations: "p99(duration_nano)",
-   service: "cart-service", requestType: "scalar", timeRange: "1h")`.
-2. Presents: "p99 latency for cart-service: 1.2s over the last hour."
-3. Offers: "Want me to break this down by operation or show the trend over time?"
-
----
-
-**User:** "When did errors spike for the frontend?"
-
-**Agent:**
-1. Calls `signoz_aggregate_traces(aggregations: "count()", error: "true",
-   service: "frontend", requestType: "time_series", timeRange: "6h")`.
-2. Presents: "Error count for frontend over the last 6 hours. Spike at 11:30 UTC:
-   error count jumped from ~5/min to ~45/min, returning to baseline by 12:15."
-3. Offers: "Want me to check what error types appeared during the spike?"
+   service: "cart-service", filter: "isEntryPoint = true OR isRoot = true",
+   requestType: "time_series", timeRange: "6h")`. The filter keeps the
+   service's entry spans, so each point is a request latency.
+2. Presents the trend with the window, and the peak with its timestamp.
+3. Offers: "Want me to break the slowest period down by operation?"
 
 ---
 
@@ -492,14 +486,11 @@ attribute mappings as `references/ai-queries.md` describes.
 
 **Agent:**
 1. Bytes by service → Cost Meter. `signoz_list_metrics(searchText: "log",
-   source: "meter")` and selects the returned log-volume metric from its live name and unit.
-2. Calls `signoz_execute_builder_query` with the outer `query` wrapper,
-   `schemaVersion: "v1"`, integer Unix-ms range,
-   `requestType: "time_series"`, `formatOptions`, `variables`, and a builder spec using
-   `signal: "metrics"`, `source: "meter"`, the discovered metric name and temporality,
-   `stepInterval: 3600`, raw `timeAggregation: "sum"`, `spaceAggregation: "sum"`, and
-   the `service.name` field returned by `signoz_get_field_keys`, copying its
-   `name`, `fieldDataType`, `fieldContext`, and `signal` into `groupBy`.
-3. Excludes `partial: true` datapoints, sums complete hourly buckets per service, and presents
-   per-service ingestion in the discovered unit. (If the meter lacks a requested attribute,
-   fall back to a direct count and note that bytes remain meter-only.)
+   source: "meter")` and selects the returned log-volume metric from its live
+   name and unit, then discovers `service.name` with `signoz_get_field_keys`.
+2. Calls `signoz_execute_builder_query` with the Cost Meter total payload
+   from Step 4, grouped by the discovered `service.name` field.
+3. Excludes `partial: true` datapoints, sums the complete buckets per service,
+   and presents per-service ingestion in the discovered unit. (If the meter
+   lacks a requested attribute, fall back to a direct count and note that
+   bytes remain meter-only.)

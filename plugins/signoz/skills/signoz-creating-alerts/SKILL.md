@@ -53,9 +53,7 @@ guesses create noisy alerts on the wrong service:
 | Notification routing | yes | direct: verified channel display name(s); policy: confirmation that an existing org policy matches this rule |
 
 If a required input is missing and undiscoverable, **stop before any write**
-and ask through the host's supported clarification UI.
-
-What to include in the question:
+and ask through the host's supported clarification UI. Include:
 
 - **What is missing**: name it concretely (e.g. "which resource-attribute
   filter to use").
@@ -81,19 +79,15 @@ Extract from the user's request:
 5. **Routing**: direct channel name(s), or an explicit request to use a
    confirmed existing org notification policy.
 
-Map signal phrasing to alert type:
-
-| User says | alertType | signal |
-|---|---|---|
-| metric, CPU, memory, latency, request rate | METRIC_BASED_ALERT | metrics |
-| log, error logs, log volume, log pattern | LOGS_BASED_ALERT | logs |
-| trace, span, latency p99, slow requests | TRACES_BASED_ALERT | traces |
-| exception, stack trace, crash | EXCEPTIONS_BASED_ALERT | (clickhouse_sql) |
-
-The table lists the types the SigNoz alert UI can edit today. Newer types
-the UI does not surface yet, such as `AI_TRACES_BASED_ALERT` for LLM and
-AI-agent span telemetry, are also accepted. Use one only when the user names
-it or no listed type fits, and say that the UI has no editor for it.
+Pick `alertType` from the signal the query reads; the `signoz_create_alert`
+input schema lists the accepted values. CPU, memory, latency histograms, and
+request rate are metrics; log lines, log volume, and log patterns are logs;
+span latency, slow requests, and span errors are traces; exceptions, stack
+traces, and crashes are exceptions, queried with `clickhouse_sql`. The SigNoz
+alert UI can edit those four types today. Newer types it does not surface
+yet, such as `AI_TRACES_BASED_ALERT` for LLM and AI-agent span telemetry, are
+also accepted. Use one only when the user names it or no other type fits, and
+say that the UI has no editor for it.
 
 If resource scope is missing, run discovery (Step 2). If still missing after
 discovery, stop and ask the user (see *Required inputs* above).
@@ -110,28 +104,27 @@ candidates instead of guessing:
    `service.name`, then `host.name`, then `k8s.namespace.name`) to get
    concrete values.
 3. If the user mentioned a metric by name, call `signoz_list_metrics` with a
-   search term to verify the exact OTel metric name. Wrong names create
-   alerts that never fire.
+   search term to verify the exact OTel metric name. A wrong name saves a
+   rule whose query returns no data.
 
-Surface the candidates in your clarification request (see *Required
-inputs* above). Do not pick one.
+Surface the candidates in your clarification request; do not pick one.
 
 ### Step 3: Check for duplicate alerts
 
-Once the scope is resolved (either provided by the user or discovered in
-Step 2), check for existing alerts before probing data or authoring a
-new config: both are wasted work if the user wants to update an
+Once the scope is resolved, check for existing alerts before probing data or
+authoring a new config: both are wasted work if the user wants to update an
 existing rule instead.
 
-Call `signoz_list_alert_rules` and **paginate through every page**:
-`pagination.hasMore` is true until you have walked the full list. This lists
-*configured* alert rules (the durable state); do not use `signoz_list_alerts`,
-which returns currently triggered/active alert instances and will silently
-miss rules that are configured but not firing right now. Check for existing
-rules that match the user's intent (same signal + same scope + similar
-threshold). If a likely duplicate exists, surface it and ask whether to
-create a new one anyway, modify the existing one (out of scope here: use
-`signoz_update_alert`), or cancel.
+Call `signoz_list_alert_rules` with a `filter` on the scope (the service,
+host, or namespace name) and page the matches to the end. The filter reads
+a rule's name, description, and labels, not its query, so when none of the
+matches is a duplicate, list again without the filter and page to the end
+before concluding there is none. `signoz_list_alerts` returns only current alert instances and
+misses rules that are not firing. Check for existing rules that match the
+user's intent (same signal + same scope + similar threshold). If a likely
+duplicate exists, surface it and ask whether to create a new one anyway,
+modify the existing one (out of scope here: use `signoz_update_alert`), or
+cancel.
 
 ### Step 4: Probe data existence for the chosen filter (fail fast)
 
@@ -139,17 +132,17 @@ Before authoring any alert config, confirm the **specific combination** the
 alert will watch (metric × service × any other filter) actually emits data.
 The most common silent failure is "metric exists in the catalog *and* the
 service exists in the catalog, but the service doesn't emit that metric";
-each piece checks out in isolation, the alert saves successfully, and it
-silently never fires.
+each piece checks out in isolation, the alert saves successfully, and its
+threshold silently never fires.
 
 Run a single probe over the last 1 hour using the same filter the alert
 will use, but with the simplest aggregation that confirms data exists:
 
 - **Metrics**: use `signoz_query_metrics` with the concrete `metricName` and
-  the alert's `filter`; it auto-applies aggregation defaults. If the full v5
-  tool is necessary, use a metrics aggregation object containing
-  `metricName`, `timeAggregation`, and `spaceAggregation`. Metrics do **not**
-  accept expression aggregations such as `count()` or filter-only probes.
+  the alert's `filter`. It fills aggregation defaults and reports them; a
+  saved rule gets none, so keep the reported `timeAggregation` and
+  `spaceAggregation` for Step 5. Metrics do **not** accept expression
+  aggregations such as `count()` or filter-only probes.
 - **Logs**: call `signoz_aggregate_logs` with `aggregations: "count()"` and
   the alert filter.
 - **Traces**: call `signoz_aggregate_traces` with `aggregations: "count()"` and
@@ -158,10 +151,9 @@ will use, but with the simplest aggregation that confirms data exists:
 Inspect the result:
 
 - **Probe returns rows** → proceed to Step 5.
-- **Probe returns empty** → STOP. Do not build an alert config the user
-  will then be asked to throw away. Stop and ask the user (see *Required
-  inputs* above), describing what was missing and offering concrete
-  recovery:
+- **Probe returns empty** → STOP before building any config. Ask the user
+  (see *Required inputs* above), describing what was missing and offering
+  concrete recovery:
   - Service doesn't emit the metric → call
     `signoz_get_field_values signal=metrics name=service.name metricName=<metric>`
     to list the services that *do* emit it; let the user pick a different
@@ -180,80 +172,61 @@ not to alerts that depend on continuous data flow.
 
 ### Step 5: Build the alert config
 
-Read the `signoz://alert/instructions` and `signoz://alert/examples` MCP
-resources for the canonical, version-current shape.
+Read these MCP resources before composing the payload, unless already read
+for this same alert:
 
-Compose the full payload; no field is filled in for you. Set these
-explicitly on every rule, anomaly rules included:
+1. `signoz://alert/instructions` and `signoz://alert/examples`, for every
+   rule: the rule shape, the fields SigNoz requires, threshold, evaluation,
+   and unit rules, anomaly scoring, and a complete payload per pattern.
+2. `signoz://promql/instructions`, before writing the query of a
+   `promql_rule`.
+3. `signoz://dashboard/clickhouse-schema-for-logs`,
+   `signoz://dashboard/clickhouse-schema-for-traces`, or
+   `signoz://dashboard/clickhouse-schema-for-metrics`, for the signal a
+   `clickhouse_sql` rule reads; `signoz://alert/examples` holds no SQL. They
+   describe dashboard widgets, so take only table and column names from them.
+4. `signoz://ai/query-builder-guide`, for an `AI_TRACES_BASED_ALERT`.
 
-- `schemaVersion: "v2alpha1"`. SigNoz rejects a rule that omits it.
-- `evaluation`: `{ "kind": "rolling", "spec": { "evalWindow": "5m0s",
-  "frequency": "1m0s" } }` unless the intent implies another cadence.
-  Required on v2alpha1 rules.
-- `notificationSettings`: required on v2alpha1 rules; set `usePolicy` per
-  Step 7 and `groupBy` on high-cardinality queries.
-- `condition.compositeQuery.panelType: "graph"`. SigNoz rejects a rule that
-  omits it.
-- `condition.compositeQuery.unit`: the unit the query returns, on every rule
-  whose tiers set `targetUnit` (`ns` for `duration_nano`, `percentunit` for a
-  0 to 1 ratio). With an empty unit SigNoz does not convert the target, so
-  `target: 80`, `targetUnit: "percent"` is compared as 80 against a ratio
-  series and never fires.
+If the client cannot read `signoz://` resources, find a rule of the same
+`ruleType` and query type with `signoz_list_alert_rules`, fetch it with
+`signoz_get_alert`, and copy its shape without the server-populated fields
+(`id`, `state`, `createdAt`, `updatedAt`, `createdBy`, `updatedBy`, `webUrl`).
 
-Do not send `labels.severity`, `condition.algorithm`, or top-level
-`preferredChannels`. SigNoz rejects the last two; *Severity defaults* below
-covers the first.
+The guide and the `signoz_create_alert` input schema list the required
+fields, so this skill does not repeat them. SigNoz rejects an unknown key at
+the top level or in `condition`: never send retired fields such as
+`condition.algorithm` or top-level `preferredChannels`.
 
-Anomaly rules use the same v2alpha1 shape and add `condition.seasonality`.
-Their threshold tiers compare a signed anomaly score (see *Threshold `op` and
-`matchType` values*), so leave
-`targetUnit` empty; a unit would rescale the score. An anomaly `evaluation`
-uses a longer window, for example `evalWindow: "24h"`, `frequency: "3h"`.
-
-`condition.thresholds` requires `kind` (use `"basic"`) and
-non-empty `spec[]`. Current v2 cannot represent `alertOnAbsent` as the sole
-trigger. For an exact absent-only request, stop before any write and offer a
-combined threshold + absence rule only with explicit approval.
+Every rule requires `condition.thresholds` with at least one tier, so
+`alertOnAbsent` cannot be the sole trigger. For an exact absent-only request, stop before any write and
+offer a combined threshold + absence rule only with explicit approval.
 
 For most user intents, the config is one of a small number of patterns:
 
 | Pattern | Example intents |
 |---|---|
-| Single-metric threshold | "alert when CPU > 80%", "p99 latency > 2s" |
-| Log volume threshold | "more than N error logs/min" |
-| Trace-based count or p-tile | "p99 span duration > 2s on checkout" |
+| Threshold on a metric, a log count, or a trace count or p-tile | "alert when CPU > 80%", "more than N error logs/min", "p99 span duration > 2s on checkout" |
 | Error-rate formula (A/B*100): see "Common query shapes" below | "error rate > 5%" |
 | Anomaly detection (Z-score) | "alert me on anomalous traffic" |
 | Combined threshold + absence (only after approval) | "alert if data stops arriving" |
-| ClickHouse SQL alert: author SQL using the schema in `signoz://alert/examples` | non-trivial joins, custom aggregations the builder cannot express |
+| ClickHouse SQL alert: take tables and columns from the schema resource read above | non-trivial joins, custom aggregations the builder cannot express |
 | PromQL alert: delegate to `signoz-generating-queries` for the query, then return here | when user already has PromQL |
 
-**Threshold `op` and `matchType` values.** Use these `op` words: `above`,
-`below`, `equal`, `not_equal`, `above_or_equal`, `below_or_equal`, and
-`outside_bounds`; `equals` is invalid. An anomaly score is signed,
-(value - predicted) / standard deviation, so it is negative on a drop. For
-anomaly rules use `above` with target 3 for spikes, `below` with target -3
-for drops, or `outside_bounds` with target 3 for either; `outside_bounds`
-compares the score's absolute value. Put the same deviation in the anomaly
-function's `z_score_threshold` arg: it only sets the expected-range band,
-and the tier target decides when the rule fires.
-
-| Comparison | `op` | Evaluation behavior | `matchType` |
-|---|---|---|---|
-| above / exceeds / > | `"above"` | breach at any point | `"at_least_once"` |
-| below / under / < | `"below"` | breach for entire window | `"all_the_times"` |
-| equal / = | `"equal"` | average breaches | `"on_average"` |
-| not equal / != | `"not_equal"` | sum breaches | `"in_total"` |
-|  |  | last value breaches | `"last"` |
+**Threshold `op` and `matchType`.** Use the canonical words the guide lists
+(`equal`, not `equals`). An anomaly tier compares a signed score, negative
+on a drop: use `above` with target 3 for spikes, `below` with target -3 for
+drops, and `outside_bounds` with target 3 when the request covers both
+directions. Leave `targetUnit` empty on an anomaly tier and pass the same
+deviation as the anomaly function's `z_score_threshold`.
 
 **Conventions this skill writes into the payload (and surfaces in the
 preview):**
 - `evalWindow: 5m0s`, `frequency: 1m0s`: change only if the intent implies
   a slower or faster cadence.
-- `matchType: "on_average"` for CPU / memory / latency: smooths
-  transient spikes.
-- `matchType: "at_least_once"` for error counts / error rates:
-  catches any breach.
+- `matchType`: `on_average` (the window average) for CPU / memory / latency,
+  `at_least_once` (any point in the window) for error counts / error rates.
+  The others: `all_the_times` (every point), `in_total` (the window sum),
+  and `last` (the most recent point).
 
 **Severity defaults.** Resolve each threshold tier's severity in this order:
 
@@ -264,12 +237,13 @@ preview):**
    default one tier (`critical` to `warning`, `warning` to `info`, `info`
    stays `info`). A cue tied to one threshold ("page me at 90%") applies
    only to that tier. Ask when urgency cues conflict on the same tier.
-3. Name each threshold tier by its severity and do not set `labels.severity`.
-   Each alert carries `severity` and `threshold.name` equal to the tier that
-   fired. A static `labels.severity` replaces that `severity` on every alert,
-   so every tier would report the same one. SigNoz's alert-rule list reads
-   severity from the label only, so the rule lists with no severity. The
-   Step 8 preview states each tier's severity and why.
+3. Name each threshold tier by its severity. Each fired alert carries
+   `severity` and `threshold.name` equal to the tier that fired. A static
+   `labels.severity` does not change that: SigNoz drops rule labels named
+   `severity` or `threshold.name` from fired alerts. The alert-rule list
+   reads severity from that label only, so set it only when the user asks
+   for the list to show a severity, with the value they name. The Step 8
+   preview states each tier's severity and why.
 
 | Alert intent | Default severity |
 |---|---|
@@ -294,33 +268,36 @@ not the config:
 - `summary`: single-line headline. Include the resource scope and the
   numeric value: `"checkoutservice error rate {{$value}}% above 3%"`.
 - `description`: longer message. Include `{{$value}}`, `{{$threshold}}`,
-  the groupBy values (e.g. `{{$labels.service_name}}`), and a sentence on
-  what to do or where to look. For count-based alerts include the count
-  explicitly: `"{{$value}} crash log lines in the last 5 minutes from
-  service {{$labels.service_name}}"`.
-
-Use `{{$value}}` for the breaching value, `{{$threshold}}` for the target,
-and `{{$labels.<key>}}` for groupBy values (note SigNoz substitutes the
-dotted attribute name with underscores: `service.name` → `service_name`).
+  the groupBy values, and a sentence on what to do or where to look. Write a
+  groupBy value as `{{$labels.<key>}}` with the key's dots as underscores
+  (`service.name` becomes `{{$labels.service_name}}`). For count-based
+  alerts include the count explicitly: `"{{$value}} crash log lines in the
+  last 5 minutes from service {{$labels.service_name}}"`.
 
 #### Common query shapes: conventions
 
-Read `signoz://alert/examples` for the authoritative JSON of all
-patterns (error rate, p99 latency, log volume, absent-data, anomaly,
-PromQL, ClickHouse SQL). The conventions that don't live in the
-schema:
+`signoz://alert/examples` has the JSON for each builder and PromQL pattern.
+The conventions that don't live in the schema:
 
-- **Error-rate formula:** set `disabled: true` on the component
-  queries A and B so only the formula F1 renders in the alert chart
-  and notification. The raw counts are intermediate, not the alert
-  signal: forgetting this clutters the preview with three series and
-  confuses the on-call engineer reading the notification.
+- **Service requests from traces:** a service's requests are its entry
+  spans. For a request count, rate, error rate, or latency, add
+  `AND (isEntryPoint = true OR isRoot = true)` to every trace query in the
+  rule; without it the query covers every span the service records and a
+  request with nested spans counts more than once. When the user wants every
+  span, leave the filter out and call the result span-level in the preview.
+  The span metrics `signoz_calls_total` and `signoz_latency` count every
+  span too; say so when a rule uses them for a request rate.
+- **Error-rate formula:** set `disabled: true` on the component queries A
+  and B so only the formula F1 renders in the alert chart and notification;
+  three series confuse the on-call engineer reading it.
 - **p99 latency:** the query emits nanoseconds, but express the threshold in
   the user's unit (for example `target: 2`, `targetUnit: "s"`) and set
   `compositeQuery.unit: "ns"`; SigNoz converts the target to that unit during
-  evaluation.
-- **Low-traffic percentile guard:** put `count() > N` in the percentile
-  query's `having.expression` and set `stepInterval` to the requested bucket
+  evaluation. A 0 to 1 ratio metric with a percent target takes
+  `compositeQuery.unit: "percentunit"` and `targetUnit: "percent"`.
+- **Low-traffic percentile guard:** list the percentile first and `count()`
+  second in the percentile query's `aggregations`, put `count() > N` in its
+  `having.expression`, and set `stepInterval` to the requested bucket
   size (for example, `60` for “per minute”). Do not invent comparison operators
   inside a formula such as `A * (B >= N)`.
 - **Log volume spike:** prefer `groupBy: service.name` over a hard
@@ -331,63 +308,53 @@ schema:
 
 Step 4 confirmed data flows. Step 6 does two things:
 
-1. **Validate query shape.** Run the full builder spec (with
-   `groupBy`, formulas, disabled component queries, and non-string
-   filters): Step 4's bare `count()` probe doesn't exercise these.
-   The create-alert schema accepts queries that error at evaluation
-   (numeric `groupBy`, unquoted bool filter, mismatched aggregation).
-   Any HTTP 5xx or "filter type mismatch" = fix the config before
-   proceeding to (2). `disabled: true` on formula component queries
-   (A, B in `A * 100 / B`) is the *recommended* pattern, not a failure
-   (see Step 5).
-2. **Calibrate the threshold.** Given the validated query, would the
-   alert have fired a sensible number of times in the last hour?
+1. **Validate query shape.** Run the queries exactly as the rule will store
+   them (`groupBy`, formulas, disabled component queries, every aggregation
+   field): Step 4's probe tools fill defaults a saved rule does not get.
+   SigNoz saves a rule whose query errors or returns no data at evaluation
+   (a metrics query without `timeAggregation`, a wrong metric name, a
+   mismatched aggregation). Fix any error before (2).
+   `disabled: true` on formula component queries (A, B in `A * 100 / B`) is
+   the *recommended* pattern, not a failure (see Step 5).
+2. **Calibrate the threshold.** Given the validated query, how many
+   returned points breach the proposed threshold in the last hour?
 
 Run the full primary query (or formula) over the last hour:
-- `signoz_execute_builder_query` for **all** builder, formula,
-  and PromQL queries: set `compositeQuery.queries[].type` to
-  `builder_query` / `builder_formula` / `promql` as appropriate. Alert PromQL
-  specs carry only `name` / `query` / `legend` / `disabled`; dry-run execution
-  PromQL specs may also carry `step` / `stats`. Still omit builder-only
-  `stepInterval`.
-  Put the string in `spec.query`, read
-  `signoz://promql/instructions` for the UTF-8 quoted-selector form
-  SigNoz requires (`{"metric.name.with.dots"}`, not the underscored
-  or bare-dotted forms), and keep alert PromQL fully literal: no `$var`,
-  `$__rate_interval`, or other dashboard variable is evaluated.
-- Alert specs omit time bounds, but this dry-run cannot: set outer-query
-  `start` / `end` to absolute JSON integer Unix-ms (e.g. now−3600000 → now),
-  or `signoz_execute_builder_query` fails with `missing start or end timestamp`.
-- For intent grouped by a dimension, each execution `groupBy[].name` is the
+- Call `signoz_execute_builder_query` with `query` set to `{start, end,
+  requestType: "time_series", compositeQuery: {queries:
+  <condition.compositeQuery.queries>}}`: the rule's own query envelopes,
+  unchanged, without `queryType`, `panelType`, or `unit`. Set `start` / `end`
+  to absolute JSON integer Unix-ms (e.g. now−3600000 → now); the rule itself
+  stores no time bounds.
+- Do not dry-run with `signoz_query_metrics`, `signoz_aggregate_logs`, or
+  `signoz_aggregate_traces`: each builds its own query, and
+  `signoz_query_metrics` fills aggregation defaults a saved rule does not
+  get, so a pass there does not show the saved query runs.
+- Keep alert PromQL fully literal: no `$var`, `$__rate_interval`, or other
+  dashboard variable is evaluated.
+- For intent grouped by a dimension, each `groupBy[].name` is the
   exact Step 2 key (e.g. `k8s.pod.name`), never empty. Omit `groupBy` otherwise.
-- `signoz_aggregate_logs` / `signoz_aggregate_traces`
-  when those fit better.
-- `signoz_query_metrics` when the alert query targets a single
-  known metric by `metricName`: the tool auto-applies aggregation
-  defaults and accepts `filter`, `groupBy`, and `formula` alongside.
-  PromQL is not supported here; use `signoz_execute_builder_query`
-  for that.
 
 **Omit `limit` and `order` from every query in the persisted rule**, builder
 queries, formula inputs, and formula results alike. On a grouped alert query
-`limit` plus `order` act as a top-N series cap: only the top-N groups ranked
-over the whole evaluation window are evaluated, so series beyond N
-are never evaluated, a group with a short-lived spike can be ranked out, and a
-`below` alert ordered descending can exclude every breaching series. Set them
+they cap evaluation to the top-N series ranked over the whole evaluation
+window: a group with a short-lived spike can be ranked out, and a `below`
+alert ordered descending can exclude every breaching series. Set them
 only when top-N alerting is the explicit intent ("alert on the five busiest
 hosts"), using Query Builder v5 wire `order`, never dashboard `orderBy`.
 
-The dry-run is different: `signoz_execute_builder_query` is a display
-context with a response budget, so the bounds `signoz-generating-queries`
-teaches for it (a positive `limit` and v5 `order` on each query) are fine
-there. They stay in the dry-run envelope only; never copy them into the
-`signoz_create_alert` payload. Because the dry-run returns at most `limit`
-groups, a breach count computed from it covers the returned groups only;
-when the groupBy can exceed that bound, say so in the preview rather than
-reporting the count as complete.
+The dry-run is different: `signoz_execute_builder_query` inserts a display
+`limit` and `order` on each standalone query and formula result that omits
+them, and names them in a result note. Leave `limit` unset on every query a
+formula references: SigNoz applies an input's limit before the formula runs
+and drops the other series. The dry-run returns at most `limit` groups, so a
+breach count from it covers the returned groups only; when the groupBy can
+exceed that bound, say so in the preview rather than reporting it as complete.
 
-Compute how many evaluation points breached the proposed threshold.
-Surface in the preview as **"would have fired N times in the last 1h"**.
+Compute how many returned points breached the proposed threshold.
+Surface in the preview as **"N of M returned points breached in the last 1h"**.
+Do not report breached points as fires. A fire depends on the evaluation
+window and `matchType`; only `signoz_get_alert_history` transitions count fires.
 A 1h window is too short to grade most alerts: only the upper extreme
 is actionable:
    - **N is large (e.g. > 30)** → likely alert storm. Surface and
@@ -409,9 +376,10 @@ is actionable:
      skip the breach count.
 
 If Step 4 was somehow skipped (e.g. a downstream skill is invoking this
-flow mid-stream), the no-data stop rule applies here too: empty result →
-stop and ask the user (see *Required inputs* above) instead of saving an
-alert that will never fire.
+flow mid-stream), the no-data stop rule and its crash-log exception apply
+here too: empty result → stop and ask the user (see *Required inputs* above).
+While its query returns no series, a saved rule can fire only a nodata alert,
+and only when `alertOnAbsent` is set.
 
 ### Step 7: Resolve notification routing
 
@@ -426,133 +394,106 @@ policy that matches `severity` needs no static label: each alert carries the
 `severity` of the tier that fired (Step 5), so name the tier to match.
 
 For direct routing, reuse a fully paginated same-operation channel result or
-page `signoz_list_notification_channels` until `hasMore=false`; its `total`
-counts filtered matches. Match and route by immutable `displayName`, not the
-machine `name`; show `displayName` and `kind` when asking the user to pick.
-Offer creation only from user-provided config and never create automatically.
-Build `signoz_create_notification_channel` arguments from its current input
-schema, which defines the supported provider kinds and identity fields:
-provider settings go inside `config`, never as flat fields. Ask whether the
-user wants a test notification and send `test: true` only if they agree. On
-`PERMISSION_DENIED`, use an
+page `signoz_list_notification_channels` to the end. Match and route by
+`displayName`, not the machine `name`; show `displayName` and `kind` when
+asking the user to pick. Offer creation only from user-provided config and
+never create automatically. Ask whether the user wants a test notification
+and send `test: true` only if they agree. On `PERMISSION_DENIED`, use an
 admin-created channel or a short-lived minimum-role credential from the host's
 secret store. If routing remains unresolved, stop and ask.
 
+Before composing `config` for `signoz_create_notification_channel` or
+`signoz_update_notification_channel`, read
+`signoz://notification-channel/examples`: every provider kind, each kind's
+`config.spec` fields, and a worked payload per kind. If the client cannot
+read it, start from the minimal example in the tool description and correct
+from the error SigNoz returns.
+
 Put exact returned display names in each threshold's `channels`, anomaly
-rules included. A threshold tier with no channels, or a displayName that does not
-exist, fails unless `notificationSettings.usePolicy` is `true`. SigNoz
-rejects top-level `preferredChannels`.
+rules included: with direct routing SigNoz rejects a tier with no channels
+and a channel name that does not exist. With `usePolicy: true`, omit tier
+`channels`; a name supplied there can still fail validation.
 
 #### Updating or handling secret-bearing channel config
 
-`signoz_update_notification_channel` is full replacement: resolve `id`, get
-the channel, copy complete `config`, change requested fields, then send `id`
-plus full `config`. Do not send or change `name` or `displayName`. Preserve
-credentials and effective `sendResolved` without echoing them. A kind change
-needs the complete new provider config. Update tests require explicit opt-in.
+`signoz_update_notification_channel` replaces the whole `config`; its
+description gives the get-then-replace steps. Preserve credentials and the
+effective `sendResolved` without echoing them.
 
 If a requested test fails after a successful write, report mutation and test
 status separately. On a post-write auth error with `mutationCommitted: true`,
 retain the id and inspect after authentication; do not replay mutation or test.
 Transport success does not prove final provider delivery.
 
-Slack webhook URLs, PagerDuty integration keys, and similar webhook tokens
-are secrets. When the user supplies them inline, treat them as opaque
-inputs and follow these rules:
+Slack webhook URLs, PagerDuty integration keys, and similar tokens are
+secrets. When the user supplies one inline:
 
-- **Do not echo the secret back.** Never include the webhook URL,
-  integration key, or any password-like token in chat output, previews,
-  confirmation messages, summaries, or the `<navigation_suggestions>`
-  payload. Refer to the channel by its `displayName` only ("Slack channel
-  `Platform Alerts` created") and omit the value entirely.
-- **Do not stash secrets in clarification context.** If you need to ask the
-  user a follow-up question after they pasted a secret, do not include
-  the secret value in the clarification `message`, `discovered_context`,
-  or any other field that the host may persist for resume. Refer to it
-  symbolically (e.g. "the webhook you just provided").
-- **One-pass only.** Pass the secret directly to
-  `signoz_create_notification_channel` and do not retain it in any
-  intermediate prose. After the create call succeeds, refer to the
-  channel by display name; after a failure, ask the user to re-paste rather than
-  echoing what they sent.
-- **If the user instead asks "how do I set up a Slack channel?"**: that
-  is a docs question, not a create-channel request. Answer with the docs
-  flow (the SigNoz UI's Notification Channels page) and do not solicit
-  the secret in chat at all. Prefer the UI path when the user seems
-  uncertain about exposing the token.
+- **Do not echo it.** Never include the value in chat output, previews,
+  confirmations, summaries, or the `<navigation_suggestions>` payload. Name
+  the channel by `displayName` only ("Slack channel `Platform Alerts` created").
+- **Do not stash it in clarification context.** Leave it out of the
+  clarification `message`, `discovered_context`, and any other field the host
+  may persist for resume; call it "the webhook you just provided".
+- **One pass only.** Pass it directly to
+  `signoz_create_notification_channel`. After a failure, ask the user to
+  re-paste rather than echoing what they sent.
+- **"How do I set up a Slack channel?" is a docs question.** Answer with the
+  docs flow (the SigNoz UI's Notification Channels page) and do not solicit
+  the secret in chat. Prefer the UI path when the user seems uncertain about
+  exposing the token.
 
 ### Step 8: Preview the prepared config
 
-Emit a one-paragraph plain-language summary of what will be created:
-no raw JSON dump. The user-facing facts (what fires, on what scope, at
-what threshold, where it routes) are captured by the summary; clicking
-through the JSON does not catch query-shape errors (Step 6's dry-run
-does).
+Emit a one-paragraph plain-language summary of what will be created, with no
+raw JSON dump: what fires, on what scope, at what threshold, and where it
+routes. Step 6's dry-run catches query-shape errors; reading JSON does not.
 
 > **Summary**: This alert fires when [condition] for [resource scope],
 > evaluated every [frequency] over the last [window]. Severity: [tier],
 > because [table row or user cue]. Thresholds:
 > warning at X, critical at Y. Notifications route through [direct channels / confirmed org policy]. Dry-run on
-> the last hour: would have fired N times.
+> the last hour: N of M returned points breached.
 
 ### Step 9: Save and report
 
 1. Call `signoz_create_alert` with the config from Step 8.
 2. **Name collision**: if `signoz_create_alert` returns a duplicate-name
-   error, **do not** suffix-append or call `signoz_update_alert`. Stop and
-   tell the user the existing alert blocked creation; offer to use a
-   different name or modify the existing alert (which is out of scope for
-   this skill).
+   error, **do not** suffix-append or call `signoz_update_alert`. Stop, tell
+   the user the existing alert blocked creation, and offer a different name
+   or a change to the existing alert (out of scope for this skill).
 3. On success, report:
    - The alert ID and name.
    - What it watches, at what threshold, and at what severity.
    - How notifications route (direct channels or the confirmed org policy).
-   - The dry-run summary ("would have fired N times in last 1h").
+   - The dry-run summary ("N of M returned points breached in last 1h").
 
 ## Guardrails
 
 - **Strict inputs over guessing** Resource attribute and notification routing
-  are required. Direct routing needs a channel; policy routing needs a confirmed
-  existing match and does not require a direct channel.
-- **Always paginate `signoz_list_alert_rules`** Stopping at page 1 misses
-  duplicates and produces noise.
+  are required. Policy routing needs a confirmed existing match.
+- **Finish the duplicate check** Page the filtered `signoz_list_alert_rules`
+  matches, then the unfiltered list, before concluding none exists (Step 3).
 - **Dry-run is mandatory** Complete Steps 4 and 6 before
-  `signoz_create_alert`; a never-firing alert creates false confidence.
-- **Threshold operators use canonical words** Use the `op` and `matchType`
-  words from Step 5, never `equals`.
-- **Compose the full payload** Set `schemaVersion`, `evaluation`,
-  `notificationSettings`, and `panelType` yourself (Step 5); nothing fills
-  them in.
+  `signoz_create_alert`; a rule on a query with no data gives false confidence.
+- **Compose the full payload** SigNoz fills in almost nothing. Supply every
+  field the Step 5 guide and the tool schema require, including each metrics
+  query's `timeAggregation`.
 - **No `limit` or `order` on persisted alert queries** They cap a grouped
-  alert to its top-N series (Step 6). Keep them in the dry-run envelope only.
-- **Signal must match alertType** `signal: "logs"` requires
-  `LOGS_BASED_ALERT`. Mismatches fail validation.
-- **Anomaly rules are metrics-only** `anomaly_rule` + non-metric alertType
-  is rejected.
-- **Routing must be confirmed.** Direct routes use exact returned
-  `displayName` values from the fully paginated
-  `signoz_list_notification_channels`; put them in per-threshold
-  `channels` for every rule type. Confirmed policy routes set `notificationSettings.usePolicy`
-  and omit direct channel fields.
-- **Never echo channel secrets.** Slack webhook URLs, PagerDuty integration
-  keys, and similar webhook tokens are secrets. Pass them to
-  `signoz_create_notification_channel` once and never repeat the
-  value in chat output, previews, confirmations, summaries, clarification
-  payloads, or navigation suggestions. Refer to the channel by display name only
-  after creation; ask the user to re-paste on failure rather than
-  reproducing what they sent.
+  alert to its top-N series (Step 6).
+- **Match `alertType` to the query signal** SigNoz evaluates the query
+  whatever `alertType` says and builds the fired alert's related logs or
+  traces link from it, so a mismatch saves and links to the wrong explorer.
+- **Anomaly rules are metrics-only** An `anomaly_rule` takes
+  `METRIC_BASED_ALERT` and a builder metrics query.
+- **Routing must be confirmed.** Direct routes put exact returned
+  `displayName` values in per-threshold `channels`, for every rule type.
+  Confirmed policy routes set `notificationSettings.usePolicy` and omit them.
+- **Never echo channel secrets.** Apply the Step 7 secret rules to every
+  output, preview, and clarification payload.
 
 ## Examples
 
 Four canonical alert flows (multi-severity metric threshold, error-rate
 formula, log-volume groupBy, and anomaly detection) live in
-[`references/examples.md`](references/examples.md).
-
-## Additional resources
-
-- `signoz://alert/instructions` and `signoz://alert/examples` MCP resources:
-  the alert payload shape, the fields to set explicitly,
-  threshold codes, filter expression syntax, and version-current pattern
-  examples. Always preferred over any transcribed copy.
-- `signoz-generating-queries` skill: for authoring PromQL or testing queries
-  before wrapping them in an alert.
+[`references/examples.md`](references/examples.md). To author PromQL or test
+a query before wrapping it in an alert, use `signoz-generating-queries`.

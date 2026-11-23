@@ -9,7 +9,7 @@
       "expectations": [
         "Before direct-routing creation, the agent reuses a fully paginated signoz_list_notification_channels result only from the same still-current prepared operation or calls it until pagination.hasMore=false; if a requested name is unavailable, it presents exact returned choices and asks the user instead of guessing",
         "No query in the signoz_create_alert payload carries limit or order; any limit/order used in the signoz_execute_builder_query dry-run stays in the dry-run envelope",
-        "The signoz_create_alert payload sets schemaVersion=v2alpha1, an explicit evaluation block (rolling, evalWindow, frequency), notificationSettings, and condition.compositeQuery.panelType=graph, and sets no labels.severity",
+        "The signoz_create_alert payload sets schemaVersion=v2alpha1, an explicit evaluation block (rolling, evalWindow, frequency), notificationSettings, and condition.compositeQuery.panelType=graph",
         "Every signoz_execute_builder_query dry-run carries start and end as JSON integer Unix-millisecond values in the outer query",
         "The data probe calls signoz_query_metrics with a concrete metricName and the cartservice filter; it never sends count() or count_distinct(service.name) as a metrics aggregation expression",
         "The signoz_create_alert payload puts Slack in the warning threshold channels and PagerDuty in the critical threshold channels",
@@ -22,7 +22,7 @@
       "id": 1,
       "eval_name": "traces-error-rate-duplicate-detection",
       "prompt": "alert me when error rate on checkoutservice goes above 3%. send to #staging-alerts on slack.",
-      "expected_output": "TRACES_BASED_ALERT with formula F1 = A*100/B (A = count of error spans, B = count of all spans) on service.name='checkoutservice', threshold target 3, targetUnit percent. CRITICAL: must paginate signoz_list_alert_rules and detect existing 'checkout-svc Error Rate > 3%' alert, surface it as a duplicate, and ask whether to proceed/modify/cancel rather than silently creating another one.",
+      "expected_output": "TRACES_BASED_ALERT with formula F1 = A*100/B on service.name='checkoutservice' (A = count of errored entry spans, B = count of all entry spans, both filtered with isEntryPoint = true OR isRoot = true; a ratio over every span is acceptable only if the preview calls it span-level), threshold target 3 on a percent series (compositeQuery.unit percent). CRITICAL: must list signoz_list_alert_rules (filtered on the scope, paging the matches to the end, and unfiltered if none is a duplicate) and detect existing 'checkout-svc Error Rate > 3%' alert, surface it as a duplicate, and ask whether to proceed/modify/cancel rather than silently creating another one.",
       "expectations": [
         "If creation proceeds after duplicate resolution, the direct channel is in condition.thresholds.spec[].channels",
         "If creation proceeds after duplicate resolution, the exact returned channel displayName is in condition.thresholds.spec[].channels",
@@ -36,7 +36,7 @@
       "id": 2,
       "eval_name": "logs-pod-crash-keywords",
       "prompt": "create a log-based alert for pod crashes: fire if we see OOMKilled, CrashLoopBackOff, panic, or FATAL anywhere in log bodies. group by service so I know which one. notify #staging-alerts.",
-      "expected_output": "LOGS_BASED_ALERT, signal=logs, count() aggregation, body filter using LIKE/CONTAINS for the four keywords (OR'd), groupBy service.name with fieldContext=resource and fieldDataType=string. Threshold > 0, matchType='at_least_once' (canonical word form). Runs the mandatory data probe and full-query dry-run. CRITICAL: crash-pattern alerts (OOMKilled / CrashLoopBackOff / panic / FATAL) intentionally have zero matches in a healthy system: agent must surface the zero-match result, ask the user to confirm before saving an alert that returns nothing now, and skip the would-have-fired breach-count computation per the skill's healthy-zero exception. Must NOT treat zero matches as a failure or nudge the user to loosen the filter.",
+      "expected_output": "LOGS_BASED_ALERT, signal=logs, count() aggregation, body filter using LIKE/CONTAINS for the four keywords (OR'd), groupBy service.name with fieldContext=resource and fieldDataType=string. Threshold > 0, matchType='at_least_once' (canonical word form). Runs the mandatory data probe and full-query dry-run. CRITICAL: crash-pattern alerts (OOMKilled / CrashLoopBackOff / panic / FATAL) intentionally have zero matches in a healthy system: agent must surface the zero-match result, ask the user to confirm before saving an alert that returns nothing now, and skip the breached-points count per the skill's healthy-zero exception. Must NOT treat zero matches as a failure or nudge the user to loosen the filter.",
       "expectations": [
         "The persisted log builder_query grouped by service.name carries no limit or order, so every service is evaluated rather than a top-N subset; any dry-run bounds stay in the dry-run envelope",
         "The signoz_create_alert payload sets schemaVersion=v2alpha1 with explicit evaluation and notificationSettings blocks and panelType=graph",
@@ -51,7 +51,7 @@
       "id": 3,
       "eval_name": "anomaly-frontend-request-rate",
       "prompt": "set up anomaly detection for frontend service request rate: alert me if traffic suddenly drops or spikes versus normal patterns. slack #staging-alerts is fine.",
-      "expected_output": "METRIC_BASED_ALERT with anomaly_rule and seasonality=daily or hourly. Uses signoz_calls_total or http.server.request.count metric filtered by service.name='frontend'. A schemaVersion v2alpha1 rule with evaluation, notificationSettings, and one threshold tier using op='outside_bounds' with target ~3 standard deviations, because the request covers both drops and spikes and the anomaly score is signed. Skips the 'would have fired N times' breach count but dry-runs the underlying metric query and routes to Slack through the tier's channels.",
+      "expected_output": "METRIC_BASED_ALERT with anomaly_rule and seasonality=daily or hourly. Uses a request metric such as http.server.request.count filtered by service.name='frontend'; if it uses signoz_calls_total it says that metric counts every span of the service, not only its requests. A schemaVersion v2alpha1 rule with evaluation, notificationSettings, and one threshold tier using op='outside_bounds' with target ~3 standard deviations, because the request covers both drops and spikes and the anomaly score is signed. Skips the breached-points count but dry-runs the underlying metric query and routes to Slack through the tier's channels.",
       "expectations": [
         "The anomaly create payload sets schemaVersion v2alpha1, evaluation, notificationSettings, and condition.thresholds",
         "The metric data probe calls signoz_query_metrics with a concrete metricName and service.name='frontend'; it never uses an expression-only count() metrics aggregation",
@@ -66,10 +66,10 @@
       "id": 4,
       "eval_name": "formula-gated-p99-with-count-guard",
       "prompt": "alert me when paymentservice p99 latency exceeds 1 second, but ONLY when request count is above 50 per minute: don't want to be paged on low-traffic noise. critical severity, send to both #staging-alerts slack AND 'test pager send resolved' pagerduty.",
-      "expected_output": "TRACES_BASED_ALERT with query A = p99(duration_nano) on service.name='paymentservice', stepInterval=60, and having.expression='count() > 50' to suppress low-traffic one-minute buckets. selectedQueryName='A'. Threshold target 1 with targetUnit='s', op='above', critical severity, and both channels attached. It does not invent a comparison inside a numeric formula. Runs the exact guarded query through signoz_execute_builder_query before save and explains the count guard in the preview.",
+      "expected_output": "TRACES_BASED_ALERT with query A on service.name='paymentservice' whose aggregations are p99(duration_nano) first and count() second, stepInterval=60, and having.expression='count() > 50' to suppress low-traffic one-minute buckets. selectedQueryName='A'. Threshold target 1 with targetUnit='s', op='above', critical severity, and both channels attached. It does not invent a comparison inside a numeric formula. Runs the exact guarded query through signoz_execute_builder_query before save and explains the count guard in the preview.",
       "expectations": [
         "The actual signoz_execute_builder_query dry-run carries start and end as JSON integer Unix-millisecond values in the outer query",
-        "The full dry-run preserves having.expression=count() > 50 in the Query Builder spec",
+        "The full dry-run and the saved rule keep p99(duration_nano) as query A's first aggregation and count() as its second, with having.expression=count() > 50",
         "The signoz_create_alert payload places both Slack and PagerDuty names in the critical threshold channels array",
         "The signoz_create_alert payload places both returned Slack and PagerDuty displayNames in the critical threshold channels array",
         "The persisted trace builder_query carries no limit or order; the signoz_create_alert payload sets schemaVersion=v2alpha1 with explicit evaluation and notificationSettings blocks",
@@ -98,7 +98,7 @@
       "expectations": [
         "The signoz_create_alert payload sets notificationSettings.usePolicy=true",
         "The policy-routed create payload omits condition.thresholds.spec[].channels and top-level preferredChannels without asking the user to choose a direct channel",
-        "The alert carries labels.team=checkout, names the threshold critical, and sets no labels.severity, so the confirmed policy match inputs are preserved; it does not invent different matcher labels",
+        "The alert carries labels.team=checkout and names the threshold critical, so the confirmed policy match inputs are preserved; it does not invent different matcher labels",
         "The response does not call signoz_create_notification_channel or claim that the alert write created the org notification policy"
       ],
       "files": []
@@ -162,12 +162,12 @@
       "id": 11,
       "eval_name": "error-rate-severity-from-defaults-table",
       "prompt": "alert me when paymentservice error rate goes above 2%. send to #staging-alerts on slack.",
-      "expected_output": "TRACES_BASED_ALERT error-rate formula F1 = A*100/B on service.name='paymentservice' with threshold target 2 and targetUnit percent. The request has no severity or urgency cue, so the Severity defaults table decides: an error rate threshold above 1% is critical. The preview states severity critical and gives the error-rate row as the reason. The agent does not fall back to warning because the user did not say \"page\", \"wake up\", or \"critical\".",
+      "expected_output": "TRACES_BASED_ALERT error-rate formula F1 = A*100/B on service.name='paymentservice' with threshold target 2 on a percent series (compositeQuery.unit percent). The request has no severity or urgency cue, so the Severity defaults table decides: an error rate threshold above 1% is critical. The preview states severity critical and gives the error-rate row as the reason. The agent does not fall back to warning because the user did not say \"page\", \"wake up\", or \"critical\".",
       "expectations": [
         "The preview shown before signoz_create_alert states the severity as critical",
         "The preview gives the error-rate default (threshold above 1%) as the reason for critical, not a user cue",
         "The agent does not choose warning on the grounds that the user did not say page, wake up, or critical",
-        "If creation proceeds, the signoz_create_alert payload names its threshold tier critical and sets no labels.severity, with the returned Slack displayName in that tier's channels"
+        "If creation proceeds, the signoz_create_alert payload names its threshold tier critical, with the returned Slack displayName in that tier's channels"
       ],
       "files": []
     },
@@ -175,12 +175,12 @@
       "id": 12,
       "eval_name": "error-rate-severity-lowered-by-fyi-cue",
       "prompt": "just FYI: let me know when cartservice error rate goes above 2%. send to #staging-alerts on slack.",
-      "expected_output": "TRACES_BASED_ALERT error-rate formula on service.name='cartservice' with threshold target 2 and targetUnit percent. The error-rate row of the Severity defaults table gives critical, and the user's \"just FYI\" cue lowers it one tier to warning. The preview states severity warning and gives the user's cue as the reason.",
+      "expected_output": "TRACES_BASED_ALERT error-rate formula on service.name='cartservice' with threshold target 2 on a percent series (compositeQuery.unit percent). The error-rate row of the Severity defaults table gives critical, and the user's \"just FYI\" cue lowers it one tier to warning. The preview states severity warning and gives the user's cue as the reason.",
       "expectations": [
         "The preview shown before signoz_create_alert states the severity as warning",
         "The preview gives the user's \"just FYI\" cue as the reason the severity is below the critical default",
         "The agent neither keeps critical nor lowers the severity two tiers to info",
-        "If creation proceeds, the signoz_create_alert payload names its threshold tier warning and sets no labels.severity"
+        "If creation proceeds, the signoz_create_alert payload names its threshold tier warning"
       ],
       "files": []
     }

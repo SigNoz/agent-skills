@@ -1,6 +1,6 @@
 {
   "mode": "offline_mcp_fixture",
-  "instructions": "Use these responses to explain the rule and summarize its fire history offline. Do not query a live tenant. History was requested with timeRange=7d, state=firing, order=desc.",
+  "instructions": "Use these responses to explain the rule and summarize its fire history offline. Do not query a live tenant. History was requested with timeRange=7d, state=firing, order=desc. Each response's note is the completeness note the tool returns as a separate text block after the JSON body.",
   "responses": [
     {
       "tool": "signoz_get_alert",
@@ -13,13 +13,33 @@
           "alert": "Checkout failures",
           "alertType": "TRACES_BASED_ALERT",
           "ruleType": "threshold_rule",
+          "schemaVersion": "v2alpha1",
           "state": "inactive",
           "disabled": false,
           "condition": {
             "compositeQuery": {
               "queryType": "builder",
-              "queries": []
+              "panelType": "graph",
+              "queries": [
+                {
+                  "type": "builder_query",
+                  "spec": {
+                    "name": "A",
+                    "signal": "traces",
+                    "stepInterval": 60,
+                    "aggregations": [
+                      {
+                        "expression": "count()"
+                      }
+                    ],
+                    "filter": {
+                      "expression": "service.name = 'checkout' AND has_error = true AND (isEntryPoint = true OR isRoot = true)"
+                    }
+                  }
+                }
+              ]
             },
+            "selectedQueryName": "A",
             "thresholds": {
               "kind": "basic",
               "spec": [

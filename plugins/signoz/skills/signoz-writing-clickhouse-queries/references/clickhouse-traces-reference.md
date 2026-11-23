@@ -70,7 +70,8 @@ The main table for querying span data. 30+ columns following OpenTelemetry conve
     `attribute_string_rpc$$method` LowCardinality(String) DEFAULT attributes_string['rpc.method'] CODEC(ZSTD(1)),
     `attribute_string_peer$$service` LowCardinality(String) DEFAULT attributes_string['peer.service'] CODEC(ZSTD(1))
 )
-ORDER BY (ts_bucket_start, resource_fingerprint, has_error, name, timestamp)
+-- Sort key of the local table `signoz_index_v3` that this distributed table reads:
+-- ORDER BY (ts_bucket_start, resource_fingerprint, has_error, name, timestamp)
 ```
 
 ### distributed_traces_v3_resource (Resource Lookup Table)
@@ -100,6 +101,7 @@ Used in the resource filter CTE pattern for efficient filtering by resource attr
     `exceptionStacktrace` String CODEC(ZSTD(1)),
     `exceptionEscaped` Bool CODEC(T64, ZSTD(1)),
     `resourceTagsMap` Map(LowCardinality(String), String) CODEC(ZSTD(1)),
+    -- Skip indexes of the local table `signoz_error_index_v2` that this distributed table reads:
     INDEX idx_error_id errorID TYPE bloom_filter GRANULARITY 4,
     INDEX idx_resourceTagsMapKeys mapKeys(resourceTagsMap) TYPE bloom_filter(0.01) GRANULARITY 64,
     INDEX idx_resourceTagsMapValues mapValues(resourceTagsMap) TYPE bloom_filter(0.01) GRANULARITY 64
