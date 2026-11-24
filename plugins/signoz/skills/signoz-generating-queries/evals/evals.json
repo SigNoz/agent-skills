@@ -237,6 +237,22 @@
         "Output states the one-hour window and does not present a sample of rows as the full total"
       ],
       "files": []
+    },
+    {
+      "id": 19,
+      "eval_name": "json-body-window-compare-uses-clickhouse-sql",
+      "prompt": "For each decline reason, how many declines did the payments service log in the last hour compared with the hour before? The reason is inside the JSON log body under error.decline_reason, and SigNoz does not list it as a field I can group by.",
+      "expected_output": "Agent confirms with signoz_get_field_keys that no builder query can group by the body field, then sends one clickhouse_sql query through signoz_execute_builder_query. The SQL extracts the decline reason from the log body with a JSONExtract function, keeps only logs that carry it, and groups by it, and the request's start and end span both hours so that the same query counts each hour with countIf or sumIf under that hour's own bounds. Every time bound uses SigNoz's time variables or an offset from one, with no literal epoch number. The SQL bounds timestamp and ts_bucket_start, filters on the payments service's resource, and ends with a LIMIT. The reply gives both counts for each decline reason with the two hours' time ranges, and the agent does not pull raw log rows to parse them itself.",
+      "expectations": [
+        "Agent checks with signoz_get_field_keys (signal logs, fieldContext body) that the path cannot be grouped in a builder query before it chooses SQL",
+        "Agent sends one clickhouse_sql query through signoz_execute_builder_query that extracts the decline reason from the log body with a JSONExtract function and counts only logs that carry the field, rather than pulling raw log rows and parsing them itself",
+        "The request's start and end span both hours, and one SQL query groups by the extracted decline reason and counts each hour with countIf or sumIf under that hour's own bounds, rather than running one query per window",
+        "Every time bound in the SQL uses a SigNoz time variable such as $start_timestamp_nano, $end_timestamp_nano, $start_timestamp, or $end_timestamp, or an offset from one; the SQL has no literal epoch number as a time bound",
+        "The SQL bounds both timestamp and ts_bucket_start, filters on the payments service's resource, and ends with a LIMIT",
+        "Agent reads signoz://dashboard/clickhouse-schema-for-logs before writing the SQL, or the local logs reference of signoz-writing-clickhouse-queries when the client cannot read resources",
+        "Output gives both counts for each returned decline reason, with the two hours' time ranges"
+      ],
+      "files": []
     }
   ]
 }

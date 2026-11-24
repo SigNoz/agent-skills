@@ -33,20 +33,10 @@ tools.
 
 ## When to use
 
-Use this skill when the user asks to:
-- Query, search, or look up observability data (traces, logs, metrics)
-- Compute aggregations (error rate, p99 latency, request count, throughput)
-- Find specific log entries, traces, or metric values
-- Investigate patterns (spikes, drops, trends over time)
-
 Do NOT use when:
-- User wants raw ClickHouse SQL for a dashboard panel (custom joins, window
-  functions, regex over log bodies); that's a separate dashboard-panel SQL
-  workflow, not this skill.
-- User needs the Exceptions Explorer as an exception-specific signal: the
-  current MCP contract has no exception query tool. Explain that limitation and
-  offer an equivalent error-trace or error-log query only if it answers their
-  underlying question.
+- Raw ClickHouse SQL for a dashboard panel: `signoz-writing-clickhouse-queries`.
+- The Exceptions Explorer: the MCP server has no exception query tool. Say so,
+  and offer an error-trace or error-log query only if it answers the question.
 
 ## Instructions
 
@@ -147,7 +137,7 @@ discovery and retry with a returned key; never report "nothing matched".
 | Complex log/trace formula or shaping | `signoz_execute_builder_query` | Use when ratios, shaping, ordering, or cardinality control exceed the convenience tools; never hand-build a plain grouped count. |
 | Which services call or depend on a service | `signoz_get_service_map` | Caller and callee edges between traced services in the window. |
 | One service's operations with latency and call counts | `signoz_get_service_top_operations` | Ranked by p99, highest first. To rank operations by calls or errors, aggregate traces instead. |
-| A join or a regex extraction no builder query expresses | `signoz_execute_builder_query` with a `clickhouse_sql` query | Only under the conditions in **ClickHouse SQL** below. |
+| A join on `trace_id`, or a value extracted from a log body, that no builder query expresses | `signoz_execute_builder_query` with a `clickhouse_sql` query | Only under the conditions in **ClickHouse SQL** below. |
 
 **Read the guide for the query before you write it.** Do this once per
 conversation for each guide, before the first `filter`, aggregation
@@ -180,12 +170,16 @@ when you skip the guides:
 `clickhouse_sql` query through `signoz_execute_builder_query` only when no
 builder query answers the question in one call:
 
-- a join between two sets of logs, or between logs and traces, on `trace_id`;
-- a value extracted from the log body with a regular expression, then grouped
-  or counted.
+- a join on `trace_id`: two sets of logs, logs and traces, or spans of one
+  trace (child to parent on `c.parent_span_id = p.span_id`, or the first and
+  last span per trace or per key);
+- a value extracted from the log body with a regular expression or
+  `JSONExtract*`, then grouped or counted.
 
-Compare two time windows with `timeShift` (`references/functions.md`), not
-SQL. Before writing the SQL:
+Compare two time windows with `timeShift` (`references/functions.md`). Only
+when the question already needs SQL for a case above, compare them in that
+SQL, and first read "Compare windows in ClickHouse SQL" in that file: a
+wrong window bound gives a wrong count with no error. Before the SQL:
 
 1. Read `signoz://dashboard/clickhouse-schema-for-logs` or
    `signoz://dashboard/clickhouse-schema-for-traces` for the tables, columns,
@@ -194,9 +188,12 @@ SQL. Before writing the SQL:
    shape. SigNoz fills `$start_timestamp`, `$end_timestamp`,
    `$start_timestamp_nano`, `$end_timestamp_nano`, `$start_datetime`, and
    `$end_datetime` from the request's `start` and `end`.
-3. Bound both time columns of every log and span table: `timestamp`, and
-   `ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp`.
-   Bound a resource table on `seen_at_ts_bucket_start` instead.
+3. Bound both time columns of every log and span table with those
+   variables, never with a literal epoch number: `timestamp`, and
+   `ts_bucket_start BETWEEN $start_timestamp - 1800 AND $end_timestamp` (a
+   resource table: `seen_at_ts_bucket_start`). A millisecond literal fails
+   on the traces `timestamp` with a Decimal overflow; as a lower bound on
+   `ts_bucket_start` (seconds) it matches no rows and raises no error.
 4. Filter on the resource when the question names a service, namespace, or
    host. Use `GLOBAL IN` for a subquery on a distributed table. When you
    need columns from both, `GLOBAL JOIN` a small, time-bounded right side.
@@ -404,8 +401,8 @@ attribute mappings as `references/ai-queries.md` describes.
   cover resource-attribute filters, operators, and negative filters. A result
   note can say what the query measured, such as every span rather than every
   request; read the notes before reporting a number.
-- **Query Builder first**: Use ClickHouse SQL only for the two cases in
-  Step 3, with bounded time predicates and a `LIMIT`.
+- **Query Builder first**: Use ClickHouse SQL only for the cases in Step 3,
+  with time bounds from SigNoz's variables and a `LIMIT`.
 - **Scope boundary**: This skill queries data. If the user wants to wrap the
   query into a recurring alert, redirect to `signoz-creating-alerts`.
 - **Emit `apply_filter` on the final message.** When the user asks you to
