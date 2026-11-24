@@ -227,12 +227,13 @@
       "id": 18,
       "eval_name": "logs-traces-join-uses-clickhouse-sql",
       "prompt": "Which merchants had the most failed withdrawals in the last hour? The withdrawal failure logs carry no merchant id. It is only on the request span as the merchant.id attribute, and both carry the trace id.",
-      "expected_output": "Agent recognizes a join between logs and traces on trace_id that no builder query expresses. It reads the logs and traces ClickHouse schema resources and signoz://query-builder/examples, then sends one clickhouse_sql query through signoz_execute_builder_query that joins the two tables and groups by merchant in SQL. Each table is bounded on both timestamp and ts_bucket_start by the request window, any subquery over a distributed table uses GLOBAL IN or GLOBAL JOIN, and the query ends with a LIMIT. It reports the merchants with the one-hour window, and does not pull raw rows from each signal to join them outside SigNoz.",
+      "expected_output": "Agent recognizes a join between logs and traces on trace_id that no builder query expresses. It reads the logs and traces ClickHouse schema resources and signoz://query-builder/examples, then sends one clickhouse_sql query through signoz_execute_builder_query that joins the two tables and groups by merchant in SQL, without letting the join count a withdrawal more than once. Each table is bounded on both timestamp and ts_bucket_start by the request window, any subquery over a distributed table uses GLOBAL IN or GLOBAL JOIN, and the query ends with a LIMIT. It reports the merchants with the one-hour window, and does not pull raw rows from each signal to join them outside SigNoz.",
       "expectations": [
         "Agent sends a clickhouse_sql query through signoz_execute_builder_query rather than joining raw rows from signoz_search_logs and signoz_search_traces itself",
         "The SQL bounds timestamp and ts_bucket_start on both the logs table and the traces table using the request window",
         "Any IN or JOIN subquery that reads a distributed table uses GLOBAL IN or GLOBAL JOIN",
         "The SQL aggregates per merchant and ends with a LIMIT",
+        "The join cannot inflate the count: the SQL reduces the span side to one row per trace_id before joining, or counts with uniqExact on trace_id or another withdrawal key, not a plain count() over joined rows",
         "Agent reads the ClickHouse schema resource for logs and for traces, or loads signoz-writing-clickhouse-queries, before writing the SQL",
         "Output states the one-hour window and does not present a sample of rows as the full total"
       ],

@@ -198,7 +198,10 @@ wrong window bound gives a wrong count with no error. Before the SQL:
    host. Use `GLOBAL IN` for a subquery on a distributed table. When you
    need columns from both, `GLOBAL JOIN` a small, time-bounded right side.
 5. End with a `LIMIT`, and aggregate in SQL; do not pull raw rows to join or
-   count them yourself.
+   count them yourself. Count each event once: a join returns a row per
+   matching pair, so extra logs or spans in a trace inflate `count()` with
+   no error. Make the side you take a value from one row per `trace_id`, and
+   count events with `uniqExact` on their key when one event has several rows.
 
 `signoz-writing-clickhouse-queries` has the query patterns and the type
 errors to avoid. If SigNoz rejects the SQL, apply the suggestion in the error
