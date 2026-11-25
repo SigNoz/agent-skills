@@ -54,8 +54,7 @@ Do NOT use when the user wants to:
 If the input is missing or ambiguous, this skill is **best-effort** (not
 strict; read-only operations are cheap to recover from):
 
-1. Call `signoz_list_alert_rules`, paginate through every page, and find
-   the closest name match.
+1. Resolve the name as Step 1 describes and pick the closest match.
 2. State the interpretation in the response:
    "Interpreting your request as alert 'High Error Rate - Checkout' (id 42).
    If you meant a different one, tell me the name or id."
@@ -68,31 +67,43 @@ strict; read-only operations are cheap to recover from):
 If the user provided a rule ID (UUID or legacy numeric ID), skip to Step 2.
 Otherwise:
 
-1. Call `signoz_list_alert_rules` and **paginate every page**:
-   `pagination.hasMore` is true until the full list is walked.
-2. Match by name (case-insensitive substring). If multiple match,
-   present the candidates and ask which one (interactive) or pick the
-   closest and flag the assumption (autonomous).
+1. Call `signoz_list_alert_rules` with `filter` set to one distinctive word
+   of the name (a bare word matches name, description, and labels, ignoring
+   case) and follow `pagination.nextOffset` while `pagination.hasMore` is true.
+2. If nothing matches or no match is close, list without the filter and
+   page to the end before saying the rule does not exist.
+3. If several rules match, present the candidates and ask which one
+   (interactive) or pick the closest and flag the assumption (autonomous).
 
-### Step 2: Fetch the full configuration
+### Step 2: Fetch the full configuration and the alert guide
 
-Call `signoz_get_alert` with the rule id. This is **mandatory**: the
-list response does not include the full condition / thresholds /
-notification settings, and explanations based on the name alone are
-guesses.
+1. Call `signoz_get_alert` with the rule id. This is **mandatory**: the
+   list response does not include the full condition / thresholds /
+   notification settings, and explanations based on the name alone are
+   guesses.
+2. Read `signoz://alert/instructions` before decoding the rule, unless
+   already read in this conversation. It defines the fields Step 4 explains:
+   formulas and `selectedQueryName`, units, `recoveryTarget`, rolling and
+   cumulative `evaluation`, `notificationSettings`, routing labels, and
+   anomaly scoring.
+3. Read `signoz://alert/examples` only when the rule's shape is still
+   unclear after the guide.
+
+If the client cannot read `signoz://` resources, decode with the hints in
+Step 4 and say which field you could not interpret.
 
 ### Step 3: Pull a one-line fire-frequency summary
 
-First call `signoz_get_alert_history` with `timeRange: "7d"`,
-`state: "firing"`, `order: "desc"`, and a large limit. Continue only when
-`data.nextCursor` exists (the completeness note also reports `hasMore: true`):
-pass that value as `cursor`, replace `timeRange` with the note's resolved
-absolute `start` and `end`, and preserve the same state, filter, and order.
-Stop when `nextCursor` is absent / the note reports `hasMore: false`. Never use
-`offset` or infer completeness from page fullness.
-History `state` accepts `inactive`, `pending`, `recovering`, `firing`, `nodata`,
-or `disabled`. For "resolved" / "recovered", use `state: "inactive"`;
-`resolved` is not a value; `recovering` is a transient keep-firing state, not resolution.
+Call `signoz_get_alert_history` with `timeRange: "7d"`, `state: "firing"`,
+`order: "desc"`, and a large limit. While the result's completeness note
+reports more results, fetch the next page exactly as the note says. The
+history is complete only when the note says all matching results were
+returned (`hasMore=false`). An absent `nextCursor` alone does not show that:
+the note can instead say the tool could not count the returned rows and more
+may exist. Treat that note, a failed call, or a pagination stopped early as
+incomplete history.
+For "resolved" / "recovered", use `state: "inactive"`; `recovering` is a
+transient keep-firing state, not resolution.
 Derive a single rule-level line from the complete set. History rows are emitted
 per label-group `fingerprint`, so never equate row count with alert-fire count.
 Count distinct rule transitions where `overallStateChanged: true` and
@@ -111,9 +122,9 @@ returned: "No firing events were returned for the last 7d." Do not shorten
 this to "has not fired" or "never fired". Complete history can still miss
 fires because of retention or because the rule was recreated under a new ID.
 Add that caveat when the user relies on the answer, for example when they
-expected the alert to fire. If a history call fails or pagination
-stops before `nextCursor` is absent, say the history is incomplete and report
-any count as "at least N"; never report zero from a failed or partial read.
+expected the alert to fire. If the history is incomplete, say so and report
+any count as "at least N". Report an exact count, zero included, only from a
+history the tool reported as complete.
 
 Report these as separate facts, each from its own source:
 
@@ -128,17 +139,12 @@ Report these as separate facts, each from its own source:
 
 Do not derive one from another. A disabled rule can still have earlier fires
 in the lookback, and an empty history does not show the rule is inactive now.
-
-This single line grounds the explanation. Do **not** drill into specific
-fires here; that's `signoz-investigating-alerts`.
+Do **not** drill into specific fires here; that's `signoz-investigating-alerts`.
 
 ### Step 4: Build the explanation
 
-The single most useful thing for the user is a tight summary. Lead
-with a **TL;DR that directly answers the question they asked**, not a
-generic alert summary. The TL;DR is the only thing some users will
-read; burying their answer under a fixed template forces them to
-scroll for what they wanted in the first place.
+Lead with a **TL;DR that directly answers the question the user asked**,
+not a generic alert summary. Some users read nothing else.
 
 Match the TL;DR shape to the user's question:
 
@@ -151,15 +157,15 @@ Match the TL;DR shape to the user's question:
   the description of what fires:
   > **TL;DR**: Mostly well-configured, but recommend: (1) add
   > `alertOnAbsent` (currently a crashed service stays silent); (2)
-  > fix annotation template `{{$topic}}` → `{{$labels.topic}}` (won't
-  > interpolate); (3) split critical to PagerDuty (both tiers
+  > add a `recoveryTarget` (the value hovers near the threshold and
+  > the rule flaps); (3) split critical to PagerDuty (both tiers
   > currently route to Slack). `<fire-frequency line>`.
 
 - **"How does X work?" / "Explain the count guard"**: answer the
   mechanism in 1–2 sentences before any framing:
-  > **TL;DR**: The count guard is a `having: count() > 50` clause on
-  > query A: any 1-minute bucket with ≤50 spans is dropped before
-  > evaluation, so low-traffic minutes can't fire the alert.
+  > **TL;DR**: Query A selects `p99(duration_nano)` and `count()`; its
+  > `having: count() > 50` clause drops any 1-minute bucket with ≤50
+  > spans before evaluation, so low-traffic minutes can't fire the alert.
 
 - **"What's the threshold?" / focused config question**: state the
   exact thing they asked about:
@@ -173,30 +179,29 @@ the user's specific question first.
 
 After the TL;DR, write the explanation in prose, organized into the
 four sections below. **Skip any section that has nothing meaningful to
-add**: empty severity labels, default notification settings, vanilla
-annotations don't deserve a header. Short and skimmable beats
-perfunctorily complete; the user is not reading a checklist.
+add**: empty severity labels, default notification settings, and vanilla
+annotations don't deserve a header.
 
 **1. What it watches**: one short paragraph. Combine signal type
 (metrics / logs / traces / exceptions), what the query measures, and
 scope. Translate the query to operational language; for formulas, name
 each sub-query (A, B, …) and state what F1 (or whichever
 `selectedQueryName` triggers) computes, e.g. "F1 = A × 100 / B → error
-percentage". Decode filter operators (`=` equals, `!=` not equals,
-`IN` / `NOT IN`, `LIKE` / `ILIKE`, `CONTAINS`, `REGEXP`, `EXISTS` /
-`NOT EXISTS`); enumerate `IN` / `NOT IN` value lists so the user can
-verify them. Name each `groupBy` dimension and its practical effect
-("fires separately per service" for `service.name`).
+percentage". Put the filter into words and enumerate `IN` / `NOT IN` value
+lists so the user can verify them. Name each `groupBy` dimension and its
+practical effect ("fires separately per service" for `service.name`). A
+trace query without `isEntryPoint = true OR isRoot = true` covers every span
+the service records: describe its count, rate, or latency as span-level, not
+as requests.
 
 For **anomaly rules** (`ruleType: anomaly_rule`), explicitly state that
 the threshold is in **standard deviations from the learned pattern, not
 the raw value**; this is the most common point of confusion. Include
-`seasonality` (hourly / daily / weekly) and how the target's magnitude
-shifts sensitivity (closer to 0, such as 2 or -2 → more noise; further from
-0, such as 4 or -4 → only extreme deviations). The score is signed,
-(value - predicted) / standard deviation: `above` with target 3 fires only
-on rises, `below` with target -3 only on drops, and `outside_bounds` with
-target 3 on either. Say which directions the rule catches.
+`seasonality` and how the target's magnitude shifts sensitivity (closer to
+0 → more noise; further from 0 → only extreme deviations). The score is
+signed: `above` with target 3 fires only on rises, `below` with target -3
+only on drops, and `outside_bounds` with target 3 on either. Say which
+directions the rule catches.
 
 **2. When it fires**: one paragraph covering threshold + timing.
 Decode the threshold spec into plain English using these mappings:
@@ -208,14 +213,16 @@ Decode the threshold spec into plain English using these mappings:
   all_the_times (entire window), `3` on_average (window average), `4`
   in_total (window sum), `5` last (most recent point).
 
-State each threshold tier's `name`, `target`, `targetUnit`, and
-attached channels. **Always state the threshold in `targetUnit`, not
-the native query unit** (e.g. "fires when p99 exceeds 500 ms", not
-"…exceeds 500 000 000 ns"). Note `recoveryTarget` if set (hysteresis);
-if absent, mention flap risk when the value hovers near the boundary.
-Describe timing as "checks every `<frequency>` over the last
-`<evalWindow>`", and mention that with `at_least_once` a single-point
-breach triggers, while `all_the_times` requires the full window.
+State each threshold tier's `name`, `target`, unit, and attached channels.
+State the threshold in its `targetUnit` (e.g. "fires when p99 exceeds
+500 ms", not "…exceeds 500 000 000 ns"); a tier with no `targetUnit` is in
+the query unit, `compositeQuery.unit`. Note `recoveryTarget` if set
+(hysteresis); if absent, mention flap risk when the value hovers near the
+boundary. For `evaluation.kind: "rolling"`, describe timing as "checks every
+`<frequency>` over the last `<evalWindow>`". For `"cumulative"`, say the
+rule totals from the schedule's reset point (for example daily at 00:00 in
+its `timezone`) and checks every `<frequency>`. With `at_least_once` a
+single-point breach triggers, while `all_the_times` requires the full window.
 
 **3. Where it notifies**: decode effective routing, not just fields in
 isolation. If `notificationSettings.usePolicy` is true, say that org policy
@@ -237,15 +244,21 @@ high-impact ones:
   alert. Always call this out for production-tier rules.
 - **`alertOnAbsent: true` but `nodata` not in `renotify.alertStates`**:
   the absent-data fire pages once and then goes silent (easy to miss).
-- **Template variable bugs**: `{{$topic}}` won't interpolate; the
-  correct form is `{{$labels.topic}}`. Dots in label keys become
-  underscores (`service.name` → `{{$labels.service_name}}`).
-- **Multiple severity tiers and a static `labels.severity`**: the static
-  label replaces each tier's `severity` on every alert, so a warning
-  breach reports the static value and a policy that matches `severity`
-  cannot tell the tiers apart. Recommend removing the label; the cost is
-  that the alert-rule list shows no severity for the rule. A missing
-  `labels.severity` is not a gap.
+- **Annotation template variables**: the `signoz_create_alert` schema
+  shows `{{$labels.service_name}}` for the `service.name` label and
+  `signoz://alert/examples` writes `{{$service.name}}`, so do not call
+  either form broken from the config alone. Flag a variable only when it
+  names something the rule does not produce (not a `groupBy` key, `$value`,
+  or `$threshold`). A static rule label is not available to an annotation.
+- **`having` on an aggregation a logs or traces query does not select**:
+  the alert guide requires a `having.expression` aggregation to be in that
+  query's own `aggregations`. Flag `count() > N` on a query whose
+  `aggregations` lack `count()`; another query's `count()` does not supply it.
+- **A static `labels.severity` that differs from a tier name**: the label
+  does not set a fired alert's severity. Each fire carries the `severity`
+  of the tier that fired, and SigNoz drops a rule label of that name from
+  fired alerts; the label only sets what the alert-rule list shows. A
+  missing `labels.severity` is not a routing gap.
 - **All tiers route to the same channel**: defeats the point of
   graduated thresholds.
 - **High-cardinality `groupBy`** (e.g. `pod.name` × `partition`) →
@@ -264,10 +277,9 @@ If the user asked only "what does this alert do", stop here. The audit
 
 ### Step 5: Assess the configuration (only if asked)
 
-The user may ask "is this alert reasonable" alongside the explanation.
-Only assess when asked or when the request implies it (audit, review,
-"is this configured correctly"). Keep assessment grounded in what's
-actually in the config:
+Assess only when asked or when the request implies it (audit, review,
+"is this configured correctly"). Ground the assessment in the config, and
+apply the Step 4 concerns (absent data, groupBy cardinality) as well:
 
 - **Threshold calibration**: appropriate for the signal? Consider
   service criticality and traffic.
@@ -281,10 +293,6 @@ actually in the config:
   warning → low-urgency (Slack).
 - **Missing runbook / description**: if `annotations` are empty or
   default, suggest adding context.
-- **Absent-data monitoring**: for critical signals, recommend
-  `alertOnAbsent: true` if it isn't set.
-- **GroupBy cardinality**: high-cardinality groupBy fields can produce
-  many independent alert series; flag potential notification storms.
 - **`limit`/`order` on a grouped query**: only the top-N series they
   select, ranked over the whole window, are evaluated, so series beyond N
   are never evaluated and a `below` rule ordered descending can miss every
@@ -303,19 +311,17 @@ actually in the config:
 ### Step 6: Offer next steps
 
 Surface up to 3 follow-up intents based on what the explanation
-revealed: things like investigating a recent fire, running the
-underlying query to see current values, adjusting a threshold, or
-creating a related alert for a coverage gap. Use your judgment; do
-not pad to 3.
-
-Skip follow-ups entirely when the user is purely inspecting ("what
-does this alert do?") and signals no further intent. Offering no
-follow-ups is better than offering wrong ones.
+revealed: investigating a recent fire, running the underlying query to see
+current values, adjusting a threshold, or creating a related alert for a
+coverage gap. Do not pad to 3. Skip follow-ups when the user is purely
+inspecting ("what does this alert do?") and signals no further intent.
+Offering no follow-ups is better than offering wrong ones.
 
 ## Guardrails
 
 - **Fetch before explaining.** Always call `signoz_get_alert`. Do not
-  base explanations on the rule name or list response alone.
+  base explanations on the rule name or list response alone; if the name
+  says "checkout" but the filter targets `payments`, call that out.
 - **Always pull fire history.** The one-line frequency summary grounds the
   explanation, including for disabled alerts: disabled rules can still have
   earlier fires in the lookback.
@@ -324,31 +330,25 @@ follow-ups is better than offering wrong ones.
   infer health, correct thresholds, or notification delivery from it.
 - **Decode, don't dump.** Translate `op`, `matchType`, filter
   expressions, and query JSON into operational language. Show raw JSON
-  only if the user asks.
-- **Decode every sub-query.** For formula alerts, explain each builder
-  query and the formula. Don't gloss over a formula as "error rate";
-  show the user what A, B, and F1 each compute.
-- **Anchor to the actual config.** Don't speculate based on the alert
-  name. If the name says "checkout" but the filter targets `payments`,
-  call that out.
+  only if the user asks. For formula alerts, show what A, B, and F1 each
+  compute; don't gloss over a formula as "error rate".
 - **No live queries by default.** Do not run the alert's query unless
-  the user asks. Explain is about understanding the rule, not
-  inspecting current data.
-- **Paginate alert listing.** Before concluding an alert does not
-  exist, walk every page of `signoz_list_alert_rules`.
-- **SigNoz evaluation model.** SigNoz uses `evalWindow` + `frequency`
-  + `matchType`, not Prometheus-style `for` durations. Don't describe
-  the evaluation model in Prometheus terms.
-- **Stay in scope.** Investigation of a specific fire window belongs
-  to `signoz-investigating-alerts`. Modifications belong to
-  `signoz_update_alert`.
+  the user asks. This skill explains the rule; it does not inspect
+  current data.
+- **Stay in scope.** A specific fire window belongs to
+  `signoz-investigating-alerts`; changes belong to `signoz_update_alert`.
+- **Finish the listing.** Before concluding an alert does not exist, page
+  `signoz_list_alert_rules` to the end without a filter.
+- **SigNoz evaluation model.** SigNoz evaluates a rolling `evalWindow` or a
+  cumulative schedule every `frequency`, with a `matchType`. It has no
+  Prometheus-style `for` duration; don't describe it in Prometheus terms.
 
 ## Examples
 
 **User:** "Explain my checkout error rate alert"
 
 **Agent:**
-1. `signoz_list_alert_rules` (paginated) → finds
+1. `signoz_list_alert_rules` with `filter: "checkout"` → finds
    "High Error Rate - Checkout" id 42.
 2. `signoz_get_alert id=42` → traces formula (A errored spans / B
    total spans × 100), single critical threshold at 5%, `op=1`,
@@ -357,7 +357,7 @@ follow-ups is better than offering wrong ones.
    → fired 3 times, last fire 2h ago.
 4. Replies:
 
-   > **TL;DR**: Fires when checkout error rate (errored spans / total
+   > **TL;DR**: Fires when checkout's span error rate (errored spans / all
    > spans) exceeds 5% at any point in the last 5 min, pages
    > `pagerduty-oncall`. Fired 3 times in the last 7d (last 2h ago).
    >
@@ -435,8 +435,8 @@ follow-ups is better than offering wrong ones.
    > for each hour of day, so peak-hour latency won't false-trigger if
    > it matches the historical norm for that hour.
    >
-   > **When it fires**: when |Z-score| >= 3 (`outside_bounds`), i.e. the
-   > value is at least 3 standard deviations above or below the expected
+   > **When it fires**: when |Z-score| > 3 (`outside_bounds`), i.e. the
+   > value is more than 3 standard deviations above or below the expected
    > pattern, so both spikes and drops fire. Lower
    > target → more sensitive (more noise); higher → only extreme
    > deviations. The threshold is **not** in seconds or milliseconds.

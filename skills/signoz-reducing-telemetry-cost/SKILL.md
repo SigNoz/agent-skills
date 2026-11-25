@@ -22,7 +22,7 @@ This skill calls SigNoz MCP server tools heavily (`signoz_list_metrics`,
 `signoz_get_field_keys`, `signoz_execute_builder_query`,
 `signoz_get_top_metrics`, `signoz_check_metric_usage`, `signoz_check_metric_cardinality`,
 `signoz_aggregate_logs`, `signoz_aggregate_traces`, `signoz_search_logs`,
-`signoz_list_alert_rules`, `signoz_get_alert`, `signoz_get_service_top_operations`). Before
+`signoz_list_alert_rules`, `signoz_get_alert`). Before
 running the workflow, confirm the `signoz_*` tools are available. If they are not, the SigNoz
 MCP server is not installed or configured; run `signoz-mcp-setup` first. The whole
 investigation is grounded in these queries; without the server there is nothing to analyze.
@@ -41,13 +41,15 @@ metrics, logs, and traces steps for every signal with data, ordered by current c
 
 ### Step 1: Cost Meter snapshot
 
-Establish the cross-signal cost picture first. Always call `signoz_list_metrics` with
+Establish the cross-signal cost picture first. Read the Cost Meter section of
+`signoz://metrics-aggregation-guide` once before the first meter query. Always call `signoz_list_metrics` with
 `source: "meter"`; treat its returned metric names, types, temporalities, and units as the live
 source of truth because the meter set evolves. Then query each relevant discovered metric with
 `signoz_execute_builder_query` (`source: "meter"`, `requestType: "time_series"`,
 `stepInterval: 3600`, the discovered `temporality`, and `timeAggregation: "sum"`); see
-`references/cost-meter-queries.md` for the full tool-argument template. Sum complete hourly
-buckets and exclude every datapoint marked `partial: true`. Do **not** use
+`references/cost-meter-queries.md` for the full tool-argument template. Sum the complete
+buckets and exclude every datapoint marked `partial: true`. Over a long window SigNoz raises the
+step above an hour; read the step it applied from `data.meta.stepIntervals`. Do **not** use
 `signoz_query_metrics` for Cost Meter totals or grouped total attribution.
 Report only values returned by successful queries. If a query fails or returns no usable values
 after the MCP tools are available, show the intended query and say that the total could not be
@@ -246,7 +248,9 @@ For each top service by GB:
 **3c. Log alerts, dashboards, and saved views: check before any log-reduction recommendation.**
 `signoz_list_alert_rules`, **paginating through every page** (follow `pagination.nextOffset`
 until `pagination.hasMore` is false; do not stop at the first page, or an alert on a later page
-is missed and a filter looks safe when it isn't). Keep `alertType == "LOGS_BASED_ALERT"`. For
+is missed and a filter looks safe when it isn't). Start with `alertType == "LOGS_BASED_ALERT"`,
+then check rules of any other type whose name or labels mention the service: SigNoz evaluates
+the stored query whatever `alertType` says. For
 each, `signoz_get_alert(id)` and read `condition.compositeQuery.queries[].spec.filter.expression`
 + `groupBy` to see which service / severity / namespace it guards. Check every query the alert's
 condition depends on, not just the one that looks related (see the formula-dependency guardrail
@@ -271,17 +275,21 @@ represent span bytes, summed as in Step 1 and grouped by the `service.name` fiel
 Compute each service's % against the **grouped total (sum of all service groups from this same
 query)**, not a top-N sum and not the separately-fetched ungrouped total; keep numerator and
 denominator on one grouped basis. For each top-3
-service by GB, get its dominant operations with `signoz_get_service_top_operations` (or
-`signoz_aggregate_traces` with `service: "<svc>"` + `groupBy: "name"`). The op breakdown is
-top-3 for brevity, but the error-rate check (4c) and the APM guard below apply to **every**
-service you consider reducing.
+service by GB, find its highest-volume operations with `signoz_aggregate_traces`
+(`aggregations: "count()"`, `service: "<svc>"`, `groupBy: "name"`). This ranks operations by
+span count, which shows where to look and is not a byte figure.
+`signoz_get_service_top_operations` ranks by p99 latency, so it does not answer this. The op
+breakdown is top-3 for brevity, but the error-span check (4c) and the APM guard below apply to
+**every** service you consider reducing.
 
-**4c. Error rate per service.** `signoz_aggregate_traces`, `aggregations: "count()"`, `groupBy: "service.name"`
-(total), then again with `error: true`. Error rate = errors ÷ total, per service.
+**4c. Error span share per service.** `signoz_aggregate_traces`, `aggregations: "count()"`, `groupBy: "service.name"`
+(total), then again with `error: true`. Share = error spans ÷ all spans, per service. This is a
+share of spans, the unit a sampling decision acts on; it is not the service's request error rate.
 
 **4d. Trace alerts, dashboards, and saved views.** `signoz_list_alert_rules`, **paginating
-through every page** (follow `pagination.nextOffset` until `pagination.hasMore` is false). Keep
-`alertType == "TRACES_BASED_ALERT"`; `signoz_get_alert(id)` for what each guards. Check every
+through every page** (follow `pagination.nextOffset` until `pagination.hasMore` is false). Start with
+`alertType == "TRACES_BASED_ALERT"` and `"AI_TRACES_BASED_ALERT"`, then check rules of any other
+type whose name or labels mention the service; `signoz_get_alert(id)` for what each guards. Check every
 query the alert's condition depends on, not just the one that looks related (see the
 formula-dependency guardrail below). Then check dashboards and saved views the same way (see the
 dashboard/view coverage guardrail below).
@@ -368,9 +376,10 @@ a signal the workflow already analyzed.
   metrics, `signoz_check_metric_usage` returns both `dashboards` and `alerts` in a single call.
   No equivalent tool exists for logs or traces, so perform this check manually before marking any
   log-severity or trace-operation reduction "Safe to implement": call `signoz_list_dashboards`
-  and `signoz_list_views` (scoped to the affected signal), **paginating through every page**
-  (follow `pagination.nextOffset` until `pagination.hasMore` is false, the same rule as the
-  alert-rule check above). Name and tags are not a reliable filter: a dashboard called
+  and `signoz_list_views` (scoped to the affected signal), **paginating through every page**.
+  While a result reports `pagination.hasMore` as true, continue at `pagination.nextOffset`; when
+  a result has no `pagination` object, raise `offset` by the number of rows the page returned
+  until the offset reaches the reported `total`. Name and tags are not a reliable filter: a dashboard called
   "Operations Overview" can hold a panel querying the exact service/operation with no mention of
   either in its metadata. Do not use name/tags/description to narrow which dashboards or views get
   checked; call `signoz_get_dashboard` / `signoz_get_view` on **every** one returned (across all
@@ -383,13 +392,15 @@ a signal the workflow already analyzed.
 - **Volume comes from discovered Cost Meter metrics and their live units:** bytes for span/log
   volume or samples for metric volume. Never cite span/log record counts as volume.
 - **Cost totals and grouped total attribution use `signoz_execute_builder_query`** with raw
-  `timeAggregation: sum`, hourly `stepInterval: 3600`, and complete datapoints only, never
+  `timeAggregation: sum`, `stepInterval: 3600`, and complete datapoints only, never
   `signoz_query_metrics`.
 - Every Cost Meter `builder_query` sent through that raw escape hatch includes
   `limit: 100` and Query Builder v5 `order: [{key:{name:"__result"},
   direction:"desc"}]`. This is wire `order`, not dashboard `orderBy`; preserve
   it in grouped queries. The limit ranks groups over the whole window, so call
-  out the possibility that a short-lived group falls outside the top N.
+  out the possibility that a short-lived group falls outside the top N. A grouped
+  query that returns exactly `limit` groups may have dropped the rest: raise
+  `limit` and rerun before using its sum as the denominator for a share.
 - **Check a share measured on a shorter window before applying it to the week.** Report that
   window's Cost Meter total for the signal next to the week's daily average. If the window is the
   week's highest or lowest day, measure the share on a second day too and report both.

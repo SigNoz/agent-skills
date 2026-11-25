@@ -5,6 +5,13 @@ week, day over day, before and after a deploy), or asks for a series that is
 smoothed, has no gaps, has spikes capped, shows the change per step, or shows
 a running total.
 
+## Contents
+
+- Where functions go
+- Compare a window with an earlier one
+- Compare windows in ClickHouse SQL
+- Other functions
+
 ## Where functions go
 
 `functions` is a list of `{name, args}` objects; each arg is
@@ -100,6 +107,32 @@ Error logs in the last hour against the same hour last week, as the change per
 - Report both windows in absolute UTC, for example "10:00 to 11:00 UTC on
   2026-11-10 against the same hour on 2026-11-03".
 
+## Compare windows in ClickHouse SQL
+
+Use this only when the question already needs ClickHouse SQL for a join or a
+log-body extraction (`SKILL.md`, **ClickHouse SQL**). Otherwise use
+`timeShift` as above. A wrong window bound gives a wrong count with no error.
+
+1. Set the request's `start` and `end` to span both windows, on whole
+   seconds. `$start_datetime` and `$end_datetime` drop fractions of a second.
+2. Give each window its own start-inclusive, end-exclusive bounds, as
+   offsets from a variable: `$end_datetime - INTERVAL 1 DAY` on traces,
+   `$end_timestamp_nano - 3600000000000` (one hour) on logs. A single split
+   point is correct only when the two windows touch. The windows must not
+   overlap; for overlapping windows, run one query per window.
+3. Keep only the rows inside one of the windows, in `WHERE`. A group seen
+   only in the gap between them would otherwise take a place under the
+   `LIMIT`.
+4. Aggregate each window with an `-If` function, such as `countIf`, `sumIf`,
+   or `quantileIf`.
+5. For a comparison per time bucket, group by the bucket's offset from the
+   start of its own window, so both values for the same offset share a row.
+   Send it as `requestType: "scalar"`: a `time_series` result needs a
+   timestamp column, and SigNoz drops the rows that have none.
+6. When a join pairs two rows that must fall in the same window, join on the
+   window as well as on the keys.
+7. Report both windows in absolute UTC.
+
 ## Other functions
 
 | Function | Args | What it does | Use it for |
@@ -110,7 +143,10 @@ Error logs in the last hour against the same hour last week, as the change per
 | `cumulativeSum` | none | Replaces each point with the sum of all points up to it. The total starts again with each window. | A running total of errors in the window. |
 | `ewma3`, `ewma5`, `ewma7` | optional alpha | Exponentially weighted average; the default alpha is 0.5, 0.333, or 0.25. A higher alpha follows the raw series more closely. | Smoothing a noisy trend. |
 | `median3`, `median5`, `median7` | none | Median of the 3, 5, or 7 points around each point. A spike that lasts one step disappears. | Removing one-step spikes from a trend. |
-| `fillZero` | none | Adds a zero at each step with no data. | Counts of sparse events, such as failed requests. |
+| `fillZero` | none needed; optional start, end, and step in milliseconds | Adds a zero at each step with no data, over the request window at the query's step unless the arguments say otherwise. | Counts of sparse events, such as failed requests. |
 | `absolute`, `log2`, `log10` | none | Transform each value. Zero and negative values have no logarithm. | Series with very different sizes on one chart. |
 
-`anomaly` is for anomaly alert rules; see `signoz-creating-alerts`.
+`anomaly` takes named arguments (`seasonality`, `z_score_threshold`) and
+returns predicted, bound, and score series. Read its example in
+`signoz://query-builder/examples` before using it in a query; for an anomaly
+alert rule, use `signoz-creating-alerts`.

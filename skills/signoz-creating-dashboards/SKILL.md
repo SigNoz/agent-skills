@@ -58,7 +58,7 @@ sensible defaults, but a few cannot be guessed:
 | Technology / domain (e.g. PostgreSQL, Redis, "payment pipeline") | yes | parse from intent; otherwise ask |
 | Confirmation to create (plus the modify-or-create choice when duplicates exist) | yes | ask the user (Step 2); still required with zero duplicates and under stated urgency |
 | Resource scope for custom builds (service / namespace / cluster) | yes for custom builds | discover via `signoz_get_field_keys` + `signoz_get_field_values`; fall back to a dashboard variable |
-| Specific metrics / signals for custom builds | inferred | derive from technology + MCP `signoz://dashboard/*` resources; surface in preview |
+| Specific metrics / signals for custom builds | inferred | derive from technology + the Step 3b-ii.3 guides; surface in preview |
 | Layout | inferred | apply defaults (see "Defaults" below) |
 
 If a required input is missing and cannot be discovered, **stop before
@@ -93,18 +93,24 @@ modify or create.
 
 ### Step 1: Check for duplicates
 
-Call `signoz_list_dashboards`. Most installs fit in the default
-page (`limit=50`); narrow with the `filter` argument when the wording is
-distinctive (see `signoz://dashboard/list-filter-guide`), and page by `offset`
-until you have covered `total`; the schema accepts
-integer or string `limit` / `offset` values.
-
-**Match by relevance** Compare each existing
-dashboard's lowercased `spec.display.name`, `.description`, and `tags` against the
-user's technology/domain. Surface only matches a human would recognize
-as the same thing: a "redis" dashboard does not match a "postgresql"
-request just because both have a `database` tag. Collect each match's
-`spec.display.name`, `id`, and `createdAt` for the next step.
+1. Call `signoz_list_dashboards`. When the wording is distinctive, narrow with
+   the `filter` argument; read `signoz://dashboard/list-filter-guide` before
+   writing a filter longer than one free-text word. If a filtered listing
+   returns nothing, list again without the filter, from offset 0.
+2. Cover the whole listing. Start at offset 0 and keep the same filter and
+   sort. While the result's `pagination.hasMore` is true, continue at
+   `pagination.nextOffset`; when it is false, stop. When the result has no
+   `pagination` object, raise `offset` by the number of dashboards the page
+   returned and stop once the offset reaches the reported `total`. Do not
+   raise `offset` by `limit`, because a page can hold fewer dashboards than
+   `limit`. If a page returns no dashboards before the offset reaches
+   `total`, tell the user the listing is incomplete.
+3. **Match by relevance** Compare each dashboard's lowercased
+   `spec.display.name`, `.description`, and `tags` against the user's
+   technology/domain. Surface only matches a human would recognize as the
+   same thing: a "redis" dashboard does not match a "postgresql" request just
+   because both have a `database` tag. Collect each match's
+   `spec.display.name`, `id`, and `createdAt` for the next step.
 
 ### Step 2: Ask the user (modify or create)
 
@@ -116,6 +122,9 @@ choice; that's an internal decision in Step 3b):
   these, (b) create a new dashboard anyway, or (c) stop?"
 - **No duplicates:** "I'll create a new dashboard for this. Proceed?"
   (No "modify" option when there's nothing to modify.)
+- **A match whose list row has `legacy: true`:** list it as a duplicate, say
+  that it is still in the v1 schema and that these tools cannot fetch or edit
+  it, and do not offer to modify it.
 
 Wait for the user's choice. "modify" → Step 3a. "create new" / confirm
 → Step 3b. "stop" → stop.
@@ -134,10 +143,11 @@ modification is out of scope. (See "Scope boundary" in Guardrails.)
 Run the template lookup first. The user has already agreed to create
 new; the lookup decides *how* we build it.
 
-Call `signoz_list_dashboard_templates` once with no arguments.
-The full catalog (~95 entries) returns in a single call; read it
-in-context and pick the best match for the user's intent. When several
-entries plausibly fit, present the top 3–5 and let the user choose.
+Call `signoz_list_dashboard_templates` with `searchText` set to the technology
+the user named; omit `searchText` only when the user asks what templates
+exist. If nothing matches, retry with fewer words before concluding there is
+no template. When several entries fit, present the top 3–5 and let the user
+choose.
 
 Branch on the result:
 - **Single clear template match**: proceed to Step 3b-i (template
@@ -161,13 +171,10 @@ Branch on the result:
 #### Step 3b-i: Import the template
 
 > **Tool guardrail** The only template tools are
-> `signoz_list_dashboard_templates` and
-> `signoz_import_dashboard`. Do not shell out, fetch raw GitHub
-> URLs, or invent other tool names.
-> `signoz_import_dashboard` takes the template `path` from the
-> catalog entry and creates the dashboard in one call, so you do not need
-> to fetch the JSON yourself or call `signoz_create_dashboard`
-> afterwards.
+> `signoz_list_dashboard_templates` and `signoz_import_dashboard`. Do not
+> shell out, fetch raw GitHub URLs, or invent other tool names. The import
+> creates the dashboard in one call: do not fetch the template JSON yourself
+> or call `signoz_create_dashboard` afterwards.
 
 ##### Step 3b-i.1: Pre-flight no-data probe (fail fast)
 
@@ -184,12 +191,11 @@ them; keep the total small:
 
 - **Metric-based templates** (most infra/runtime templates): call
   `signoz_list_metrics` with `searchText` set to the technology
-  prefix (e.g. `searchText="postgresql"`). Empty result → metric family
-  is not being ingested. *Early out:* if this returns empty, declare
-  "None present" and skip the rest of the metric probes; they will all
-  return zero. Use `timeRange` for a relative window, or pass
-  `start`/`end` (unix-ms strings) when you need an exact window instead
-  of the server default.
+  prefix (e.g. `searchText="postgresql"`). It lists the metrics active in
+  the window (default 1h), so an empty result means none were active then.
+  *Early out:* if it returns empty, declare "None present" and skip the rest
+  of the metric probes. Pass `timeRange`, or `start` and `end`, to probe a
+  different window.
 - **Trace-based templates** (APM-style): call
   `signoz_aggregate_traces` with `aggregations="count()"`,
   `timeRange=1h`. No filter is needed for the "is anything flowing"
@@ -214,9 +220,9 @@ Branch on the probe result:
   data" until ingestion is set up, and offer to create it anyway or
   stop. Wait for the user's choice.
 
-This probe is cheap (a handful of queries, ~hundreds of ms total), and
-catching the no-data case early avoids the worst UX failure mode of the
-template path.
+The probe shows which signals were active in its window. It cannot show that
+each template panel has data, because template bodies are not readable before
+import: report the names it found and do not claim per-panel coverage.
 
 ##### Step 3b-i.2: Preview, import, report
 
@@ -226,8 +232,6 @@ template path.
    mode the human can intervene.
 2. **Import** Call `signoz_import_dashboard` with the `path`
    from the chosen catalog entry (e.g. `postgresql/postgresql.json`).
-   The server fetches the JSON, validates it, and creates the dashboard
-   in one call.
 3. **Report** Read the response and tell the user the dashboard's
    title, panel count, and section breakdown. Surface the dashboard's
    variables ("filter by `service.name`", "filter by
@@ -272,9 +276,9 @@ data:
 
 1. **Metrics**: call `signoz_list_metrics` with `searchText`
    tied to the technology (e.g. `searchText="postgresql"`) to get the
-   *exact* OTel metric names. Catalog presence ≠ data flowing; for
-   any metric you intend to use, follow up with `signoz_query_metrics`
-   on a representative window to confirm it actually has datapoints.
+   *exact* OTel metric names. A listed metric was active in the window,
+   but not necessarily for your scope; for any metric you intend to use,
+   run `signoz_query_metrics` with the panel's filter to confirm datapoints.
 2. **Resource attributes**: call `signoz_get_field_keys` with
    `fieldContext=resource` for the relevant signal to enumerate
    available attributes; call `signoz_get_field_values` on the
@@ -291,72 +295,74 @@ or stop. Wait for the user's choice before building.
 
 ##### Step 3b-ii.3: Read the dashboard MCP resources
 
-These are the source of truth for the JSON schema, panel types, query
-builder shape, and layout rules; do not transcribe schema text into
-this skill, it will rot out of sync with the server. Read the core
-resources before authoring panel JSON.
+The MCP server owns the dashboard JSON shape, panel kinds, query shapes, and
+layout rules; do not author from memory or from schema text copied into this
+skill. Read these before authoring panel JSON:
 
-> **Fallback when the MCP resource-reader is unavailable** Some MCP
-> client harnesses do not expose a resource-reading tool. If you
-> cannot read `signoz://...` URIs in this session, fall back to
-> `signoz_list_dashboards` + `signoz_get_dashboard` on
-> an existing dashboard of the same signal type (metrics / traces /
-> logs) and read its `spec.panels` map for worked panel shapes.
+1. `signoz://dashboard/instructions`: title, tags, description, layout,
+   variables.
+2. `signoz://dashboard/widgets-instructions`: the panel kinds, when to use
+   each, which query kinds each accepts, legends, and the dry-run procedure.
+   Take the list of panel kinds from this guide, not from memory.
+3. `signoz://dashboard/widgets-examples`: one worked panel per common kind.
+4. `signoz://dashboard/examples`: whole create payloads with panels, layouts,
+   and variables assembled.
+5. The guides for each query language the panels use:
+   - Query Builder: `signoz://dashboard/query-builder-example`, plus the
+     signal's guide: `signoz://metrics-aggregation-guide` (valid
+     `timeAggregation` / `spaceAggregation` per metric type),
+     `signoz://traces/query-builder-guide`,
+     `signoz://logs/query-builder-guide`, or
+     `signoz://ai/query-builder-guide` for LLM and AI-agent telemetry.
+   - PromQL: `signoz://promql/instructions`. Grafana-only
+     `$__rate_interval` and `$__interval` are invalid in SigNoz.
+   - ClickHouse SQL on metrics:
+     `signoz://dashboard/clickhouse-schema-for-metrics` and
+     `signoz://dashboard/clickhouse-metrics-example`.
+   - ClickHouse SQL on traces:
+     `signoz://dashboard/clickhouse-schema-for-traces` and
+     `signoz://dashboard/clickhouse-traces-example`.
+   - ClickHouse SQL on logs: `signoz://dashboard/clickhouse-schema-for-logs`
+     and `signoz://dashboard/clickhouse-logs-example`.
 
-- `signoz://dashboard/instructions`: title, tags, description,
-  layout, variables.
-- `signoz://dashboard/widgets-instructions`: 7 panel types and layout
-  rules.
-- `signoz://dashboard/widgets-examples`: complete panel configs with
-  all required fields (the most important resource; every panel must
-  include `kind`, `spec.display`, `spec.plugin`, and exactly one query).
-- `signoz://dashboard/examples`: whole create payloads with panels,
-  layouts, and variables assembled.
-- `signoz://dashboard/query-builder-example`: query builder reference.
-
-Add signal-specific resources as needed:
-
-- Metrics (PromQL): `signoz://promql/instructions`.
-  Saved PromQL may reference declared dashboard `$var` variables, but
-  `signoz_execute_builder_query` does not expand them: substitute representative
-  literals only for dry-runs, never in saved panels. Grafana-only
-  `$__rate_interval` / `$__interval` are invalid. Dotted OTel metric names use
-  Prometheus 3.x UTF-8 selectors such as `{"metric.name.with.dots"}`.
-- Metrics (ClickHouse): `signoz://dashboard/clickhouse-schema-for-metrics`
-  + `signoz://dashboard/clickhouse-metrics-example`.
-- Metrics (Query Builder aggregation rules):
-  `signoz://metrics-aggregation-guide`: required for picking valid
-  `timeAggregation` / `spaceAggregation` per metric type.
-- Traces (Query Builder): `signoz://traces/query-builder-guide`.
-- Logs (Query Builder): `signoz://logs/query-builder-guide`.
-- Traces (ClickHouse): `signoz://dashboard/clickhouse-schema-for-traces`
-  + `signoz://dashboard/clickhouse-traces-example`.
-- Logs (ClickHouse): `signoz://dashboard/clickhouse-schema-for-logs`
-  + `signoz://dashboard/clickhouse-logs-example`.
+If this client cannot read `signoz://` resources, take field shapes and kind
+names from the `signoz_create_dashboard` input schema, and call
+`signoz_list_dashboards` then `signoz_get_dashboard` on an existing dashboard
+of the same signal type (metrics / traces / logs) to read worked panels from
+its `spec.panels` map.
 
 ##### Step 3b-ii.4: Build the dashboard JSON
 
-Follow the schema documented in the resources above. Use OTel
-semantic attribute names (not shorthand) in filters, groupBy, and
-variables. Apply the defaults below unless the user specified otherwise.
+Follow the `signoz_create_dashboard` input schema and the guides above for
+every kind name and field shape; do not carry over Grafana names such as
+`timeseries`. Use OTel semantic attribute names (not shorthand) in filters,
+groupBy, and variables. Apply the defaults below unless the user specified
+otherwise.
 
-Dashboard create/update payloads do not persist a default time range or
-refresh interval. Panels follow the viewer-selected global range. If the user
-asks for a specific window, mention that range in the final handoff instead of
-inventing `timeRange`, `defaultTimeRange`, or `refresh` fields. Do not encode a
-PromQL range selector inside a Builder query.
-
-Use SigNoz kinds and JSON types exactly. `signoz/TimeSeriesPanel` means time series
-(never Grafana `timeseries`); variables are `ListVariable` / `TextVariable` carrying a
-`signoz/DynamicVariable`, `signoz/CustomVariable`, or `signoz/QueryVariable` plugin.
-The envelope is `schemaVersion: "v6"` plus `spec`, with no top-level `name` on create;
-the server derives that immutable machine label from `spec.display.name`. Tags are
-`{key, value}` objects; defer full shapes to the resources.
-
-Keep panel ids and grid items bijective; create/remove both entries together.
-`spec.panels` is a map keyed by panel id, and `spec.layouts` positions those ids
-through `content.$ref`. During import or rebuild, drop any grid item whose
-`$ref` names a panel you did not carry over.
+- **Name** Leave the top-level `name` out on create; the server derives that
+  immutable label from `spec.display.name`.
+- **Default time range and refresh** `spec.duration` and
+  `spec.refreshInterval` store them. Set them when the user asks for a
+  default. Whether the UI applies them depends on the SigNoz version, so
+  read each field's description in the `signoz_create_dashboard` input
+  schema. When it says the UI does not apply the field, panels compute over
+  the range the viewer selects: tell the user in the handoff to select that
+  range in the UI.
+  Do not invent `timeRange`, `defaultTimeRange`, or `refresh` fields, and do
+  not encode a PromQL range selector inside a Builder query.
+- **Placement** Give every panel the user should see exactly one grid item.
+  SigNoz accepts a panel with no grid item and does not show it; the input
+  schema is authoritative here, although the layout checklist in
+  `signoz://dashboard/instructions` asks for one grid item per panel. SigNoz
+  rejects a grid item whose `$ref` names a missing panel, so when rebuilding
+  from another dashboard drop the grid items of panels you did not carry
+  over.
+- **Request panels** A panel that reports requests (request rate, request
+  count, request latency, or error rate), for one service or grouped by
+  service, counts entry spans. Add `isEntryPoint = true OR isRoot = true` to
+  the filter, in parentheses when you AND it with other conditions. Without
+  it the query counts every span, and so do the span metrics
+  `signoz_calls_total` and `signoz_latency`.
 
 **Defaults the skill applies (and surfaces in the preview):**
 
@@ -369,54 +375,47 @@ through `content.$ref`. During import or rebuild, drop any grid item whose
 | Counter render unit (rate vs. count) | per-second rate | per-interval **increase** count over a wider window (24h–7d) for any low-volume / bursty / human-paced counter (requests, **error counts**, restarts, OOM kills) where `/sec` renders as tiny decimals (e.g. `0.03/s`); gauges (CPU/mem/queue depth) are already absolute and unaffected; note `increase` rescales its y-axis with the selected range, so prefer it deliberately, not by reflex |
 | Variables (services) | `service.name`, `deployment.environment` (or `deployment.environment.name`; verify which exists via `signoz_get_field_keys`) | add `k8s.cluster.name` / `k8s.namespace.name` when k8s-flavored |
 | Variables (k8s/infra) | `k8s.cluster.name`, `k8s.namespace.name` (or `host.name` for hostmetrics) | drop `service.name`; it is rarely populated on infra signals |
-| Layout | 2-column grid (`width: 6`), 12 columns wide; every item has `0 <= x < 12`, `1 <= width <= 12`, `x + width <= 12` | full-width (`x: 0, width: 12`) for tables and time-series with many series |
+| Layout | 2-column grid (`width: 6`) | full-width (`x: 0, width: 12`) for tables and time-series with many series |
 | GroupBy on per-service panels | `service.name` resource attribute | drop when filtering to a single service |
 
-**Sections** A section is one Grid entry in `spec.layouts`, with its own
-`spec.display.title` and its own `spec.items`. One Grid per section, in display
-order; a panel belongs to a section by having its grid item in that Grid. Item
-coordinates are per-Grid, so adding to an earlier section leaves later
-sections untouched.
+**Sections** Use one Grid entry in `spec.layouts` per section, in display
+order, titled with the section name. Item coordinates restart in each Grid.
 
 **Title and description** The dashboard title (`spec.display.name`) should name the
 technology and the scope clearly: "PostgreSQL - prod-us-east-1", not
 just "PostgreSQL". `spec.display.description` should answer "what is this for" in one
-sentence. Tags are `{key, value}`: technology + signal types + environment when known.
+sentence. Tags: technology + signal types + environment when known.
 
 ##### Step 3b-ii.5: Shape check before save
 
-`signoz://dashboard/widgets-examples` is the source of truth for panel
-required fields, panel-type-specific shapes, plugin `kind` names, and
-common write-shape errors. Re-skim it before serialising any custom panel
-JSON.
+Check each panel against the `signoz_create_dashboard` input schema, which is
+authoritative for required fields and plugin `kind` names, and against the
+worked panel of the same kind in `signoz://dashboard/widgets-examples`. Send
+`spec`, `tags`, and everything inside them as native JSON objects and arrays,
+never as stringified JSON.
 
-Every builder query and formula entry, except a formula's base queries, must carry a
-positive `limit` and non-empty `order`. Raw list and trace-request panels default to 100 with timestamp-desc ordering
-(raw logs add id); a deliberately smaller list page may lower `limit`. Aggregate panels use 100 with
-the primary aggregation desc. Formula outputs use 100 with `__result desc`; every referenced base query carries no
-`limit` or `order`, because base limits apply before formula evaluation. Find those inputs from every formula expression, including
-formulas with `disabled: true`, following references until every base `builder_query` leaf is reached. This dependency
-walk chooses bounds only; it does not establish deterministic formula-to-formula evaluation order, so dry-run the
-complete composite payload. A metrics `order` key is the composed `spaceAggregation(timeAggregation(metricName))`
-expression; the bare metric name is rejected, while `__result` and groupBy keys are accepted.
-Time-series top-N ranks groups over the whole window and can omit a short-lived local spike.
-
-Two rules `widgets-examples` does not call out, but
-`signoz_create_dashboard` enforces: **no `JSON.stringify` on
-arrays/objects** (`spec`, `panels`, `layouts`, `tags`, and `variables`
-are native JSON) and **one query per panel**, so a panel plotting two
-series carries a single `signoz/CompositeQuery` envelope holding both.
+Bound each query on purpose. Follow the result-bounds rule in
+`signoz://dashboard/widgets-examples`, which the
+`signoz_execute_builder_query` input schema also states: a standalone query
+and a formula result carry a `limit` and an `order`, and a formula's base
+queries carry neither. A query that a formula with `disabled: true` reads is
+still a base query. The panel sections of
+`signoz://dashboard/widgets-instructions` override that rule for Top List
+(the limit is the row count) and Geo Map (no limit that drops places). Use
+the limit the user asked for, such as a top 5. On a time series the limit
+keeps the top groups ranked over the whole window, so a short-lived spike
+can fall outside it. Dry-run the complete composite payload.
 
 ##### Step 3b-ii.6: Dry-run before save (mandatory)
 
 For every query-bearing panel, follow "Dry-run a panel query" in
-`signoz://dashboard/widgets-instructions`.
-The panel already stores the execution spec, so lift it into the outer envelope
-and call `signoz_execute_builder_query` with that payload, never panel JSON.
-Dry-run over a short absolute Unix-ms window (usually the last 30-60 minutes),
-never the panel's display range by reflex; apply that section's empty-result and
-timeout rules before widening or retrying. Use representative variable
-values in the dry-run copy and keep `$var` in `signoz_create_dashboard`.
+`signoz://dashboard/widgets-instructions`; if that guide is unreadable, take
+the request shape from the `signoz_execute_builder_query` input schema.
+Send the panel's saved query spec, never the panel JSON. Dry-run over a short
+absolute Unix-ms window (usually the last 30-60 minutes), never the panel's
+display range by reflex; apply that section's empty-result and timeout rules
+before widening or retrying. Use representative variable values in the
+dry-run copy and keep `$var` in `signoz_create_dashboard`.
 
 If the executor cannot represent a saved field, report the
 panel as unvalidated and continue only after explicit user acceptance. Server or
@@ -451,8 +450,8 @@ accepted absent telemetry.
   builds. If missing, stop and ask the user (see *Required inputs*
   above). A guessed scope on a shared dashboard is harder to clean up
   than asking.
-- **Always paginate `signoz_list_dashboards`** Stopping at page
-  1 misses duplicates and produces clutter.
+- **Cover the whole `signoz_list_dashboards` listing** Follow the Step 1
+  paging rule; stopping at the first page misses duplicates.
 - **Duplicate check first** The user's only two upfront options are
   "modify an existing one" or "create a new one"; never offer
   template-import as a separate top-level choice.
@@ -479,12 +478,9 @@ accepted absent telemetry.
 - **No metric guessing** For custom builds, verify metric names with
   `signoz_list_metrics` before authoring. Wrong names produce
   empty panels and the user only finds out later.
-- **Valid JSON shapes only** Follow the schema documented in
-  `signoz://dashboard/*` MCP resources. Required panel and query
-  fields are listed in `signoz://dashboard/widgets-instructions` and
-  `signoz://dashboard/widgets-examples`. Never wrap arrays/objects in
-  `JSON.stringify`; enforce the panel/grid-item bijection, field types, and
-  plugin kinds from Step 3b-ii.4.
+- **Valid JSON shapes only** The `signoz_create_dashboard` input schema and
+  the Step 3b-ii.3 guides define the shape. Send native JSON, never
+  stringified arrays or objects.
 - **Scope boundary** This skill creates dashboards. The moment the
   user asks to modify, edit, rearrange, or extend an existing dashboard
   (including immediately after import), hand off to
