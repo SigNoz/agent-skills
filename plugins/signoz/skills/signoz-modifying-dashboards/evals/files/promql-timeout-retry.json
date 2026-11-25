@@ -17,7 +17,9 @@
         "data": {
           "id": "88888888-8888-4888-8888-888888888888",
           "name": "prometheus-overview-0f3a",
-          "tags": [{"key": "source", "value": "prometheus"}],
+          "schemaVersion": "v6",
+          "source": "user",
+          "tags": [{"key": "stack", "value": "prometheus"}],
           "spec": {
             "display": {"name": "Prometheus Overview", "description": "Prometheus scrape health"},
             "variables": [],

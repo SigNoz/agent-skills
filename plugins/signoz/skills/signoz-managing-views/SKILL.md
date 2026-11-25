@@ -96,48 +96,42 @@ Read both MCP resources by URI using your client's resource-read mechanism:
    handles field discovery, type checking, and live-data validation in one
    pass; adapting an example payload from `signoz://view/examples` or
    running a bare `signoz_search_traces` call skips the field-type
-   checks and service-name resolution that catch silent 400s before they
-   become permanent bad views. Skipping it means a malformed filter becomes
-   a saved view that must be deleted and recreated.
+   checks and service-name resolution that catch a bad filter before it
+   is saved. Skipping it means a malformed filter becomes a saved view that
+   needs a second update to repair.
    For a `meter` view, tell `signoz-generating-queries` it's a **Cost Meter**
    query (`source=meter`) so discovery hits the meter store, not the default one.
    Retain the exact `queries` array from its successful
-   `signoz_execute_builder_query` validation call, then translate it explicitly:
+   `signoz_execute_builder_query` validation call and copy
+   `query.compositeQuery.queries` unchanged into `spec.queries`. Leave the
+   rest of the execution envelope out of the saved spec (`schemaVersion`,
+   `start`, `end`, its `requestType`, `formatOptions`, `variables`), and do
+   not nest a `query` or `compositeQuery` object in it.
 
-   ```text
-   execution query.compositeQuery.queries
-     -> saved spec.queries
-   ```
-
-   Build the `spec` argument to `signoz_create_view` as
-   `{ "displayName": "<human label>", "panelType": "<list|graph|table|value|trace>",
-   "requestType": "<raw|time_series|scalar|trace>", "queries": <copied queries> }`,
-   adding `selectedFields` / `display` when the Explorer layout calls for them.
-   Copy the `queries` array losslessly, but do not copy the execution-only
-   envelope fields `schemaVersion`, `start`, `end`, `requestType` (the
-   execution envelope's), `formatOptions`, or `variables`; do not put a
-   `query` key or a `compositeQuery` object inside the saved spec. Choose
-   `panelType` and `requestType` from the saved-view intent rather than
-   inventing them from the execution envelope. Metrics and Cost Meter views
-   are always `panelType: "graph"` with `requestType: "time_series"`: those
-   Explorers run and draw only a time series, whatever the view stores.
-   Set the top-level `name` (a DNS-1123 label: lowercase letters, digits,
-   hyphens) or pass `generateName: true` to derive it from
-   `spec.displayName`. `schemaVersion` is always `"v2"`; the server fills it
-   in when omitted.
+   Take the remaining view and `spec` fields from the `signoz_create_view`
+   input schema and `signoz://view/instructions`. Choose `panelType` and
+   `requestType` for the Explorer the view opens in, not from the execution
+   envelope; this skill saves Metrics and Cost Meter views as
+   `panelType: "graph"` with `requestType: "time_series"`. For a list view,
+   send the columns in `selectedFields`: an empty array shows no trace
+   columns. Set the top-level `name` (a DNS-1123 label: lowercase letters,
+   digits, hyphens) or pass `generateName: true` to derive it from
+   `spec.displayName`.
    The copied queries must retain every positive `spec.limit` and v5
    `spec.order` entry losslessly. Never translate them to dashboard `orderBy`.
    Raw/list views use 100 rows (logs: timestamp/id desc; traces: timestamp
    desc); standalone aggregate views and formula results use 100 groups.
    Builder queries referenced by a formula carry neither `limit` nor `order`,
-   because a limit is applied before the formula runs. Order standalone queries
-   by the primary aggregation desc and formula results by `__result` desc.
+   because a limit is applied before the formula runs; this overrides the
+   "every builder_query" wording in `signoz://view/instructions`. Order a
+   standalone metrics query and a formula result by `__result` desc, and a
+   standalone log or trace aggregate by its primary aggregation desc.
    Time-series top-N ranks groups over the whole selected window and can omit
    a short-lived local spike.
    Preserve raw query entries exactly where the v2 resource permits them,
    including disabled flags and PromQL or SQL envelopes. On create, a PromQL
    or SQL envelope must come verbatim from the user or an existing view;
-   `signoz-generating-queries` does not author it, so validate it in Step 5.
+   do not compose one for a view, and validate it in Step 5.
 4. **Enforce the signal rule** in every `builder_query` spec. A mismatch
    saves without error, and the Explorer renders only views whose queries
    match its signal, so the view is unusable.
@@ -195,8 +189,9 @@ preserving an authored `search()` filter.
 
 `source` is optional on `signoz_list_views`. Pass it when the user names
 an Explorer. When the user did not specify one and is searching by name,
-call it once with `source` omitted: that single call lists every Explorer's
-views, so do not guess a source and do not fan out one call per source. Use
+run one listing with `source` omitted, following every page: that listing
+covers every Explorer's views, so do not guess a source and do not fan out
+one listing per source. Use
 the `name` parameter for server-side partial-match filtering when the user
 gives a substring; do not fetch everything and grep client-side. There is no
 `category` filter; it was removed with the v2 API.
@@ -222,7 +217,9 @@ whatever the user described from memory.
 wipes the unspecified fields. The machine `name` is immutable server-side;
 renaming a view means changing `spec.displayName`. The flow:
 
-1. `signoz_get_view` with the view's `id` → returns
+1. Read `signoz://view/instructions` and `signoz://view/examples` if this
+   conversation has not read them yet. Then `signoz_get_view` with the
+   view's `id` → returns
    `{ "status": "success", "data": { ...SavedView... } }`.
 2. Take the `data` object. Strip server-populated fields (`id`,
    `createdAt`, `createdBy`, `updatedAt`, `updatedBy`) and drop `name`; the

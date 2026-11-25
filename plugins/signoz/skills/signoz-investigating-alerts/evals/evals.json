@@ -12,8 +12,8 @@
         "History pagination never uses offset or page fullness as the continuation signal",
         "The rule incident is bounded by distinct overallStateChanged transitions, while group-specific transitions are partitioned by fingerprint and require stateChanged=true",
         "The agent never infers flapping by alternating rows from different fingerprints",
-        "Each Tier-2 signoz_execute_builder_query call has an outer query object with Unix-ms start/end, requestType=time_series, compositeQuery, formatOptions, variables, and stepInterval",
-        "Tier 1 preserves the stored positive bounds to reproduce the alert exactly; if a formula input carries a limit, the agent identifies pre-formula truncation risk and compares against that input with no limit before ruling groups out. New Tier-2 standalone/formula-result queries use 100 with v5 order rather than dashboard orderBy, and formula inputs carry no limit",
+        "Each Tier-2 signoz_execute_builder_query call has an outer query object with Unix-ms start/end, requestType=time_series, and compositeQuery; formatOptions and variables are optional",
+        "When the stored rule carries limit and order, Tier 1 keeps them and runs the stored query over the evaluation window that fired to see the subset the rule evaluated, because the top-N ranking covers the whole requested window; if a formula input carries a limit, the agent identifies pre-formula truncation risk and compares against that input with no limit before ruling groups out. New Tier-2 standalone/formula-result queries use 100 with v5 order rather than dashboard orderBy, and formula inputs carry no limit",
         "Trace drill-down groups by status_message rather than nonexistent error_message",
         "When drilling into a searched trace, signoz_get_trace_details receives the returned trace_id as traceId and no time window"
       ],
@@ -23,7 +23,7 @@
       "id": 1,
       "eval_name": "fuzzy-match-rca",
       "prompt": "I got paged about a checkout error rate alert, can you investigate the most recent fire?",
-      "expected_output": "Agent paginates signoz_list_alert_rules to resolve 'checkout error rate' (multiple candidates exist: 'checkout-svc Error Rate > 3%' METRIC_BASED + TRACES_BASED, plus eval-1 alerts). Uses each candidate's paginated 7d firing history in descending order, picks the TRACES_BASED rule whose history contains the fire near 14:32 UTC, states the assumption clearly, then runs full RCA on that fire window. Tier-2 baseline is prior-day same hour; flags if baseline data is sparse since fire is near the lookback boundary.",
+      "expected_output": "Agent lists signoz_list_alert_rules (filtered on the name, paging the matches to the end) to resolve 'checkout error rate' (multiple candidates exist: 'checkout-svc Error Rate > 3%' METRIC_BASED + TRACES_BASED, plus eval-1 alerts). Uses each candidate's paginated 7d firing history in descending order, picks the TRACES_BASED rule whose history contains the fire near 14:32 UTC, states the assumption clearly, then runs full RCA on that fire window. Tier-2 baseline is prior-day same hour; flags if baseline data is sparse since fire is near the lookback boundary.",
       "files": []
     },
     {

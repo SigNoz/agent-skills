@@ -24,18 +24,18 @@ log-volume groupBy, and anomaly detection.
    result, or calls it through `pagination.hasMore=false`; the user picks
    `slack-infra` and `pagerduty-oncall`. If none fits, it offers
    `signoz_create_notification_channel` with user-provided provider config.
-5. Builds JSON: `METRIC_BASED_ALERT`, `threshold_rule`,
-   `schemaVersion: "v2alpha1"`, `signal=metrics`, two thresholds named
-   `warning` and `critical` (`op="above"`, `matchType="on_average"`,
-   `targetUnit="percent"`), `compositeQuery.unit: "percentunit"` (the metric
-   is a 0 to 1 ratio), no `labels.severity` (each alert carries the severity
-   of the tier that fired), filter `service.name = 'checkout'`, an explicit
-   `evaluation` block (rolling, 5m window, 1m frequency),
-   `notificationSettings`, and `panelType: "graph"`. The builder query
-   carries no `limit` or `order`.
+5. Reads `signoz://alert/instructions` and `signoz://alert/examples` and
+   adapts the `metric_threshold_single` example: `METRIC_BASED_ALERT`,
+   `threshold_rule`, filter `service.name = 'checkout'`, two tiers named
+   `warning` and `critical` (`above`, `on_average`) with targets 80 and 90,
+   `targetUnit: "percent"`, and `compositeQuery.unit: "percentunit"` because
+   the metric is a 0 to 1 ratio. The query sets `timeAggregation` and
+   `spaceAggregation` explicitly and carries no `limit` or `order`. Each
+   fired alert carries the severity of its tier, so the rule needs no
+   `labels.severity` for that.
 6. Dry-run via `signoz_execute_builder_query` over last 1h, with the
    display bounds the query tool expects but the persisted rule omits:
-   returns data, would have fired 0 times (clean baseline).
+   returns data, 0 of the returned points breached (clean baseline).
 7. Emits a one-paragraph plain-language summary, no JSON dump.
 8. Calls `signoz_create_alert`. Reports created alert with ID, threshold
    summary, channel routing, and dry-run result.
@@ -51,19 +51,21 @@ log-volume groupBy, and anomaly detection.
 2. `signoz_get_field_keys fieldContext=resource signal=traces` confirms
    `service.name`. `signoz_get_field_values` confirms `payments` exists.
 3. No existing payments error-rate alert.
-4. Builds formula alert: query A counts spans with `has_error = true` for
-   `service.name = 'payments'`, query B counts all spans for the same
-   service, formula F1 = `A * 100 / B`, `selectedQueryName: "F1"`,
-   one threshold tier named `critical` with target 5,
-   `targetUnit: "percent"`, `op: "above"`, `matchType: "at_least_once"`
-   (catch any breach), `compositeQuery.unit: "percent"`, and no
-   `labels.severity`.
+4. Adapts the `traces_error_rate_formula` example to count requests: query
+   A counts entry spans with `has_error = true` (`service.name = 'payments'
+   AND has_error = true AND (isEntryPoint = true OR isRoot = true)`), query
+   B counts all entry spans for the same service, both `disabled: true`,
+   formula F1 = `A * 100 / B`, `selectedQueryName: "F1"`. One threshold tier
+   named `critical` with a bare target 5, `op: "above"`,
+   `matchType: "at_least_once"` (catch any breach), and
+   `compositeQuery.unit: "percent"`: the formula already emits percent, so
+   the tier sets no `targetUnit`.
 5. No channel was named, so it reuses a fully paginated same-operation
    `signoz_list_notification_channels` result, or calls it through
    `pagination.hasMore=false`; the user picks `slack-payments`. If none fits,
    it offers `signoz_create_notification_channel` with user-provided config.
-6. Dry-run on last 1h: payments error rate hovered around 0.3%, would have
-   fired 0 times. Clean, not too tight.
+6. Dry-run on last 1h: payments error rate hovered around 0.3%, 0 of the
+   returned points breached. Clean, not too tight.
 7. Preview states severity `critical` with the error-rate row as the reason.
    Save, report.
 
@@ -79,11 +81,9 @@ log-volume groupBy, and anomaly detection.
 2. `signoz_get_field_keys signal=logs fieldContext=resource` confirms
    `service.name` exists; **no service filter required** since the user
    said "any service" → groupBy provides the scoping.
-3. Builds: `LOGS_BASED_ALERT`, `signal=logs`,
-   `aggregations: [{expression: "count()"}]`,
-   `filter: {expression: "severity_text IN ('ERROR', 'FATAL')"}`,
-   `groupBy: [{name: "service.name", fieldContext: "resource", fieldDataType: "string"}]`,
-   threshold 1000, `targetUnit: ""`, `evalWindow: 1m0s`,
+3. Adapts the `logs_threshold` example: `LOGS_BASED_ALERT`, `count()` over
+   `severity_text IN ('ERROR', 'FATAL')`, grouped by the resource key
+   `service.name`, threshold 1000 with no `targetUnit`, `evalWindow: 1m0s`,
    `matchType: "at_least_once"` (catch any minute that breaches). No `limit`
    or `order` on the grouped query: with them SigNoz would evaluate only the
    top-N services and a quiet service that suddenly spikes could be ranked
@@ -92,8 +92,8 @@ log-volume groupBy, and anomaly detection.
    `signoz_list_notification_channels` result, or calls it through
    `pagination.hasMore=false`; the user picks a Slack channel. If none fits,
    it offers `signoz_create_notification_channel` with user-provided config.
-5. Dry-run: returned per-service counts, max in last 1h was 87, which would
-   have fired 0 times. The dry-run's display `limit` bounds how many services
+5. Dry-run: returned per-service counts, max in last 1h was 87, so 0 of the
+   returned points breached. The dry-run's display `limit` bounds how many services
    came back, so the preview states the count covers the returned services.
 6. Preview, save, report.
 
@@ -107,11 +107,10 @@ log-volume groupBy, and anomaly detection.
    `METRIC_BASED_ALERT` + `anomaly_rule`.
 2. `signoz_list_metrics searchText=duration` → finds
    `http.server.request.duration`.
-3. Builds a v2alpha1 anomaly rule: `schemaVersion: "v2alpha1"`,
-   `anomaly_rule`, `seasonality=daily`,
-   the anomaly function with `z_score_threshold: 3`, `evaluation` with a
-   rolling `evalWindow: "24h"` and `frequency: "3h"`, and
-   `notificationSettings`. One threshold tier named `warning`: `op:
+3. Adapts the `metric_anomaly` example: `anomaly_rule`,
+   `seasonality=daily`, the anomaly function with `z_score_threshold: 3`,
+   and a rolling `evalWindow: "24h"` with `frequency: "3h"`. One threshold
+   tier named `warning`: `op:
    "above"`, `target: 3` (3 standard deviations above the forecast),
    `matchType: "at_least_once"`, empty `targetUnit`. A request about drops
    would use `op: "below"` with `target: -3`, and one about either direction

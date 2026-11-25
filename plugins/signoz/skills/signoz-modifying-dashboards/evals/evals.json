@@ -150,8 +150,6 @@
         "Every Grid item satisfies 0 <= x < 12, 1 <= width <= 12, and x+width <= 12",
         "Every grid item satisfies 0 <= x < 12, 1 <= width <= 12, and x+width <= 12",
         "Existing Overview grid item remains at x:0, y:0, width:12, height:6",
-        "Existing Overview panel remains at x:0, y:0, w:12, h:6",
-        "New panel is placed at x:0 and y equals max(y+h) from the fetched layout before the new entry is added",
         "The new grid item is placed at x:0 and y equals max(y+height) in that Grid before the new item is added",
         "The new panel and its grid item are added in the same patch, with content.$ref pointing at the new panel id",
         "The new panel appears exactly once in spec.panels and exactly one Grid item references it",
@@ -164,7 +162,7 @@
       "id": 7,
       "eval_name": "target-dashboard-on-second-page",
       "prompt": "Add an error-rate panel to my 'Payments API' dashboard.",
-      "expected_output": "In an offline simulated tool trace using the attached fixture, the first signoz_list_dashboards page has no match but reports total=51 against a 50-row page. Agent raises offset to 50, finds Payments API, fetches it, and plans the new panel while preserving Request Rate.",
+      "expected_output": "In an offline simulated tool trace using the attached fixture, the first signoz_list_dashboards page returns 50 dashboards with no match and reports total=51. Agent raises offset by the 50 dashboards returned, finds Payments API, fetches it, and plans the new panel while preserving Request Rate.",
       "files": [
         "evals/files/target-on-second-page.json"
       ],
@@ -176,8 +174,7 @@
         "The modification plan preserves the fetched request-rate panel and its grid item",
         "The simulated trace invokes signoz_get_dashboard only for the second-page Payments API match",
         "The simulated trace invokes signoz_get_dashboard only for the second-page Payments API match, using its id",
-        "The simulated trace invokes signoz_list_dashboards again with offset equal to pagination.nextOffset using an accepted integer or string value",
-        "The simulated trace invokes signoz_list_dashboards again with offset=50, derived from total and the returned page length, using an accepted integer or string value"
+        "The simulated trace invokes signoz_list_dashboards again with offset=50, the first offset plus the 50 dashboards the first page returned, because the result has no pagination object and total is 51; the offset is an accepted integer or string value"
       ]
     },
     {
@@ -206,7 +203,7 @@
         "Agent does not call signoz_update_dashboard with a panel whose dry-run failed",
         "Agent does not ignore or downplay the dry-run error",
         "Agent either corrects and successfully re-runs the exact panel query or stops with the failure explained",
-        "Every attempted builder query stays explicitly bounded with a positive limit plus a non-empty order, even while another validation error blocks the dry-run"
+        "Every attempted standalone query and formula result stays explicitly bounded with a positive limit plus a non-empty order, and a formula's base queries carry neither, even while another validation error blocks the dry-run"
       ]
     },
     {
@@ -268,19 +265,19 @@
       "id": 12,
       "eval_name": "unsupported-default-range-and-refresh",
       "prompt": "Set my API Monitoring dashboard's default range to 7 days and auto-refresh it every 30 seconds.",
-      "expected_output": "Agent explains that dashboard payloads do not persist default time range or refresh settings and that panels follow the viewer-selected global range. It does not add timeRange, defaultTimeRange, or refresh fields and does not call a write tool.",
+      "expected_output": "Agent explains that spec.duration and spec.refreshInterval store a default time range and refresh interval, and reports whether the UI applies them as the signoz_update_dashboard input schema describes it. At MCP server v1.0.0 the schema says stored but not applied, so panels still follow the range and refresh the viewer selects. Its patch, prepared or applied, sets spec.duration to 7d and spec.refreshInterval to 30s and adds no timeRange, defaultTimeRange, or refresh fields.",
       "files": [],
       "expectations": [
-        "Agent does not call signoz_patch_dashboard or signoz_update_dashboard, and does not invent timeRange, defaultTimeRange, or refresh fields",
-        "Agent does not call signoz_update_dashboard or invent timeRange, defaultTimeRange, or refresh fields",
-        "Agent explains that time range and refresh are viewer controls rather than persisted dashboard fields"
+        "The prepared or applied patch sets /spec/duration to 7d and /spec/refreshInterval to 30s, and does not invent timeRange, defaultTimeRange, or refresh fields",
+        "Agent does not invent timeRange, defaultTimeRange, or refresh fields in any patch or update body",
+        "Agent tells the user whether the UI applies spec.duration and spec.refreshInterval, as the signoz_update_dashboard input schema describes it, and does not promise the dashboard opens on 7 days when the schema says the UI does not apply the field"
       ]
     },
     {
       "id": 13,
       "eval_name": "list-panel-execution-and-update-wrapper-contract",
       "prompt": "Using the attached offline fixture, change the Recent Errors list on Error Explorer to 25 rows and sort oldest first, then apply the update.",
-      "expected_output": "Agent fetches the dashboard, dry-runs the changed raw query, and applies the edit through the write path the skill mandates for a two-field change on one panel: signoz_patch_dashboard with ops targeting that query's limit and order. The saved query spec is the execution spec, so the dry-run sends the same limit and order it is about to persist. If a full replacement is used instead, the payload is flat: {id, schemaVersion, name, tags, spec} with the immutable name round-tripped verbatim and every GET-only field dropped: never nested under a 'dashboard' key.",
+      "expected_output": "Agent fetches the dashboard, dry-runs the changed raw query, and applies the edit through the write path the skill mandates for a two-field change on one panel: signoz_patch_dashboard with ops at or under that panel's query path, /spec/panels/recent-errors/spec/queries/0. The saved query spec is the execution spec, so the dry-run sends the same limit and order it is about to persist.",
       "files": [
         "evals/files/update-payload-contract.json"
       ],
@@ -288,15 +285,13 @@
         "Agent calls signoz_patch_dashboard, not signoz_update_dashboard, for this targeted edit",
         "Agent does not treat the fixture's filters, pageSize, orderBy, selectColumns, queryName, or dataSource fields as persistable v6 state",
         "Any described current query uses filter.expression, limit=25, canonical timestamp-asc order, and selectFields",
-        "If the agent falls back to signoz_update_dashboard, the payload is the fetched response's data object sent flat beside id (schemaVersion, name, tags, spec): never the {status, data} envelope or a 'dashboard' wrapper, name unchanged from the fetched value, and no createdAt/createdBy/updatedAt/updatedBy/orgId/legacy/source/webUrl",
         "No nested dashboard replacement is assembled from the legacy fixture",
         "No op targets /name, and no full spec object is resent",
         "No update is called until current v6 state is available and its changed query dry-run succeeds",
-        "The actual signoz_update_dashboard call, if full replacement is necessary, is flat {id,schemaVersion,name,tags,spec}; uuid and a nested dashboard field are absent",
         "The dry-run query spec contains none of filters, pageSize, orderBy, selectColumns, queryName, or dataSource",
         "The legacy fixture's widget-only fields are not copied into a v6 replacement",
         "The ops set limit to 25 and order to [{key:{name:'timestamp'},direction:'asc'}]",
-        "The patch payload is {id, patch: [...]} where every path is a JSON Pointer under /spec/panels/recent-errors/spec/queries/0",
+        "The patch payload is {id, patch: [...]} where every path is /spec/panels/recent-errors/spec/queries/0 or a JSON Pointer under it",
         "The signoz_execute_builder_query call uses requestType='raw' with limit=25 and the same ascending timestamp order",
         "The write is called only after the dry-run succeeds"
       ]
@@ -338,10 +333,10 @@
       "id": 16,
       "eval_name": "indirect-full-replacement-preserves-authored-state",
       "prompt": "Update the dashboard description and keep everything else exactly as it is. The patch tool is unavailable.",
-      "expected_output": "Agent gets the complete source=user dashboard once, changes only spec.display.description, strips server-populated fields, preserves immutable name and all authored spec/tags, and calls signoz_update_dashboard with flat {id,schemaVersion,name,tags,spec}.",
+      "expected_output": "Agent gets the complete source=user dashboard once, changes only spec.display.description, strips server-populated fields, preserves immutable name and all authored spec/tags, and calls signoz_update_dashboard with the fetched body flat beside id: schemaVersion, name, tags, spec, and image when the dashboard has one.",
       "files": [],
       "expectations": [
-        "Update uses flat canonical {id,schemaVersion,name,tags,spec}; nested dashboard and uuid are absent",
+        "Update sends the authored fields flat beside id (schemaVersion, name, tags, spec, and image when the fetched dashboard has one); nested dashboard and uuid are absent",
         "Immutable machine name and every unrelated authored panel, layout, variable, link, tag, and display field are preserved",
         "The canonical id is retained while timestamps, creator/updater, org metadata, locked, source, and webUrl are omitted",
         "Prepared reads and authorization are reused rather than repeated"
