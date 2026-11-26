@@ -1,0 +1,56 @@
+{
+  "mode": "offline_mcp_fixture",
+  "instructions": "Use these responses to answer offline. Do not query a live tenant. The MCP server supports source=\"audit\" on the log tools. Both calls succeeded.",
+  "responses": [
+    {
+      "tool": "signoz_search_logs",
+      "request": {
+        "source": "audit",
+        "filter": "signoz.resource.kind = 'rule'",
+        "timeRange": "1h",
+        "limit": 100
+      },
+      "response": {
+        "data": {
+          "rows": null
+        },
+        "note": "note: returned 0 rows (limit 100); all matching results returned (hasMore=false). note: an empty or all-zero audit result can also mean this SigNoz does not record audit events (it is too old, or audit logging is not enabled), so do not read it as proof that nothing happened."
+      }
+    },
+    {
+      "tool": "signoz_aggregate_logs",
+      "request": {
+        "source": "audit",
+        "aggregations": "count()",
+        "timeRange": "30d"
+      },
+      "response": {
+        "status": "success",
+        "data": {
+          "type": "scalar",
+          "data": {
+            "results": [
+              {
+                "queryName": "A",
+                "columns": [
+                  {
+                    "name": "__result_0",
+                    "queryName": "A",
+                    "aggregationIndex": 0,
+                    "columnType": "aggregation"
+                  }
+                ],
+                "data": [
+                  [
+                    0
+                  ]
+                ]
+              }
+            ]
+          }
+        },
+        "note": "note: an empty or all-zero audit result can also mean this SigNoz does not record audit events (it is too old, or audit logging is not enabled), so do not read it as proof that nothing happened."
+      }
+    }
+  ]
+}

@@ -9,7 +9,7 @@ description: >
   the payment endpoint", "find slow traces", "errors in the last hour",
   "which agent runs cost the most", "LLM token usage by model",
   "LLM calls from agent runs with many tool calls", "why does AI
-  Observability show no data",
+  Observability show no data", "who deleted the checkout dashboard",
   or otherwise asks an exploratory question that needs live observability
   data, even if they don't say "query" or "search" explicitly.
 ---
@@ -55,6 +55,7 @@ Map the user's intent to the right signal:
 | Ingestion volume (bytes or count), cost, or billing usage | **metrics** with `source=meter` (Cost Meter) | `signoz.meter.*` ingestion metrics (logs/spans/datapoints by count **and** bytes) live only in the meter store; bytes are unavailable on the raw signals. Dollar **cost is not a metric**; derive it from volume × per-unit price (see Step 2). groupBy/filter work like a normal metric, but only over the limited attribute set the meter retains (not arbitrary log/trace fields). For a *count* sliced by an attribute the meter doesn't carry, aggregate logs/traces directly instead. |
 | LLM or AI-agent cost, tokens, models, or tool calls | **traces** (`gen_ai.*` span attributes) | See `references/ai-queries.md`. LLM token cost is a trace attribute, not SigNoz ingestion cost; never answer it from the Cost Meter. |
 | "How many X per Y" (count/rate grouped by dimension) | **traces** or **logs** (aggregate) | Use `signoz_aggregate_traces` or `signoz_aggregate_logs` for grouped counts. |
+| Who created, changed, or deleted a SigNoz dashboard, alert rule, view, channel, user, or role | **logs** with `source: "audit"` | SigNoz audit events. See `references/audit-queries.md`. |
 
 Traces have no unqualified full-text search; use `CONTAINS` against a discovered
 structured trace field. `searchText` convenience search is logs-only.
@@ -121,6 +122,11 @@ and values also require a non-empty discovered `name`.
 An unknown filter key usually returns no rows plus a `key ... not found in
 metadata` warning instead of an error. That means the key is absent: rerun
 discovery and retry with a returned key; never report "nothing matched".
+
+Audit events (`source: "audit"`) are the exception to the discovery rules in
+this step. Field discovery does not list their fields, so take each name
+from the audit section of `signoz://logs/query-builder-guide`, and check a
+key SigNoz reports as not found against that section.
 
 ### Step 3: Choose the right tool and read its guide
 
@@ -214,6 +220,9 @@ first query about LLM calls or AI-agent runs. It covers when to set
 aggregation rules SigNoz enforces, and checking attribute mappings when AI
 Observability shows no data.
 
+**Change history:** read `references/audit-queries.md` before the first
+query about who created, changed, or deleted something in SigNoz.
+
 **Comparing windows and shaping a series:** read `references/functions.md`
 when the user compares a window with an earlier one (week over week, day over
 day, before and after a deploy), or asks for a smoothed series, zeros for
@@ -224,13 +233,14 @@ missing steps, capped spikes, the change per step, or a running total.
 - `signoz_search_logs` accepts `filter`; the former `query` alias is
   rejected.
 - `searchText` matches only the log body unless `searchScope` says
-  otherwise. When a body search returns nothing and the text could be an
-  attribute value (an ID, an error message), rerun it with
+  otherwise. When a body search of application logs returns nothing and the
+  text could be an attribute value (an ID, an error message), rerun it with
   `searchScope: "attribute"` or `"all"` before reporting no match. Those
   scopes scan more, so narrow the time range or add a `service` filter if
   SigNoz rejects the query. When you know which key holds the text, filter
   on it instead (`attribute.<key> CONTAINS 'text'`).
-- For explicit cross-field search, use `filter: "search('timeout')"`.
+- For explicit cross-field search of application logs, use
+  `filter: "search('timeout')"`.
   The `search()` scopes documented by `signoz://logs/query-builder-guide`
   support body, attribute, resource, log, or their allowed combinations.
   Unscoped `search()` means all supported log fields; enumerate scopes when
@@ -376,6 +386,9 @@ beyond it:
 An empty AI result is "no AI traces matched", not "no LLM calls"; check the
 attribute mappings as `references/ai-queries.md` describes.
 
+**Audit results.** An empty audit result does not show that nobody made a
+change; report it as `references/audit-queries.md` describes.
+
 **Drill-down:**
 - If an aggregation reveals an interesting pattern (spike, outlier service),
   offer to drill into individual traces or logs for that scope.
@@ -385,7 +398,8 @@ attribute mappings as `references/ai-queries.md` describes.
 ## Guardrails
 
 - **Discovery first**: Never guess metric, field, or service names. A field is
-  confirmed only by live output for the same signal in this conversation.
+  confirmed only by live output for the same signal in this conversation,
+  except audit fields (Step 2).
 - **Supply required parameters**: Never invoke tools hoping they auto-discover.
   `signoz_aggregate_*` requires `aggregations`; `signoz_query_metrics` requires a
   `metricName` from `signoz_list_metrics`; `signoz_get_trace_details` requires a
@@ -424,7 +438,7 @@ attribute mappings as `references/ai-queries.md` describes.
   `apply_filter` when the user's primary intent is to obtain a runnable query,
   not when the user is asking a one-shot data question that the analysis text
   already answers. For a Cost Meter query keep `signal: metrics` and ensure the
-  copied query spec carries `source: meter`.
+  copied query spec carries `source: meter`. Never emit it for an audit query.
 
 ## Examples
 
