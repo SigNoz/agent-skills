@@ -12,9 +12,9 @@
       },
       "response": {
         "data": {
-          "rows": []
+          "rows": null
         },
-        "note": "note: returned 0 rows (limit 100); all matching results returned (hasMore=false)."
+        "note": "note: returned 0 rows (limit 100); all matching results returned (hasMore=false). note: an empty or all-zero audit result can also mean this SigNoz does not record audit events (it is too old, or audit logging is not enabled), so do not read it as proof that nothing happened."
       }
     },
     {
@@ -34,7 +34,7 @@
                 "queryName": "A",
                 "columns": [
                   {
-                    "name": "count()",
+                    "name": "__result_0",
                     "queryName": "A",
                     "aggregationIndex": 0,
                     "columnType": "aggregation"
@@ -48,7 +48,8 @@
               }
             ]
           }
-        }
+        },
+        "note": "note: an empty or all-zero audit result can also mean this SigNoz does not record audit events (it is too old, or audit logging is not enabled), so do not read it as proof that nothing happened."
       }
     }
   ]

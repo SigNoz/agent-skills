@@ -123,6 +123,11 @@ An unknown filter key usually returns no rows plus a `key ... not found in
 metadata` warning instead of an error. That means the key is absent: rerun
 discovery and retry with a returned key; never report "nothing matched".
 
+Audit events (`source: "audit"`) are the exception to the discovery rules in
+this step. Field discovery does not list their fields, so take each name
+from the audit section of `signoz://logs/query-builder-guide`, and check a
+key SigNoz reports as not found against that section.
+
 ### Step 3: Choose the right tool and read its guide
 
 **Use the simplest tool that answers the question:**
@@ -228,13 +233,14 @@ missing steps, capped spikes, the change per step, or a running total.
 - `signoz_search_logs` accepts `filter`; the former `query` alias is
   rejected.
 - `searchText` matches only the log body unless `searchScope` says
-  otherwise. When a body search returns nothing and the text could be an
-  attribute value (an ID, an error message), rerun it with
+  otherwise. When a body search of application logs returns nothing and the
+  text could be an attribute value (an ID, an error message), rerun it with
   `searchScope: "attribute"` or `"all"` before reporting no match. Those
   scopes scan more, so narrow the time range or add a `service` filter if
   SigNoz rejects the query. When you know which key holds the text, filter
   on it instead (`attribute.<key> CONTAINS 'text'`).
-- For explicit cross-field search, use `filter: "search('timeout')"`.
+- For explicit cross-field search of application logs, use
+  `filter: "search('timeout')"`.
   The `search()` scopes documented by `signoz://logs/query-builder-guide`
   support body, attribute, resource, log, or their allowed combinations.
   Unscoped `search()` means all supported log fields; enumerate scopes when
@@ -380,6 +386,9 @@ beyond it:
 An empty AI result is "no AI traces matched", not "no LLM calls"; check the
 attribute mappings as `references/ai-queries.md` describes.
 
+**Audit results.** An empty audit result does not show that nobody made a
+change; report it as `references/audit-queries.md` describes.
+
 **Drill-down:**
 - If an aggregation reveals an interesting pattern (spike, outlier service),
   offer to drill into individual traces or logs for that scope.
@@ -389,7 +398,8 @@ attribute mappings as `references/ai-queries.md` describes.
 ## Guardrails
 
 - **Discovery first**: Never guess metric, field, or service names. A field is
-  confirmed only by live output for the same signal in this conversation.
+  confirmed only by live output for the same signal in this conversation,
+  except audit fields (Step 2).
 - **Supply required parameters**: Never invoke tools hoping they auto-discover.
   `signoz_aggregate_*` requires `aggregations`; `signoz_query_metrics` requires a
   `metricName` from `signoz_list_metrics`; `signoz_get_trace_details` requires a

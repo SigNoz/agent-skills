@@ -264,7 +264,8 @@
         "Calls signoz_search_logs with source audit",
         "Filters on signoz.resource.kind = 'dashboard' and signoz.audit.verb = 'delete'",
         "Does not pass the service parameter",
-        "Names the principal who deleted each matching dashboard, from the row's body or signoz.principal.email",
+        "Uses a time range covering yesterday",
+        "Names the principal of each successful deletion in the results, from the row's body or signoz.principal.email, and reports any failed attempt as an attempt",
         "Says the audit event records the dashboard id but not its name, rather than claiming one deletion was the checkout dashboard",
         "Does not emit an apply_filter action"
       ],
@@ -273,14 +274,15 @@
     {
       "id": 21,
       "eval_name": "audit-alert-rule-changes-by-user",
-      "prompt": "Which users changed alert rules this week?",
-      "expected_output": "Agent calls signoz_aggregate_logs with source audit and aggregations count(), filtered on signoz.resource.kind = 'rule', grouped by signoz.principal.email, over a window covering the past week. It does not call signoz_get_field_values for audit fields. It lists the users with their change counts and reports failed change attempts separately from successful changes when the results include them.",
+      "prompt": "Which users changed alert rules in the last 7 days?",
+      "expected_output": "Agent calls signoz_aggregate_logs with source audit and aggregations count(), filtered on signoz.resource.kind = 'rule', grouped by signoz.principal.email, over the last 7 days. It keeps failed attempts out of the change counts, either by adding signoz.audit.outcome = 'success' to the filter or by also grouping by signoz.audit.outcome. It does not call signoz_get_field_keys or signoz_get_field_values for audit fields. It lists the users with their counts of changes that applied, and reports failed attempts separately if it reports them.",
       "expectations": [
         "Calls signoz_aggregate_logs with source audit",
         "Filters on signoz.resource.kind = 'rule'",
         "Groups by signoz.principal.email",
-        "Uses a time range covering the past week, such as 7d",
-        "Does not call signoz_get_field_values for an audit field",
+        "Uses a 7-day time range, such as timeRange 7d",
+        "Filters on signoz.audit.outcome = 'success' or also groups by signoz.audit.outcome",
+        "Does not call signoz_get_field_keys or signoz_get_field_values for an audit field",
         "Does not present failed change attempts (signoz.audit.outcome = failure) as successful changes"
       ],
       "files": []
@@ -289,11 +291,11 @@
       "id": 22,
       "eval_name": "audit-empty-result-probe",
       "prompt": "Using the attached offline SigNoz responses, did anyone change our alert rules in the last hour?",
-      "expected_output": "Agent uses the fixture without querying a live tenant. After the empty audit search, it runs the 30-day count() probe on signoz_aggregate_logs with source audit. Because the probe returns 0, it reports that no audit events were recorded in this workspace in the last 30 days, and gives both explanations as possibilities: no one made a change in that time, or audit logging is not available in this workspace (it needs an active license). It does not state either cause as fact.",
+      "expected_output": "Agent uses the fixture without querying a live tenant. The fixture holds the empty audit search and the 30-day count() probe that follows it. Because the probe returns 0, it reports that it found no audit events in this workspace for the last 30 days, and gives both explanations as possibilities: no one made a change in that time, or this SigNoz does not record audit events (it is too old, audit logging is not enabled, or it has no active license). It does not state any cause as fact.",
       "expectations": [
-        "Runs signoz_aggregate_logs with source audit, aggregations count(), and a 30-day time range after the empty search",
-        "Reports that no audit events were recorded in the workspace in the last 30 days",
-        "Gives both possibilities: no changes were made, or audit logging is not available here",
+        "Makes no live SigNoz tool call",
+        "Reports that the 30-day probe found no audit events in the workspace",
+        "Gives both possibilities: no changes were made, or this SigNoz does not record audit events",
         "Does not state as fact that nobody changed the alert rules",
         "Does not state as fact that the workspace lacks a license"
       ],
