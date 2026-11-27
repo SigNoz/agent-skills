@@ -153,7 +153,7 @@ not "what changed". Run a single fire-window query for each:
 - `signoz_search_logs` with the resource filter +
   `severity_text IN ('ERROR', 'FATAL')`. Cap at 20 most recent. Group
   by message pattern (or `exception.type`) and surface the top 3.
-- For deep drill on one trace, pass the search row's `trace_id` to
-  `signoz_get_trace_details` as `traceId`, with no time window. Use its
-  span attributes (DB statement, peer service, status code) when the
-  operation name alone doesn't identify the failing call.
+- For deep drill on one trace, pass the search row's `trace_id` as `traceId`
+  and its `span_id` as `spanId` to `signoz_get_trace_details`, with no time
+  window. Use the span's attributes (DB statement, peer service, status code)
+  when the operation name alone doesn't identify the failing call.
