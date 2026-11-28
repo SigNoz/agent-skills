@@ -56,8 +56,9 @@ USD estimate.
 ## Missing AI data: attribute mappings
 
 1. List the saved mapping groups with `signoz_list_ai_attribute_mappings`.
-2. Take an LLM span's attributes from `signoz_get_trace_details` on one of
-   the app's traces and pass them to `signoz_test_ai_attribute_mapping`. A
+2. Take an LLM span's attributes from `signoz_get_trace_details`, called with
+   the `traceId` and `spanId` of a span row from `signoz_search_traces`, and
+   pass them to `signoz_test_ai_attribute_mapping`. A
    span that gains `gen_ai.request.model` is mapped; otherwise its keys show
    what the saved groups miss.
 3. To check a fix, pass a draft group in `groups` with `enabled: true`.

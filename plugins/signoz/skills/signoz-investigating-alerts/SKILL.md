@@ -215,9 +215,9 @@ specific failing operations.
      `service.name = <scope>` AND `has_error = true`. Cap at top 20.
    - Group by `name` and `status_message`. Surface the sample's top 3 with one
      trace ID each; do not call a 20-row sample count full-window frequency.
-   - Optionally call `signoz_get_trace_details` for span attributes. Pass the
-     search row's `trace_id` as `traceId`; the tool takes no time window,
-     because SigNoz locates the trace by its ID.
+   - Optionally open a failing span with `signoz_get_trace_details`: pass the
+     row's `trace_id` as `traceId` and its `span_id` as `spanId`, which returns
+     the span's attributes. The tool takes no time window.
 2. **Logs** for the fire window:
    - Call `signoz_search_logs` with filter:
      `<scope_filter>` AND `severity_text IN ('ERROR', 'FATAL')`. Cap

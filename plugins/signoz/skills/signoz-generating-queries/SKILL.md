@@ -392,8 +392,8 @@ change; report it as `references/audit-queries.md` describes.
 **Drill-down:**
 - If an aggregation reveals an interesting pattern (spike, outlier service),
   offer to drill into individual traces or logs for that scope.
-- If a trace search returns interesting spans, offer to fetch that trace
-  via `signoz_get_trace_details`.
+- If a trace search returns interesting spans, offer to open one with
+  `signoz_get_trace_details`, passing the row's `trace_id` and `span_id`.
 
 ## Guardrails
 
